@@ -2,6 +2,14 @@
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import PredefinedSplit
+import src
+
+def lookup_ticker(ticker, year):
+    '''Returns descriptive data for a given ticker in a given year'''
+    data = src.loader.load_descriptive().reset_index().set_index('ticker')
+    data = data[(data.namedt.dt.year <= year) & (data.nameendt.dt.year >= year)]
+    data = data.loc[ticker]
+    return data
 
 
 
@@ -39,3 +47,5 @@ def map_column_to_ticker(df_timeseries, df_descriptive):
     permno_to_ticker = {str(int(k)): v for (k, v) in zip(df_descriptive.permno, df_descriptive.ticker)}
     column_to_ticker = {i: permno_to_ticker[k] for i, k in enumerate(column_to_permno.values())}
     return column_to_ticker
+
+

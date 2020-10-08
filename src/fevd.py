@@ -1,5 +1,6 @@
 import numpy as np
 import scipy as sp
+import networkx as nx
 
 
 class FEVD:
@@ -222,6 +223,8 @@ class FEVD:
     
     def to_graph(self, horizon=1):
         '''Returns a networkx Graph object from decompose_pct(horizon).'''
-        from networkx.convert_matrix import from_numpy_array
-        graph = from_numpy_array(self.decompose_pct(horizon=horizon))
+        #from nx.convert_matrix import from_numpy_array
+        graph = nx.convert_matrix.from_numpy_array(\
+                            self.decompose_pct(horizon=horizon),\
+                            create_using=nx.DiGraph)
         return graph

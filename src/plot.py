@@ -6,19 +6,17 @@ import networkx as nx
 import src.utils
 
 
-def corr_heatmap(data, title='Correlation'):
+def corr_heatmap(data, title='Correlation', vmin=-1, vmax=1, cmap='seismic'):
     '''Plots a numpy array or pandas dataframe as a heatmap.'''
     if type(data) == pd.DataFrame:
         data = data.values    
     f = plt.figure(figsize=(12, 10))
-    plt.matshow(data, fignum=f.number, cmap='coolwarm')
+    plt.matshow(data, fignum=f.number, cmap=cmap, vmin=vmin, vmax=vmax)
     cb = plt.colorbar()
     cb.ax.tick_params(labelsize=14)
-    plt.title(title, fontsize=16)
-    
-    
+    plt.title(title, fontsize=16)    
 
-def cv_contour(cv, levels=12):
+def cv_contour(cv, levels=12, logy=False):
     '''Creates a countour plot from cross-validation
     for hyperparamter search.
     '''
@@ -45,26 +43,33 @@ def cv_contour(cv, levels=12):
     # labels & legend
     ax.set_xlabel('$\kappa$ (0=ridge, 1=LASSO)')#x_name)
     ax.set_ylabel('$\lambda$ (0=OLS)')#y_name)
-    ax.legend(loc='upper left')
+    ax.legend()#loc='upper left')
     cb.set_label('Cross-validation MSE', rotation=90)
+    if logy:
+        ax.set_yscale('log')
     
     # limits
     ax.set_xlim([min(x_values), max(x_values)])
     ax.set_ylim([min(y_values), max(y_values)])
     
     
-def network_graph(graph, name_mapping=None):
+def network_graph(graph, name_mapping=None, **kwargs):
     ''''''
     # relabel
     if name_mapping is not None:
         graph = nx.relabel_nodes(graph, name_mapping)
     
+    # line weights
+    weights = [graph[i][j]['weight']*5 for i,j in graph.edges()]
+    
     #plot
-    options = {"node_color": "blue",
-           'edge_color': 'grey',
-           "node_size": 0,
-           "linewidths": 0,
-           "width": 0.1,
-           'with_labels': True
-          }
-    nx.draw(graph, **options)
+    options = {'node_color': 'white',
+               'edge_color': 'grey',
+               'node_size': 0,
+               'linewidths': 0,
+               'with_labels': True,
+               'width': weights,
+               'font_weight': 'bold',
+               'arrows': False,
+              }
+    nx.draw(graph, **options, **kwargs)
