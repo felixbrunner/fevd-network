@@ -33,6 +33,13 @@ def make_cv_splitter(n_splits, n_series, t_periods):
     return splitter
 
 
+def autocorrcoef(X, lag=1):
+    '''Returns the autocorrelation matrix with input number of lags.'''
+    N = X.shape[1]
+    autocorr = np.corrcoef(X[lag:], X.shift(lag)[lag:], rowvar=False)[N:, :N]
+    return autocorr
+
+
 def cov_to_corr(cov):
     '''Returns a correlation matrix corresponding to the input covariance matrix'''
     stds = np.sqrt(np.diag(cov)).reshape(-1, 1)
@@ -49,3 +56,31 @@ def map_column_to_ticker(df_timeseries, df_descriptive):
     return column_to_ticker
 
 
+def log_replace(df, method='mean', logs=True, **kwargs):
+    '''Takes logarithms of input DataFrame and fills missing
+    values with an input fill method.
+    '''
+    df_full = df.copy()
+    
+    # logarithms
+    if logs:
+        df_full = np.log(df_full)
+    
+    # fill missing
+    if method == 'mean':
+        df_full = df_full.fillna(df_full.mean())
+    elif method == 'interpolate':
+        df_full = df_full.interpolate()
+    elif method == 'interpolate':
+        df_full = df_full.ffill(**kwargs)
+    elif method == 'min':
+        df_full = df_full.fillna(value=df_full.min())
+    df_full.fillna(0)
+    return df_full
+
+def matrix_asymmetry(M):
+    '''Returns a (self-built) measure of matrix asymmetry.'''
+    M_s = (M+M.T)/2 # symmetric_part
+    M_a = (M-M.T)/2 # asymmetric_part
+    asymmetry = np.linalg.norm(M_a) / np.linalg.norm(M_s)
+    return asymmetry

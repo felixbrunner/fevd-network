@@ -132,42 +132,63 @@ class FEVD:
             
         fev_all = np.diag(fev_all).reshape(-1, 1)
         return fev_all
+    
+    def fu_single(self, horizon):
+        '''Returns the h-step ahead forecast uncertainty matrix 
+        to generalized impulses to each variable in isolation
+        '''
+        fu_single = self.fev_single(horizon)**0.5
+        return fu_single
+    
+    def fu_all(self, horizon=1):
+        '''Returns the h-step ahead forecast uncertainty to
+        a generalised impulse to all variables.
+        '''
+        fu_all = self.fev_all(horizon)**0.5
+        return fu_all
 
-    def decompose(self, horizon):
+    def decompose_fev(self, horizon, normalise=False):
         '''Returns the forecast MSE decomposition matrix at input horizon.
         '''
         assert type(horizon) == int and horizon >= 0, \
             'horizon needs to be a positive integer'
         
         decomposition = self.fev_single(horizon) / self.fev_all(horizon)
+        
+        # row normalise if requested
+        if normalise:
+            decomposition /= decomposition.sum(axis=1).reshape(-1,1)
         return decomposition
     
-    def decompose_pct(self, horizon):
-        '''Returns the percentage forecast MSE decomposition matrix at input horizon.
+    def decompose_fu(self, horizon, normalise=False):
+        '''Returns the forecast MSE decomposition matrix at input horizon.
         '''
         assert type(horizon) == int and horizon >= 0, \
             'horizon needs to be a positive integer'
         
-        decomposition = self.decompose(horizon)
-        decomposition_pct = decomposition / decomposition.sum(axis=1).reshape(-1,1)
-        return decomposition_pct
+        decomposition = self.fu_single(horizon) / self.fu_all(horizon)
+        
+        # row normalise if requested
+        if normalise:
+            decomposition /= decomposition.sum(axis=1).reshape(-1,1)
+        return decomposition
     
-    def in_connectedness(self, horizon):
+    def in_connectedness(self, horizon, normalise=False):
         ''''''
         assert type(horizon) == int and horizon >= 0, \
             'horizon needs to be a positive integer'
     
-        decomposition_pct = self.decompose_pct(horizon)
+        decomposition_pct = self.decompose_fev(horizon, normalise=normalise)
         in_connectedness = decomposition_pct.sum(axis=1) - np.diag(decomposition_pct)
         in_connectedness = in_connectedness.reshape(-1, 1)
         return in_connectedness
     
-    def out_connectedness(self, horizon):
+    def out_connectedness(self, horizon, normalise=False):
         ''''''
         assert type(horizon) == int and horizon >= 0, \
             'horizon needs to be a positive integer'
     
-        decomposition_pct = self.decompose_pct(horizon)
+        decomposition_pct = self.decompose_fev(horizon, normalise=normalise)
         out_connectedness = decomposition_pct.sum(axis=0) - np.diag(decomposition_pct)
         out_connectedness = out_connectedness.reshape(-1, 1)
         return out_connectedness
@@ -221,10 +242,19 @@ class FEVD:
                        }
         return summary_dict
     
-    def to_graph(self, horizon=1):
-        '''Returns a networkx Graph object from decompose_pct(horizon).'''
-        #from nx.convert_matrix import from_numpy_array
-        graph = nx.convert_matrix.from_numpy_array(\
-                            self.decompose_pct(horizon=horizon),\
+    def to_fev_graph(self, horizon=1, normalise=True):
+        '''Returns a networkx Graph object from
+        FEV decomposition at input horizon.
+        '''
+        adjacency = self.decompose_fev(horizon=horizon, normalise=normalise)
+        graph = nx.convert_matrix.from_numpy_array(adjacency,\
+                            create_using=nx.DiGraph)
+        return graph
+    
+    def to_fu_graph(self, horizon=1, normalise=True):
+        '''Returns a networkx Graph object from 
+        FU decomposition at input horizon.'''
+        adjacency = self.decompose_fu(horizon=horizon, normalise=normalise)
+        graph = nx.convert_matrix.from_numpy_array(adjacency,\
                             create_using=nx.DiGraph)
         return graph

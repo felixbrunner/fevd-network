@@ -6,6 +6,9 @@ import src.plot as plot
 import src.loader as loader
 import src.crsp as crsp
 import src.preprocess as preprocess
+import src.covar as covar
+import src.estimate as estimate
+import src.factor as factor
 
 from src.fevd import FEVD
 from src.var import VAR, VARX, FAVAR

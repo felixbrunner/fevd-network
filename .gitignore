@@ -4,6 +4,13 @@
 *.hdf
 *.csv
 
+# Ignore images
+*.pdf
+*.jpg
+*.jpeg
+*.png
+*.eps
+
 
 
 # Byte-compiled / optimized / DLL files

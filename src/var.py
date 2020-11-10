@@ -155,7 +155,7 @@ class VAR:
         residual_matrix = residuals.reshape(-1, self.n_series, order='F')
         return residual_matrix
     
-    def make_cv_splitter(self, folds=10):
+    def make_cv_splitter(self, folds=12):
         '''Returns a PredefinedSplit object for cross validation.'''
     
         # shapes
@@ -174,7 +174,7 @@ class VAR:
         splitter = PredefinedSplit(split)
         return splitter
     
-    def fit_elastic_net_cv(self, grid, folds=10, return_cv=False, weighting_method='OLS', **kwargs):
+    def fit_elastic_net_cv(self, grid, folds=12, return_cv=False, weighting_method='OLS', **kwargs):
         '''Fits the FAVAR coefficients using the glmnet routine.
         Uses OLS inferred penalty weights.
         Sets the model coefficients as the best estimator.

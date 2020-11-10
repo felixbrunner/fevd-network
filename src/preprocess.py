@@ -3,6 +3,8 @@ import pandas as pd
 import os
 import src
 
+from sklearn.linear_model import LinearRegression
+
 
 
 def _has_all_days(df):
@@ -98,7 +100,7 @@ def summarise_crsp_year(year, consider_next=True):
 def n_largest_permnos(year, n=100, consider_next=True):
     '''Returns a list of permnos of the n companies
     with the highest market capitalisation end of year.'''
-    permnos = src.preprocess.summarise_crsp_year(year, consider_next)\
+    permnos = summarise_crsp_year(year, consider_next)\
                     .sort_values('size_rank')\
                     .head(n)\
                     .reset_index()\
@@ -145,10 +147,10 @@ def preprocess_year(year, n_assets=100, subsequent_years=1, last_year=False):
     '''
     # select permnos
     if last_year:
-        permnos = src.preprocess.n_largest_permnos(year=year, n=n_assets, consider_next=False)
+        permnos = n_largest_permnos(year=year, n=n_assets, consider_next=False)
         subsequent_years = 0
     else:
-        permnos = src.preprocess.n_largest_permnos(year=year, n=n_assets)
+        permnos = n_largest_permnos(year=year, n=n_assets)
     
     # filesystem management
     if not os.path.exists('../data/processed/annual/{}'.format(year)):
@@ -157,19 +159,19 @@ def preprocess_year(year, n_assets=100, subsequent_years=1, last_year=False):
     for load_year in range(year, year+subsequent_years+1):
         # load & filter
         df_year = src.loader.load_crsp_year(year=load_year)
-        df_filtered = src.preprocess.filter_permnos(df_year, permnos)
+        df_filtered = filter_permnos(df_year, permnos)
         
         # tickers
         if load_year == year:
-            permno_to_ticker = src.preprocess.make_ticker_series(df_filtered)
+            permno_to_ticker = make_ticker_series(df_filtered)
             permno_to_ticker.to_csv('../data/processed/annual/{}/tickers.csv'.format(year))
             
         # returns
-        returns = src.preprocess.make_return_matrix(df_filtered)
+        returns = make_return_matrix(df_filtered)
         returns.to_csv('../data/processed/annual/{}/returns_{}.csv'.format(year, load_year))
         
         #vola
-        volas = src.preprocess.make_vola_matrix(df_filtered)
+        volas = make_vola_matrix(df_filtered)
         volas.to_csv('../data/processed/annual/{}/volas_{}.csv'.format(year, load_year))
 
 def preprocess_spy():
@@ -196,3 +198,5 @@ def preprocess_ff_factors():
     ff_factors['rf'].to_csv('../data/processed/factors/rf.csv')
     ff_factors[['mktrf', 'smb', 'hml']].to_csv('../data/processed/factors/ff3f.csv')
     ff_factors[['mktrf', 'smb', 'hml', 'umd']].to_csv('../data/processed/factors/c4f.csv')
+
+    

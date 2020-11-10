@@ -15,13 +15,25 @@ def load_year(sampling_year, data='returns', data_year=None):
     '''Returns the data for a specific year.
     Can be either estimation or analysis data (next year).
     '''
-    assert data in ['returns', 'volas'], \
-        'data needs to be either returns or volas'
     if not data_year:
         data_year = sampling_year
-    df = pd.read_csv('../data/processed/annual/{}/{}_{}.csv'.format(sampling_year, data, data_year))
+    try:
+        df = pd.read_csv('../data/processed/annual/{}/{}_{}.csv'.format(sampling_year, data, data_year))
+    except:
+        raise Exception('Data type <{}> could not be found.'.format(data))
     df['date'] = pd.to_datetime(df['date'], yearfirst=True)
     df = df.set_index('date')
+    return df
+
+def load_spy_returns(year=None):
+    '''Returns annual SPY log vola data as pandas DataFrame.
+    Can be limited to a single year.
+    '''
+    df = pd.read_csv('../data/processed/factors/spy_ret.csv')
+    df['date'] = pd.to_datetime(df['date'], yearfirst=True)
+    df = df.set_index('date')
+    if year is not None:
+        df = df[df.index.year == year]
     return df
 
 def load_spy_vola(year=None):
@@ -50,6 +62,27 @@ def load_descriptive():
     df_desc[['namedt','nameendt']] = df_desc[['namedt','nameendt']].apply(pd.to_datetime, format='%Y-%m-%d')
     return df_desc
 
+def load_rf(year=None):
+    '''Returns risk-free rate data as pandas DataFrame.
+    Can be limited to a single year.
+    '''
+    df = pd.read_csv('../data/processed/factors/rf.csv')
+    df['date'] = pd.to_datetime(df['date'], yearfirst=True)
+    df = df.set_index('date')
+    if year is not None:
+        df = df[df.index.year == year]
+    return df
+
+def load_factors(year=None):
+    '''Returns factor data as pandas DataFrame.
+    Can be limited to a single year.
+    '''
+    df = pd.read_pickle('../data/raw/ff_factors.pkl').reset_index()
+    df['date'] = pd.to_datetime(df['date'], yearfirst=True)
+    df = df.set_index('date')
+    if year is not None:
+        df = df[df.index.year == year]
+    return df
 
 
 
@@ -66,20 +99,6 @@ def load_descriptive():
 
 
 
-
-
-
-
-def load_factors(year=None):
-    '''Returns factor data as pandas DataFrame.
-    Can be limited to a single year.
-    '''
-    df = pd.read_pickle('../data/raw/df_ff_raw.pkl')
-    df['date'] = pd.to_datetime(df['date'], yearfirst=True)
-    df = df.set_index('date')
-    if year is not None:
-        df = df[df.index.year == year]
-    return df
 
 def load_year_all(year):
     '''Returns the estimation and analysis data for a specific year.'''
