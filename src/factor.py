@@ -38,6 +38,7 @@ def decompose_vola(volas, betas, factor_vola):
     
     # idiosyncratic vola
     idio_var = volas**2 - systematic_var
+    idio_var[idio_var<=0] = np.nan
     idio_vola = (idio_var**0.5)
     return (idio_var, idio_vola)
 

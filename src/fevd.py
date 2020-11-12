@@ -9,7 +9,8 @@ class FEVD:
     def __init__(self, var_matrices, error_cov):
         self.var_matrices = var_matrices
         self.error_cov = error_cov
-        
+
+    
     @property
     def var_matrices(self):
         '''A list of np.arrays.'''
@@ -114,7 +115,7 @@ class FEVD:
             fev_single += self.impulse_response(h)**2
         return fev_single
     
-    def fev_all(self, horizon):
+    def fev_total(self, horizon):
         '''Returns the h-step ahead forecast MSE to
         a generalised impulse to all variables.
         '''
@@ -123,84 +124,15 @@ class FEVD:
         
         # initialise
         n_series = self.n_series
-        fev_all = np.zeros([n_series, n_series])
+        fev_total = np.zeros([n_series, n_series])
         
         # accumulate
         for h in range(horizon+1):
             phi_h = self.vma_matrix(h)
-            fev_all += phi_h @ self.error_cov @ phi_h.T
+            fev_total += phi_h @ self.error_cov @ phi_h.T
             
-        fev_all = np.diag(fev_all).reshape(-1, 1)
-        return fev_all
-    
-    def fu_single(self, horizon):
-        '''Returns the h-step ahead forecast uncertainty matrix 
-        to generalized impulses to each variable in isolation
-        '''
-        fu_single = self.fev_single(horizon)**0.5
-        return fu_single
-    
-    def fu_all(self, horizon=1):
-        '''Returns the h-step ahead forecast uncertainty to
-        a generalised impulse to all variables.
-        '''
-        fu_all = self.fev_all(horizon)**0.5
-        return fu_all
-
-    def decompose_fev(self, horizon, normalise=False):
-        '''Returns the forecast MSE decomposition matrix at input horizon.
-        '''
-        assert type(horizon) == int and horizon >= 0, \
-            'horizon needs to be a positive integer'
-        
-        decomposition = self.fev_single(horizon) / self.fev_all(horizon)
-        
-        # row normalise if requested
-        if normalise:
-            decomposition /= decomposition.sum(axis=1).reshape(-1,1)
-        return decomposition
-    
-    def decompose_fu(self, horizon, normalise=False):
-        '''Returns the forecast MSE decomposition matrix at input horizon.
-        '''
-        assert type(horizon) == int and horizon >= 0, \
-            'horizon needs to be a positive integer'
-        
-        decomposition = self.fu_single(horizon) / self.fu_all(horizon)
-        
-        # row normalise if requested
-        if normalise:
-            decomposition /= decomposition.sum(axis=1).reshape(-1,1)
-        return decomposition
-    
-    def in_connectedness(self, horizon, normalise=False):
-        ''''''
-        assert type(horizon) == int and horizon >= 0, \
-            'horizon needs to be a positive integer'
-    
-        decomposition_pct = self.decompose_fev(horizon, normalise=normalise)
-        in_connectedness = decomposition_pct.sum(axis=1) - np.diag(decomposition_pct)
-        in_connectedness = in_connectedness.reshape(-1, 1)
-        return in_connectedness
-    
-    def out_connectedness(self, horizon, normalise=False):
-        ''''''
-        assert type(horizon) == int and horizon >= 0, \
-            'horizon needs to be a positive integer'
-    
-        decomposition_pct = self.decompose_fev(horizon, normalise=normalise)
-        out_connectedness = decomposition_pct.sum(axis=0) - np.diag(decomposition_pct)
-        out_connectedness = out_connectedness.reshape(-1, 1)
-        return out_connectedness
-    
-    def average_connectedness(self, horizon):
-        ''''''
-        assert type(horizon) == int and horizon >= 0, \
-            'horizon needs to be a positive integer'
-    
-        in_connectedness = self.in_connectedness(horizon)
-        average_connectedness = in_connectedness.mean()
-        return average_connectedness
+        fev_total = np.diag(fev_total).reshape(-1, 1)
+        return fev_total
     
     def fev_others(self, horizon):
         '''Returns the h-step ahead forecast error variance 
@@ -230,6 +162,113 @@ class FEVD:
         fev_self = np.diag(fev_single).reshape(-1, 1)
         return fev_self
     
+    def fu_single(self, horizon):
+        '''Returns the h-step ahead forecast uncertainty matrix 
+        to generalized impulses to each variable in isolation
+        '''
+        fu_single = self.fev_single(horizon)**0.5
+        return fu_single
+    
+    def fu_total(self, horizon=1):
+        '''Returns the h-step ahead forecast uncertainty to
+        a generalised impulse to all variables.
+        '''
+        fu_total = self.fev_total(horizon)**0.5
+        return fu_total
+    
+    def fu_others(self, horizon):
+        '''Returns the h-step ahead forecast uncertainty 
+        total contributions from other variables.
+        '''
+        # initialise
+        fu_single = self.fu_single(horizon=horizon)
+        
+        # sum & deduct own contribution
+        fu_others = (fu_single.sum(axis=1) - np.diag(fu_single)).reshape(-1, 1)
+        return fu_others
+    
+    def fu_self(self, horizon):
+        '''Returns the h-step ahead forecast error variance 
+        total contributions from lags of own timeseries.
+        '''        
+        # initialise
+        fu_single = self.fu_single(horizon=horizon)
+        
+        # sum & deduct own contribution
+        fu_self = np.diag(fu_single).reshape(-1, 1)
+        return fu_self
+
+    def decompose_fev(self, horizon, normalise=False):
+        '''Returns the forecast MSE decomposition matrix at input horizon.
+        '''
+        assert type(horizon) == int and horizon >= 0, \
+            'horizon needs to be a positive integer'
+        
+        decomposition = self.fev_single(horizon) / self.fev_total(horizon)
+        
+        # row normalise if requested
+        if normalise:
+            decomposition /= decomposition.sum(axis=1).reshape(-1,1)
+        return decomposition
+    
+    def decompose_fu(self, horizon, normalise=False):
+        '''Returns the forecast MSE decomposition matrix at input horizon.
+        '''
+        assert type(horizon) == int and horizon >= 0, \
+            'horizon needs to be a positive integer'
+        
+        decomposition = self.fu_single(horizon) / self.fu_total(horizon)
+        
+        # row normalise if requested
+        if normalise:
+            decomposition /= decomposition.sum(axis=1).reshape(-1,1)
+        return decomposition
+    
+    def in_connectedness(self, horizon, normalise=False, network='fev'):
+        ''''''
+        assert type(horizon) == int and horizon >= 0, \
+            'horizon needs to be a positive integer'
+        assert network in ['fev', 'fu'], \
+            'network needs to be either fev or fu'
+        
+        if network == 'fev':
+            decomposition_pct = self.decompose_fev(horizon, normalise=normalise)
+        elif network == 'fu':
+            decomposition_pct = self.decompose_fu(horizon, normalise=normalise)
+            
+        in_connectedness = decomposition_pct.sum(axis=1) - np.diag(decomposition_pct)
+        in_connectedness = in_connectedness.reshape(-1, 1)
+        return in_connectedness
+    
+    def out_connectedness(self, horizon, normalise=False, network='fev'):
+        ''''''
+        assert type(horizon) == int and horizon >= 0, \
+            'horizon needs to be a positive integer'
+        assert network in ['fev', 'fu'], \
+            'network needs to be either fev or fu'
+        
+        if network == 'fev':
+            decomposition_pct = self.decompose_fev(horizon, normalise=normalise)
+        elif network == 'fu':
+            decomposition_pct = self.decompose_fu(horizon, normalise=normalise)
+            
+        out_connectedness = decomposition_pct.sum(axis=0) - np.diag(decomposition_pct)
+        out_connectedness = out_connectedness.reshape(-1, 1)
+        return out_connectedness
+    
+    def average_connectedness(self, horizon, normalise=False, network='fev'):
+        ''''''
+        assert type(horizon) == int and horizon >= 0, \
+            'horizon needs to be a positive integer'
+        assert network in ['fev', 'fu'], \
+            'network needs to be either fev or fu'
+    
+        in_connectedness = self.in_connectedness(horizon, normalise=normalise, network=network)
+        average_connectedness = in_connectedness.mean()
+        return average_connectedness
+    
+
+    
     def summarize(self, horizon):
         '''Returns a summarising dictionary.'''
         summary_dict = {'average_connectedness': self.average_connectedness(horizon=horizon),
@@ -237,7 +276,7 @@ class FEVD:
                         'out_connectedness': self.out_connectedness(horizon=horizon),
                         'fev_others': self.fev_others(horizon=horizon),
                         'fev_self': self.fev_self(horizon=horizon),
-                        'fev_all': self.fev_all(horizon=horizon),
+                        'fev_total': self.fev_total(horizon=horizon),
                         'fev_single_sum': self.fev_single(horizon=horizon).sum(axis=1).reshape(-1,1),
                        }
         return summary_dict

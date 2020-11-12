@@ -1,4 +1,5 @@
 import numpy as np
+import scipy as sp
 import pandas as pd
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -61,7 +62,7 @@ def net_cv_contour(cv, levels=12, logy=False, save_path=None):
     ax.set_xlabel('$\kappa$ (0=ridge, 1=LASSO)')#x_name)
     ax.set_ylabel('$\lambda$ (0=OLS)')#y_name)
     ax.legend()#loc='upper left')
-    cb.set_label('Cross-validation MSE', rotation=90)
+    cb.set_label('Cross-Validation MSE', rotation=90)
     if logy:
         ax.set_yscale('log')
     
@@ -99,10 +100,10 @@ def cov_cv_contour(cv, levels=12, logy=False, save_path=None):
     ax.scatter(*cv.best_params_.values(), label='best estimator', marker='x', s=100, color='k')
 
     # labels & legend
-    ax.set_xlabel('$\Phi(\delta)$ (0.5=sample cov, 1=zeros)')#x_name)
+    ax.set_xlabel('$\delta$ (0.5=sample cov, 1=zeros)')#x_name)
     ax.set_ylabel('$\eta$ (0=zeros, 1=soft-thresholding, 2="ridge")')#y_name)
     ax.legend()#loc='upper left')
-    cb.set_label('Cross-validation Loss', rotation=90)
+    cb.set_label('Cross-Validation Loss', rotation=90)
     if logy:
         ax.set_yscale('log')
     
@@ -155,7 +156,7 @@ def network_graph(graph, name_mapping=None, title=None, red_percent=0, save_path
     
     # save
     if save_path:
-        fig.savefig(save_path, format='png', dpi=fig.dpi*2, bbox_inches='tight')
+        fig.savefig(save_path, format='png', dpi=fig.dpi, bbox_inches='tight')
 
 
 def missing_data(df, save_path=None):
@@ -181,10 +182,20 @@ def vola_timeseries(idio_volas, total_volas=None, index_vola=None, save_path=Non
         fig.savefig(save_path, format='pdf', dpi=200, bbox_inches='tight')
         
         
-def histogram(df, bins=100, title='Data distribution', save_path=None):
+def histogram(df, bins=100, title='Data distribution', save_path=None, drop_tails=0):
     ''''''
+    # drop outliers
+    df_ = df.copy()
+    df_ = df_[(df_.quantile(0+drop_tails/2)<df_.values) & (df_.values<df_.quantile(1-drop_tails/2))]
+    
+    # plot
     fig, ax = plt.subplots(1, 1)
-    ax.hist(df, bins=bins)
+    ax.hist(df_, bins=bins, label='Data')
     ax.set_title(title)
+    kde = sp.stats.gaussian_kde(df_)
+    xvals = np.linspace(*ax.get_xlim(), bins)
+    ax.plot(xvals, kde(xvals)*(df_.max()-df_.min())/bins*len(df_)*(1-drop_tails), label='Scaled KDE', c='k')
+    ax.legend()
+    
     if save_path:
         fig.savefig(save_path, format='pdf', dpi=200, bbox_inches='tight')

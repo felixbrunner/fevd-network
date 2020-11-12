@@ -56,15 +56,16 @@ def run_estimation(year, var_grid, cov_grid, horizon):
     create_var_plots(year, var_cv, var) # VAR
     create_cov_plots(year, cov_cv, cov) # Covariance matrix
     create_fevd_plots(year, fevd, horizon, column_to_ticker) # FEVD
-    plt.close('all')
 
     return (preprocessed_data, var_cv, var, cov_cv, cov, fevd, desc, network_data)
 
 
 def load_preprocess(year):
-    data = src.loader.load_year(year, data='idio_vola')
+    data = src.loader.load_year(year, data='idio_var')
     src.plot.missing_data(data,
                           save_path='../reports/figures/annual/{}/matrix_missing.pdf'.format(year))
+    src.plot.histogram(data.fillna(0).stack(), title='Distribution of Raw Data', drop_tails=0.01,
+                          save_path='../reports/figures/annual/{}/histogram_raw_data.pdf'.format(year))
     data = src.utils.log_replace(data, method='min')
     return data
 
@@ -91,16 +92,16 @@ def make_fevd(var, cov, horizon):
 def describe_var(var_cv, var):
     var_desc = pd.Series({'lambda': var_cv.best_params_['lambdau'],
                           'kappa': var_cv.best_params_['alpha'],
-                          'VAR_matrix_density': (var.var_1_matrix_!=0).sum()/var.n_series**2,
-                          'VAR_lost_df': (var.coef_!=0).sum(),
+                          'var_matrix_density': (var.var_1_matrix_!=0).sum()/var.n_series**2,
+                          'var_lost_df': (var.coef_!=0).sum(),
                           'mean_connection': var.var_1_matrix_.mean(),
                           'mean_abs_connection': abs(var.var_1_matrix_).mean(),
-                          'VAR_asymmetry': src.utils.matrix_asymmetry(var.var_1_matrix_),
+                          'var_asymmetry': src.utils.matrix_asymmetry(var.var_1_matrix_),
                           })
     return var_desc
 
 def describe_cov(cov_cv, cov, var):
-    var_desc = pd.Series({'Phi_delta': cov_cv.best_params_['confidence_level'],
+    var_desc = pd.Series({'delta': cov_cv.best_params_['delta'],
                           'eta': cov_cv.best_params_['eta'],
                           'covar_density': (cov.covar_!=0).sum()/cov.covar_.shape[0]**2,
                           'covar_shrunk_by': 1-(cov.covar_/np.cov(var.residuals_, rowvar=False)).mean(),
@@ -118,9 +119,9 @@ def describe_fevd(fevd, horizon):
 
 def collect_var_data(var):
     var_data = pd.DataFrame(index=var.var_data.columns)
-    var_data['VAR_intercept'] = var.intercepts_
-    var_data['mean_abs_VAR_in'] = (abs(var.var_1_matrix_).sum(axis=1) - abs(np.diag(var.var_1_matrix_))) / (var.var_1_matrix_.shape[0]-1)
-    var_data['mean_abs_VAR_out'] = (abs(var.var_1_matrix_).sum(axis=0) - abs(np.diag(var.var_1_matrix_))) / (var.var_1_matrix_.shape[0]-1)
+    var_data['var_intercept'] = var.intercepts_
+    var_data['mean_abs_var_in'] = (abs(var.var_1_matrix_).sum(axis=1) - abs(np.diag(var.var_1_matrix_))) / (var.var_1_matrix_.shape[0]-1)
+    var_data['mean_abs_var_out'] = (abs(var.var_1_matrix_).sum(axis=0) - abs(np.diag(var.var_1_matrix_))) / (var.var_1_matrix_.shape[0]-1)
     return var_data
 
 def collect_cov_data(cov, var):
@@ -131,12 +132,36 @@ def collect_cov_data(cov, var):
 
 def collect_fevd_data(fevd, horizon, var):
     fevd_data = pd.DataFrame(index=var.var_data.columns)
-    fevd_data['in_connectedness'] = fevd.in_connectedness(horizon=horizon)
-    fevd_data['out_connectedness'] = fevd.out_connectedness(horizon=horizon)
+    # fev
+    fevd_data['fev_total'] = fevd.fev_total(horizon=horizon)
     fevd_data['fev_others'] = fevd.fev_others(horizon=horizon)
-    fevd_data['fev_all'] = fevd.fev_all(horizon=horizon)
-    fevd_data['eigenvector_centrality'] = list(nx.eigenvector_centrality(fevd.to_fev_graph(horizon, normalise=False), weight='weight', max_iter=1000).values())
-    fevd_data['closeness_centrality'] = list(nx.closeness_centrality(fevd.to_fev_graph(horizon, normalise=False), distance='weight').values())
+    fevd_data['fev_self'] = fevd.fev_self(horizon=horizon)
+    
+    fevd_data['fev_in_connectedness'] = fevd.in_connectedness(horizon=horizon, normalise=False, network='fev')
+    fevd_data['fev_out_connectedness'] = fevd.out_connectedness(horizon=horizon, normalise=False, network='fev')
+    fevd_data['fev_eigenvector_centrality'] = list(nx.eigenvector_centrality(fevd.to_fev_graph(horizon, normalise=False), weight='weight', max_iter=1000).values())
+    fevd_data['fev_closeness_centrality'] = list(nx.closeness_centrality(fevd.to_fev_graph(horizon, normalise=False), distance='weight').values())
+    
+    fevd_data['fev_in_connectedness_normalised'] = fevd.in_connectedness(horizon=horizon, normalise=True, network='fev')
+    fevd_data['fev_out_connectedness_normalised'] = fevd.out_connectedness(horizon=horizon, normalise=True, network='fev')
+    fevd_data['fev_eigenvector_centrality_normalised'] = list(nx.eigenvector_centrality(fevd.to_fev_graph(horizon, normalise=True), weight='weight', max_iter=1000).values())
+    fevd_data['fev_closeness_centrality_normalised'] = list(nx.closeness_centrality(fevd.to_fev_graph(horizon, normalise=True), distance='weight').values())
+    
+    #fu
+    fevd_data['fu_total'] = fevd.fu_total(horizon=horizon)
+    fevd_data['fu_others'] = fevd.fu_others(horizon=horizon)
+    fevd_data['fu_self'] = fevd.fu_self(horizon=horizon)
+    
+    fevd_data['fu_in_connectedness'] = fevd.in_connectedness(horizon=horizon, normalise=False, network='fu')
+    fevd_data['fu_out_connectedness'] = fevd.out_connectedness(horizon=horizon, normalise=False, network='fu')
+    fevd_data['fu_eigenvector_centrality'] = list(nx.eigenvector_centrality(fevd.to_fu_graph(horizon, normalise=False), weight='weight', max_iter=1000).values())
+    fevd_data['fu_closeness_centrality'] = list(nx.closeness_centrality(fevd.to_fu_graph(horizon, normalise=False), distance='weight').values())
+    
+    fevd_data['fu_in_connectedness_normalised'] = fevd.in_connectedness(horizon=horizon, normalise=True, network='fu')
+    fevd_data['fu_out_connectedness_normalised'] = fevd.out_connectedness(horizon=horizon, normalise=True, network='fu')
+    fevd_data['fu_eigenvector_centrality_normalised'] = list(nx.eigenvector_centrality(fevd.to_fu_graph(horizon, normalise=True), weight='weight', max_iter=1000).values())
+    fevd_data['fu_closeness_centrality_normalised'] = list(nx.closeness_centrality(fevd.to_fu_graph(horizon, normalise=True), distance='weight').values())
+    
     return fevd_data
 
 def create_data_plots(year, preprocessed_data, df_volas, df_spy_vola):
@@ -146,8 +171,9 @@ def create_data_plots(year, preprocessed_data, df_volas, df_spy_vola):
                          save_path='../reports/figures/annual/{}/heatmap_data_autocorrelation.pdf'.format(year))
     src.plot.vola_timeseries(preprocessed_data, total_volas=df_volas, index_vola=df_spy_vola,
                           save_path='../reports/figures/annual/{}/line_timeseries.pdf'.format(year))
-    src.plot.histogram(preprocessed_data.stack(),  title='Data distribution',
+    src.plot.histogram(preprocessed_data.stack(),  title='Distribution of Processed Data',
                        save_path='../reports/figures/annual/{}/histogram_data.pdf'.format(year))
+    plt.close('all')
     
 def create_var_plots(year, var_cv, var):
     src.plot.net_cv_contour(var_cv, 15, logy=True,
@@ -162,8 +188,9 @@ def create_var_plots(year, var_cv, var):
     res_cov = pd.DataFrame(var.residuals_).cov()
     src.plot.corr_heatmap(res_cov, title='VAR Residual Sample Covariance Matrix', vmin=-abs(res_cov.values).max(), vmax=abs(res_cov.values).max(),
                           save_path='../reports/figures/annual/{}/heatmap_VAR_residual_covariance.pdf'.format(year))
-    src.plot.histogram(var.residuals_.ravel(),  title='VAR Residual distribution',
+    src.plot.histogram(pd.DataFrame(var.residuals_).stack(),  title='Distribution of VAR Residuals',
                        save_path='../reports/figures/annual/{}/histogram_VAR_residuals.pdf'.format(year))
+    plt.close('all')
     
 def create_cov_plots(year, cov_cv, cov):
     src.plot.cov_cv_contour(cov_cv, 15, logy=False,
@@ -171,15 +198,36 @@ def create_cov_plots(year, cov_cv, cov):
     src.plot.corr_heatmap(cov.covar_, title='Adaptive Threshold Estimate of VAR Residual Covariances',
                           vmin=-abs(cov.covar_).max(), vmax=abs(cov.covar_).max(),
                           save_path='../reports/figures/annual/{}/heatmap_cov_matrix.pdf'.format(year))
+    plt.close('all')
     
 def create_fevd_plots(year, fevd, horizon, column_to_ticker):
-    src.plot.corr_heatmap(pd.DataFrame(fevd.fev_single(horizon)), 'FEV Single Contributions',
-                          vmin=-abs(fevd.fev_single(horizon)).max(), vmax=abs(fevd.fev_single(horizon)).max(),
-                          save_path='../reports/figures/annual/{}/heatmap_FEVD_contributions.pdf'.format(year))
+    src.plot.corr_heatmap(pd.DataFrame(fevd.fev_single(horizon))-np.diag(np.diag(fevd.fev_single(horizon))),
+                          'FEV Single Contributions', vmin=0, cmap='binary', infer_vmax=True,
+                          save_path='../reports/figures/annual/{}/heatmap_FEV_contributions.pdf'.format(year))
     src.plot.corr_heatmap(pd.DataFrame(fevd.decompose_fev(horizon=horizon, normalise=False))-np.diag(np.diag(fevd.decompose_fev(horizon=horizon, normalise=False))),
-                          title='FEVD Decomposition (off-diagonal)', vmin=0, vmax=None, cmap='binary',
-                          save_path='../reports/figures/annual/{}/heatmap_FEVD_decomposition.pdf'.format(year))
-    src.plot.network_graph(fevd.to_fev_graph(horizon, normalise=False), column_to_ticker, title='FEVD connectedness (absolute)', red_percent=5, linewidth=0.25,
-                           save_path='../reports/figures/annual/{}/network_absolute.png'.format(year))
-    src.plot.network_graph(fevd.to_fev_graph(horizon, normalise=True), column_to_ticker, title='FEVD connectedness (%)', red_percent=2, linewidth=0.25,
-                           save_path='../reports/figures/annual/{}/network_pct.png'.format(year))
+                          'FEV Decomposition', vmin=0, vmax=None, cmap='binary',
+                          save_path='../reports/figures/annual/{}/heatmap_FEV_decomposition.pdf'.format(year))
+    src.plot.corr_heatmap(pd.DataFrame(fevd.decompose_fev(horizon=horizon, normalise=True))-np.diag(np.diag(fevd.decompose_fev(horizon=horizon, normalise=True))),
+                          'FEV Decomposition (row-normalised)', vmin=0, vmax=None, cmap='binary',
+                          save_path='../reports/figures/annual/{}/heatmap_FEV_decomposition_normalised.pdf'.format(year))
+    
+    src.plot.corr_heatmap(pd.DataFrame(fevd.fu_single(horizon))-np.diag(np.diag(fevd.fu_single(horizon))),
+                          'FU Single Contributions', vmin=0, cmap='binary', infer_vmax=True,
+                          save_path='../reports/figures/annual/{}/heatmap_FU_contributions.pdf'.format(year))
+    src.plot.corr_heatmap(pd.DataFrame(fevd.decompose_fu(horizon=horizon, normalise=False))-np.diag(np.diag(fevd.decompose_fu(horizon=horizon, normalise=False))),
+                          'FU Decomposition', vmin=0, vmax=None, cmap='binary',
+                          save_path='../reports/figures/annual/{}/heatmap_FU_decomposition.pdf'.format(year))
+    src.plot.corr_heatmap(pd.DataFrame(fevd.decompose_fu(horizon=horizon, normalise=True))-np.diag(np.diag(fevd.decompose_fu(horizon=horizon, normalise=True))),
+                          'FU Decomposition (row-normalised)', vmin=0, vmax=None, cmap='binary',
+                          save_path='../reports/figures/annual/{}/heatmap_FU_decomposition_normalised.pdf'.format(year))
+    
+    src.plot.network_graph(fevd.to_fev_graph(horizon, normalise=False), column_to_ticker, title='FEVD Network (FEV absolute)', red_percent=5, linewidth=0.25,
+                           save_path='../reports/figures/annual/{}/network_FEV_absolute.png'.format(year))
+    src.plot.network_graph(fevd.to_fev_graph(horizon, normalise=True), column_to_ticker, title='FEVD Network (FEV %)', red_percent=2, linewidth=0.25,
+                           save_path='../reports/figures/annual/{}/network_FEV_normalised.png'.format(year))
+    
+    src.plot.network_graph(fevd.to_fu_graph(horizon, normalise=False), column_to_ticker, title='FEVD Network (FU absolute)', red_percent=5, linewidth=0.25,
+                           save_path='../reports/figures/annual/{}/network_FU_absolute.png'.format(year))
+    src.plot.network_graph(fevd.to_fu_graph(horizon, normalise=True), column_to_ticker, title='FEVD Network (FU %)', red_percent=2, linewidth=0.25,
+                           save_path='../reports/figures/annual/{}/network_FU_normalised.png'.format(year))
+    plt.close('all')

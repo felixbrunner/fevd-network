@@ -32,14 +32,14 @@ class AdaptiveThresholdEstimator(BaseEstimator):
     to 1 the estimator is equivalent to the soft-thresholding rule.
     '''
     
-    def __init__(self, confidence_level=0.95, eta=1, **kwargs):
-        self.confidence_level = confidence_level
+    def __init__(self, delta=0.95, eta=1, **kwargs):
+        self.delta = delta
         self.eta = eta
     
     @property
-    def delta(self):
-        delta = sp.stats.norm.ppf(self.confidence_level)
-        return delta
+    def confidence_threshold(self):
+        confidence_threshold = sp.stats.norm.ppf(self.delta)
+        return confidence_threshold
 
     def _t_periods(self, data):
         '''Returns the number of periods in the input data.'''
@@ -88,7 +88,7 @@ class AdaptiveThresholdEstimator(BaseEstimator):
         var_of_cov = self._var_of_cov(data)
         
         # calculate thresholds
-        thresholds = self.delta * np.sqrt(var_of_cov*log_n_series/t_periods)
+        thresholds = self.confidence_threshold * np.sqrt(var_of_cov*log_n_series/t_periods)
         return thresholds
     
     def _soft_threshold_rule(self, data):
