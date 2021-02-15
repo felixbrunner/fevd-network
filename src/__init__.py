@@ -4,8 +4,8 @@ import src.fevd as fevd
 import src.net as net
 import src.plot as plot
 import src.loader as loader
-import src.crsp as crsp
-import src.preprocess as preprocess
+import src.query as query
+import src.sampling as sampling
 import src.covar as covar
 import src.estimate as estimate
 import src.factor as factor

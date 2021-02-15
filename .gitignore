@@ -3,6 +3,8 @@
 *.db
 *.hdf
 *.csv
+*.lnk
+*.dropbox.attrs
 
 # Ignore images
 *.pdf
@@ -10,6 +12,10 @@
 *.jpeg
 *.png
 *.eps
+
+# Ignore folders
+data/
+dropbox/
 
 
 

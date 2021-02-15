@@ -5,24 +5,7 @@ import pandas as pd
 from sklearn.base import BaseEstimator
 from src.net import ElasticNet
 from sklearn.linear_model import LinearRegression
-
-
-    
-def soft_threshold_rule(self, x, thresholds, **kwargs):
-    '''The soft thresholding rule of Cai/Liu (2011).
-    Note that x is typically a covariance matrix.
-    '''
-    diff = abs(x)-thresholds
-    estimate = np.sign(x) * diff * (diff>0)
-    return estimate
-
-def adaptive_LASSO_threshold_rule(self, x, thresholds, eta=1, **kwargs):
-    '''The LASSO thresholding rule of Cai/Liu (2011).
-    Note that x is typically a covariance matrix.
-    '''
-    diff = (1-abs(thresholds/x)**eta)
-    estimate = x * diff * (diff>0)
-    return estimate
+from sklearn.covariance import GraphicalLasso
 
     
 class AdaptiveThresholdEstimator(BaseEstimator):
@@ -39,19 +22,24 @@ class AdaptiveThresholdEstimator(BaseEstimator):
     @property
     def confidence_threshold(self):
         confidence_threshold = sp.stats.norm.ppf(self.delta)
+        if confidence_threshold == np.inf:
+            confidence_threshold = 1e22
         return confidence_threshold
 
-    def _t_periods(self, data):
+    @staticmethod
+    def _t_periods(data):
         '''Returns the number of periods in the input data.'''
         t_periods = data.shape[0]
         return t_periods
     
-    def _n_series(self, data):
+    @staticmethod
+    def _n_series(data):
         '''Returns the number of series in the input data.'''
         n_series = data.shape[1]
         return n_series
     
-    def _sample_cov(self, data):
+    @staticmethod
+    def _sample_cov(data):
         '''Returns the sample covariance matrix of input data.'''
         cov = np.cov(data, rowvar=False)
         return cov
@@ -66,16 +54,17 @@ class AdaptiveThresholdEstimator(BaseEstimator):
         n_series = self._n_series(data)
         
         # squared deviations from mean
-        deviations = np.kron(data, np.ones(n_series)) * np.kron(np.ones(n_series), data)
+        deviations = np.einsum('ti, tj -> ijt', data, data)
         
         # squared deviations from sample covariance matix
-        var = (deviations - cov.reshape(1, -1))**2
+        var = (deviations - cov.reshape(n_series, n_series, 1))**2
         
         # output
-        cov_var = var.mean(axis=0).reshape(n_series, n_series)
+        cov_var = var.mean(axis=2)
         return cov_var
-        
-    def _mean(self, data):
+    
+    @staticmethod
+    def _mean(data):
         '''Returns the timeseries means of the data'''
         mean = data.mean(axis=0)
         return mean
@@ -110,37 +99,109 @@ class AdaptiveThresholdEstimator(BaseEstimator):
         The y input is not considered in the calculations.
         '''
         estimates = self._adaptive_LASSO_threshold_rule(X, **kwargs)
-        self.covar_ = estimates
-        
-    def _mean_period_loss(self, estimate, data):
-        '''Frobenius norm loss wrt individual periods.'''
-        # setup
-        t_periods = data.shape[0]
-        n_series = data.shape[1]
-        ones = np.ones([1, n_series])
-    
-        # Xt.T times Xt => squared observations
-        XX = np.kron(data, ones) * np.kron(ones, data)
-    
-        # individual losses
-        obs_losses = (estimate.reshape(1,-1) - XX)
+        self.covariance_ = estimates
+
+    def _covar_loss(self, data):
+        '''Frobenius norm loss wrt sample covariance matrix.'''
+        # differences
+        diff = self.covariance_ - self._sample_cov(data)
     
         # Frobenius norm
-        period_losses = (obs_losses**2).sum(axis=1)**0.5
+        loss = (diff**2).sum()
     
-        # aggregated loss
-        loss = t_periods**-1 * period_losses.sum()
         return loss
+        
+    def _mean_period_loss(self, data, exclude_diag=False):
+        '''Frobenius norm loss wrt individual periods.'''
+        # setup
+        n_series = data.shape[1]
+        t_periods = data.shape[0]
+        
+        # Xt.T times Xt => squared observations
+        XX = np.einsum('ti, tj -> ijt', data, data)
+        obs_losses = self.covariance_.reshape(n_series, n_series, 1) - XX
+        
+        # aggregate loss
+        total_loss = np.triu((obs_losses**2).transpose((2, 0, 1)), k=exclude_diag).transpose((1, 2, 0)).sum()
+        mean_loss = total_loss/(t_periods*n_series*(n_series-1)/2)
+        
+        return mean_loss
     
-    def score(self, X, y=None):
+    def score(self, X, y=None, scorer='mean_period'):
         '''Scores a sample using the Frobenius norm loss on
         individual periods with the fitted covariance matrix.'''
-        loss = -1*self._mean_period_loss(self.covar_, X)
+        if scorer == 'covar':
+            loss = -1*self._covar_loss(X)
+        elif scorer == 'mean_period':
+            loss = -1*self._mean_period_loss(X)
+        else:
+            raise Exception('Scoring function not implemented')
+        return loss
+
+    
+class GLASSO(GraphicalLasso):
+    
+    def _covar_loss(self, data):
+        '''Frobenius norm loss wrt sample covariance matrix.'''
+        # differences
+        diff = self.covariance_ - self._sample_cov(data)
+    
+        # norm
+        loss = (diff**2).sum()
+    
+        return loss
+        
+    def _mean_period_loss(self, data, exclude_diag=False):
+        '''Frobenius norm loss wrt individual periods.'''
+        # setup
+        n_series = data.shape[1]
+        t_periods = data.shape[0]
+        
+        # Xt.T times Xt => squared observations
+        XX = np.einsum('ti, tj -> ijt', data, data)
+        obs_losses = self.covariance_.reshape(n_series, n_series, 1) - XX
+        
+        # aggregate loss
+        total_loss = np.triu((obs_losses**2).transpose((2, 0, 1)), k=exclude_diag).transpose((1, 2, 0)).sum()
+        mean_loss = total_loss/(t_periods*n_series*(n_series-1)/2)
+        
+        return mean_loss
+    
+    def score(self, X, y=None, scorer='mean_period'):
+        '''Scores a sample using the Frobenius norm loss on
+        individual periods with the fitted covariance matrix.'''
+        if scorer == 'covar':
+            loss = -1*self._covar_loss(X)
+        elif scorer == 'mean_period':
+            loss = -1*self._mean_period_loss(X)
+        else:
+            raise Exception('Scoring function not implemented')
         return loss
     
-
+    @property
+    def covariance_density_(self):
+        '''Returns the density of the estimated covariance matrix.'''
+        density = np.count_nonzero(self.covariance_)/np.size(self.covariance_)
+        return density
+    
+    @property
+    def covariance_sparsity_(self):
+        '''Returns the sparsity of the estimated covariance matrix.'''
+        sparsity = 1 - self.covariance_density_
+        return sparsity
         
-        
+    @property
+    def precision_density_(self):
+        '''Returns the density of the estimated precision matrix.'''
+        density = np.count_nonzero(self.precision_)/np.size(self.precision_)
+        return density
+    
+    @property
+    def precision_sparsity_(self):
+        '''Returns the sparsity of the estimated precision matrix.'''
+        sparsity = 1 - self.precision_density_
+        return sparsity
+       
         
         
         
