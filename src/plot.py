@@ -336,3 +336,147 @@ def histogram(df, bins=100, title='Data distribution', save_path=None, drop_tail
     
     if save_path:
         fig.savefig(save_path, format='pdf', dpi=200, bbox_inches='tight')
+        
+def plot_estimation_summary(df, save_path=None):
+    fig, axes = plt.subplots(3, 1, figsize=(20, 12))
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    
+    # hyperparameters
+    ax1 = axes[0]
+    ax2 = ax1.twinx()
+    ax1.set_title('Cross-validated hyperparameters')
+    l1 = ax1.plot(df['lambda'], linestyle='-', label='λ, mean={}'.format(df['lambda'].mean().round(2)), c=colors[0])
+    l2 = ax1.plot(df['kappa'], linestyle='--', label='κ, mean={:.1e}'.format(df['kappa'].mean()), c=colors[1])
+    l3 = ax2.plot(df['rho'], linestyle='-.', label='ρ, mean={}'.format(df['rho'].mean().round(2)), c=colors[2])
+    # l4 = ax2.plot(df['eta'], linestyle=':', label='η, mean={}'.format(df['eta'].mean().round(2)), c=colors[3])
+    ax1.set_ylim([1e-5, 1e2])
+    ax2.set_ylim([1e-2, 1e0])
+    ax1.set_yscale('log')
+    ax2.set_yscale('log')
+    ax2.grid(None)
+    ax1.set_ylabel('VAR hyperparameters', color=colors[0])
+    ax1.tick_params(axis='y', labelcolor=colors[0])
+    ax2.set_ylabel('Covariance hyperparamters', color=colors[2])
+    ax2.tick_params(axis='y', labelcolor=colors[2])
+    lines = l1+l2+l3#+l4
+    labels = [l.get_label() for l in lines]
+    ax1.legend(lines, labels, bbox_to_anchor=(1.05, 0.5), loc='center left')
+    kf.plotting.add_recession_bars(ax1, freq='M', startdate=df.index[0], enddate=df.index[-1])
+    
+    # Losses
+    ax1 = axes[1]
+    ax2 = ax1.twinx()
+    ax1.set_title('Cross-validation losses')
+    ax1.set_ylim([0, 1])
+    l11 = ax1.plot(df['var_cv_loss'], linestyle='-', label='VAR CV loss, mean={}'.format(df['var_cv_loss'].mean().round(2)), c=colors[0])
+    l12 = ax1.plot(df['var_train_loss'], linestyle='--', label='VAR train loss, mean={}'.format(df['var_train_loss'].mean().round(2)), c=colors[0])
+    ax1.set_ylabel('VAR MSE', color=colors[0])
+    ax1.tick_params(axis='y', labelcolor=colors[0])
+    
+    #ax2.set_ylim([0, 500])
+    ax2.grid(None)
+    l21 = ax2.plot(df['covar_cv_loss'], linestyle='-.', label='Covariance CV loss, mean={}'.format(df['covar_cv_loss'].mean().round(2)), c=colors[1])
+    l22 = ax2.plot(df['covar_train_loss'], linestyle=':', label='Covariance train loss, mean={}'.format(df['covar_train_loss'].mean().round(2)), c=colors[1])
+    ax2.set_ylabel('Covariance loss', color=colors[1])
+    ax2.tick_params(axis='y', labelcolor=colors[1])
+    
+    lines = l11+l12+l21+l22
+    labels = [l.get_label() for l in lines]
+    ax1.legend(lines, labels, bbox_to_anchor=(1.05, 0.5), loc='center left')
+    kf.plotting.add_recession_bars(ax1, freq='M', startdate=df.index[0], enddate=df.index[-1])
+    
+    # R2
+    ax1 = axes[2]
+    ax2 = ax1.twinx()
+    ax1.set_title('Goodness of fit')
+    ax1.set_ylim([0, 1])
+    l11 = ax1.plot(df['var_r2'], label='AEnet, mean={}'.format(df['var_r2'].mean().round(2)), c=colors[0], linestyle='-')
+    l12 = ax1.plot(df['var_r2_ols'], label='OLS, mean={}'.format(df['var_r2_ols'].mean().round(2)), c=colors[0], linestyle='--')
+    ax1.set_ylabel('VAR R²', color=colors[0])
+    ax1.tick_params(axis='y', labelcolor=colors[0])
+    
+    ax2.grid(None)
+    l21 = ax2.plot(df['cov_mean_likelihood'],\
+                   label='GLASSO, mean={}'.format(df['cov_mean_likelihood'].mean().round(2)), c=colors[1], linestyle='-.')
+    l22 = ax2.plot(df['cov_mean_likelihood_sample_estimate'],\
+                   label='Sample covariance, mean={}'.format(df['cov_mean_likelihood_sample_estimate'].mean().round(2)),\
+                   c=colors[1], linestyle=':')
+    ax2.set_ylabel('Covariance average log-likelihood', color=colors[1])
+    ax2.tick_params(axis='y', labelcolor=colors[1])
+    
+    lines = l11+l12+l21+l22
+    labels = [l.get_label() for l in lines]
+    ax1.legend(lines, labels, bbox_to_anchor=(1.05, 0.5), loc='center left')
+    kf.plotting.add_recession_bars(ax1, freq='M', startdate=df.index[0], enddate=df.index[-1])
+    
+    if save_path:
+        fig.savefig(save_path, format='pdf', dpi=200, bbox_inches='tight')
+        
+def plot_regularisation_summary(df, save_path=None):
+    fig, axes = plt.subplots(3, 1, figsize=(20, 12))
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    
+    # Degrees of Freedom
+    ax = axes[0]
+    ax.set_title('Degrees of freedom')
+    ax.fill_between(df.index, 0, df['var_df_used'], alpha=0.5, label='DFs used by VAR estimation, mean={}'.format(int(df['var_df_used'].mean())), color=colors[0])
+    ax.plot(df['var_df_used'], c=colors[0], linewidth=1)
+    ax.fill_between(df.index, df['var_df_used'], df['var_df_used']+df['cov_used_df'],\
+                    alpha=0.5, label='DFs used by covariance estimation, mean={}'.format(int(df['cov_used_df'].mean())), color=colors[1])
+    ax.plot(df['var_df_used']+df['cov_used_df'], c=colors[1], linewidth=1)
+    ax.fill_between(df.index, df['var_df_used']+df['cov_used_df'],\
+                    df['nobs'], alpha=0.3, label='Remaining DFs, mean={}'.format(int((df['nobs']-df['var_df_used']-df['cov_used_df']).mean())), color=colors[2])
+    ax.plot(df['nobs'], c=colors[2], label='Total data points, mean={}'.format(int(df['nobs'].mean())))
+    ax.plot(df['var_regular_lost_df'], c=colors[0], label='Non-regularised VAR DFs ({})'.format(int(df['var_regular_lost_df'].mean())), linestyle='--', linewidth=1.5)
+    ax.plot(df['var_regular_lost_df']+df['covar_regular_lost_df'],\
+            c=colors[1], label='Non-regularised total DFs ({})'.format(int((df['var_regular_lost_df']+df['covar_regular_lost_df']).mean())), linestyle='-.', linewidth=1.5)
+    ax.legend(bbox_to_anchor=(1, 0.5), loc='center left')
+    kf.plotting.add_recession_bars(ax, freq='M', startdate=df.index[0], enddate=df.index[-1])
+
+    # Sparsity
+    ax = axes[1]
+    ax.set_title('Estimate sparsity')
+    ax.plot(1-df['var_matrix_density'], linestyle='-', label='VAR matrix sparsity, mean={}'.format((1-df['var_matrix_density']).mean().round(2)))
+    ax.plot(1-df['precision_density'], linestyle='--', label='Precision matrix sparsity, mean={}'.format((1-df['precision_density']).mean().round(2)))
+    ax.plot(1-df['mean_density'], linestyle='-.', label='Overall estimate sparsity, mean={}'.format((1-df['mean_density']).mean().round(2)))
+    ax.set_ylim([0, 1])
+    ax.legend(bbox_to_anchor=(1, 0.5), loc='center left')
+    kf.plotting.add_recession_bars(ax, freq='M', startdate=df.index[0], enddate=df.index[-1])
+    
+    # Shrinkage
+    ax = axes[2]
+    ax.set_title('Estimate shrinkage')
+    ax.plot(df['var_nonzero_shrinkage'], linestyle='-', label='VAR matrix shrinkage, mean={}'.format((df['var_nonzero_shrinkage']).mean().round(2)))
+    ax.plot(df['covar_nonzero_shrinkage'], linestyle='--', label='Covariance matrix shrinkage, mean={}'.format((df['covar_nonzero_shrinkage']).mean().round(2)))
+    ax.plot(df['mean_shrinkage'], linestyle='-.', label='Overall estimate shrinkage, mean={}'.format((df['mean_shrinkage']).mean().round(2)))
+    ax.set_ylim([0, 1])
+    ax.legend(bbox_to_anchor=(1, 0.5), loc='center left')
+    kf.plotting.add_recession_bars(ax, freq='M', startdate=df.index[0], enddate=df.index[-1])
+
+    
+    if save_path:
+        fig.savefig(save_path, format='pdf', dpi=200, bbox_inches='tight')
+        
+def plot_network_summary(df, save_path=None):
+    fig, axes = plt.subplots(1, 1, figsize=(20, 6))
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+
+    
+    # Network stats
+    ax1 = axes#[0]
+    ax2 = ax1.twinx()
+    ax1.set_title('FEV Network statistics')
+    l1 = ax1.plot(df['fev_avg_connectedness_normalised'], label='Average connectedness $c^{avg}$, mean='+str((df['fev_avg_connectedness_normalised']).mean().round(2)), c=colors[0])
+    l2 = ax2.plot(df['fev_asymmetry_normalised'], label='Network asymmetry, mean={}'.format((df['fev_asymmetry_normalised']).mean().round(2)), linestyle='--', c=colors[1])
+    ax2.grid(None)
+    ax1.set_ylabel('Connectedness', color=colors[0])
+    ax1.tick_params(axis='y', labelcolor=colors[0])
+    ax2.set_ylabel('Asymmetry', color=colors[1])
+    ax2.tick_params(axis='y', labelcolor=colors[1])
+    lines = l1+l2
+    labels = [l.get_label() for l in lines]
+    ax1.legend(lines, labels)
+    kf.plotting.add_recession_bars(ax1, freq='M', startdate=df.index[0], enddate=df.index[-1])
+    
+    if save_path:
+        fig.savefig(save_path, format='pdf', dpi=200, bbox_inches='tight')

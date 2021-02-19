@@ -267,6 +267,26 @@ class FEVD:
         average_connectedness = in_connectedness.mean()
         return average_connectedness
     
+    def in_entropy(self, horizon, normalise=True, network='fev'):
+        '''Returns the row-wise entropy of connections.s'''
+        assert type(horizon) == int and horizon >= 0, \
+            'horizon needs to be a positive integer'
+        assert network in ['fev', 'fu'], \
+            'network needs to be either fev or fu'
+        
+        if network == 'fev':
+            decomposition_pct = self.decompose_fev(horizon, normalise=normalise)
+        elif network == 'fu':
+            decomposition_pct = self.decompose_fu(horizon, normalise=normalise)
+            
+        # remove diagonal values & scale
+        n = decomposition_pct.shape[0]
+        decomposition_pct = decomposition_pct[~np.eye(n, dtype=bool)].reshape(n, n-1)
+        decomposition_pct /=  decomposition_pct.sum(axis=1).reshape(n, 1)
+        
+        in_entropy = sp.stats.entropy(decomposition_pct, axis=1, base=n-1)
+        in_entropy = in_entropy.reshape(-1, 1)
+        return in_entropy
 
     
     def summarize(self, horizon):
