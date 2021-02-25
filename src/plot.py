@@ -467,7 +467,7 @@ def plot_network_summary(df, save_path=None):
     ax2 = ax1.twinx()
     ax1.set_title('FEV Network statistics')
     l1 = ax1.plot(df['fev_avg_connectedness_normalised'], label='Average connectedness $c^{avg}$, mean='+str((df['fev_avg_connectedness_normalised']).mean().round(2)), c=colors[0])
-    l2 = ax2.plot(df['fev_asymmetry_normalised'], label='Network asymmetry, mean={}'.format((df['fev_asymmetry_normalised']).mean().round(2)), linestyle='--', c=colors[1])
+    l2 = ax2.plot(df['fev_asymmetry'], label='Network asymmetry, mean={}'.format((df['fev_asymmetry']).mean().round(2)), linestyle='--', c=colors[1])
     ax2.grid(None)
     ax1.set_ylabel('Connectedness', color=colors[0])
     ax1.tick_params(axis='y', labelcolor=colors[0])
