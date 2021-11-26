@@ -98,6 +98,20 @@ class FEVD:
         # transmission matrix
         psi_h = self.vma_matrix(horizon) @ self.error_cov @ diag_sigma
         return psi_h
+
+    def innovation_response_variance(self, horizon):
+        '''Returns the sum of the h-period covariance of observations to h
+        innovations - the innovation response variance (IRV).
+        '''
+        assert type(horizon) == int and horizon >= 0, \
+            'horizon needs to be a positive integer'
+
+        # accumulate period-wise covariance contributions
+        irv = np.zeros(self.error_cov.shape)
+        for h in range(horizon):
+            irv += self.vma_matrix(h) @ self.error_cov
+
+        return irv
         
     def fev_single(self, horizon):
         '''Returns the h-step ahead forecast error variance matrix 
