@@ -39,6 +39,20 @@ def run_estimation_short(year, month, var_grid, cov_grid, horizon):
                     .join(cov_data)\
                     .join(fevd_data)
     
+    # save estimates
+    pd.DataFrame(data=var.var_1_matrix_,
+                 index=df_log_idio_var.columns,
+                 columns=df_log_idio_var.columns)\
+        .to_csv('../data/estimated/monthly/{}/{}/var_matrix.csv'.format(year, month))
+    pd.DataFrame(data=cov.covariance_,
+                 index=df_log_idio_var.columns,
+                 columns=df_log_idio_var.columns)\
+        .to_csv('../data/estimated/monthly/{}/{}/cov_matrix.csv'.format(year, month))
+    pd.DataFrame(data=fevd.decompose_fev(horizon=horizon, normalise=True),
+                 index=df_log_idio_var.columns,
+                 columns=df_log_idio_var.columns)\
+        .to_csv('../data/estimated/monthly/{}/{}/fevd_matrix_normalised.csv'.format(year, month))
+    
     # save estimation data
     desc.to_csv('../data/estimated/monthly/{}/{}/desc.csv'.format(year, month))
     network_data.to_csv('../data/estimated/monthly/{}/{}/network_data.csv'.format(year, month))
@@ -165,34 +179,42 @@ def collect_fevd_data_short(fevd, horizon, var, data):
     fevd_data['fev_others'] = fevd.fev_others(horizon=horizon)
     fevd_data['fev_self'] = fevd.fev_self(horizon=horizon)
     
-    fevd_data['fev_in_connectedness'] = fevd.in_connectedness(horizon=horizon, normalise=False, network='fev')
-    fevd_data['fev_out_connectedness'] = fevd.out_connectedness(horizon=horizon, normalise=False, network='fev')
-    fevd_data['fev_eigenvector_centrality'] = list(nx.eigenvector_centrality(fevd.to_fev_graph(horizon, normalise=False), weight='weight', max_iter=1000).values())
-    fevd_data['fev_closeness_centrality'] = list(nx.closeness_centrality(fevd.to_fev_graph(horizon, normalise=False), distance='weight').values())
+    # non-normalised fevd
+    fevd_data['fevd_in_connectedness'] = fevd.in_connectedness(horizon=horizon, normalise=False, network='fev')
+    fevd_data['fevd_out_connectedness'] = fevd.out_connectedness(horizon=horizon, normalise=False, network='fev')
+    fevd_data['fevd_eigenvector_centrality'] = list(nx.eigenvector_centrality(fevd.to_fev_graph(horizon, normalise=False), weight='weight', max_iter=1000).values())
+    fevd_data['fevd_closeness_centrality'] = list(nx.closeness_centrality(fevd.to_fev_graph(horizon, normalise=False), distance='weight').values())
+    fevd_data['fevd_in_entropy'] = fevd.in_entropy(horizon=horizon, normalise=True, network='fev')
     
-    fevd_data['fev_in_connectedness_normalised'] = fevd.in_connectedness(horizon=horizon, normalise=True, network='fev')
-    fevd_data['fev_out_connectedness_normalised'] = fevd.out_connectedness(horizon=horizon, normalise=True, network='fev')
-    fevd_data['fev_eigenvector_centrality_normalised'] = list(nx.eigenvector_centrality(fevd.to_fev_graph(horizon, normalise=True), weight='weight', max_iter=1000).values())
-    fevd_data['fev_closeness_centrality_normalised'] = list(nx.closeness_centrality(fevd.to_fev_graph(horizon, normalise=True), distance='weight').values())
+    # normalised fevd
+    fevd_data['fevd_in_connectedness_normalised'] = fevd.in_connectedness(horizon=horizon, normalise=True, network='fev')
+    fevd_data['fevd_out_connectedness_normalised'] = fevd.out_connectedness(horizon=horizon, normalise=True, network='fev')
+    fevd_data['fevd_eigenvector_centrality_normalised'] = list(nx.eigenvector_centrality(fevd.to_fev_graph(horizon, normalise=True), weight='weight', max_iter=1000).values())
+    fevd_data['fevd_closeness_centrality_normalised'] = list(nx.closeness_centrality(fevd.to_fev_graph(horizon, normalise=True), distance='weight').values())
     
     #fu
     fevd_data['fu_total'] = fevd.fu_total(horizon=horizon)
     fevd_data['fu_others'] = fevd.fu_others(horizon=horizon)
     fevd_data['fu_self'] = fevd.fu_self(horizon=horizon)
     
-    fevd_data['fu_in_connectedness'] = fevd.in_connectedness(horizon=horizon, normalise=False, network='fu')
-    fevd_data['fu_out_connectedness'] = fevd.out_connectedness(horizon=horizon, normalise=False, network='fu')
-    fevd_data['fu_eigenvector_centrality'] = list(nx.eigenvector_centrality(fevd.to_fu_graph(horizon, normalise=False), weight='weight', max_iter=1000).values())
-    fevd_data['fu_closeness_centrality'] = list(nx.closeness_centrality(fevd.to_fu_graph(horizon, normalise=False), distance='weight').values())
+    # non-normalised fud
+    fevd_data['fud_in_connectedness'] = fevd.in_connectedness(horizon=horizon, normalise=False, network='fu')
+    fevd_data['fud_out_connectedness'] = fevd.out_connectedness(horizon=horizon, normalise=False, network='fu')
+    fevd_data['fud_eigenvector_centrality'] = list(nx.eigenvector_centrality(fevd.to_fu_graph(horizon, normalise=False), weight='weight', max_iter=1000).values())
+    fevd_data['fud_closeness_centrality'] = list(nx.closeness_centrality(fevd.to_fu_graph(horizon, normalise=False), distance='weight').values())
+    fevd_data['fud_in_entropy'] = fevd.in_entropy(horizon=horizon, normalise=True, network='fu')
     
-    fevd_data['fu_in_connectedness_normalised'] = fevd.in_connectedness(horizon=horizon, normalise=True, network='fu')
-    fevd_data['fu_out_connectedness_normalised'] = fevd.out_connectedness(horizon=horizon, normalise=True, network='fu')
-    fevd_data['fu_eigenvector_centrality_normalised'] = list(nx.eigenvector_centrality(fevd.to_fu_graph(horizon, normalise=True), weight='weight', max_iter=1000).values())
-    fevd_data['fu_closeness_centrality_normalised'] = list(nx.closeness_centrality(fevd.to_fu_graph(horizon, normalise=True), distance='weight').values())
+    # normalised fud
+    fevd_data['fud_in_connectedness_normalised'] = fevd.in_connectedness(horizon=horizon, normalise=True, network='fu')
+    fevd_data['fud_out_connectedness_normalised'] = fevd.out_connectedness(horizon=horizon, normalise=True, network='fu')
+    fevd_data['fud_eigenvector_centrality_normalised'] = list(nx.eigenvector_centrality(fevd.to_fu_graph(horizon, normalise=True), weight='weight', max_iter=1000).values())
+    fevd_data['fud_closeness_centrality_normalised'] = list(nx.closeness_centrality(fevd.to_fu_graph(horizon, normalise=True), distance='weight').values())
     
     return fevd_data
 
-##############################################################################
+
+
+######## CODE STILL IN USE ######################################################################
 
 def run_estimation(year, var_grid, cov_grid, horizon):
     #data
@@ -354,6 +376,10 @@ def collect_fevd_data(fevd, horizon, var):
     fevd_data['fu_closeness_centrality_normalised'] = list(nx.closeness_centrality(fevd.to_fu_graph(horizon, normalise=True), distance='weight').values())
     
     return fevd_data
+
+
+
+### PLOTS ###############################
 
 def create_data_plots(year, preprocessed_data, df_volas, df_spy_vola):
     src.plot.corr_heatmap(df_volas.corr(), title='Data Correlation prior to Decomposition',

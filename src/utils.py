@@ -70,12 +70,24 @@ def log_replace(df, method='mean', logs=True, **kwargs):
     df_full.fillna(0)
     return df_full
 
-def matrix_asymmetry(M):
+def matrix_asymmetry(M, drop_diag=False):
     '''Returns a (self-built) measure of matrix asymmetry.'''
-    M_s = (M+M.T)/2 # symmetric_part
-    M_a = (M-M.T)/2 # asymmetric_part
+    M_ = M.copy()
+    if drop_diag:
+        M_diag = np.diag(np.diag(M))
+        M_ -= M_diag
+    M_s = (M_+M_.T)/2 # symmetric_part
+    M_a = (M_-M_.T)/2 # asymmetric_part
     asymmetry = np.linalg.norm(M_a) / np.linalg.norm(M_s)
     return asymmetry
+
+def average_correlation(data):
+    '''Returns the average correlation coefficient among the columns of an array.'''
+    n = data.shape[1]
+    corr = data.corr().values
+    cross_corrs = corr[np.triu_indices(n, k=1)]
+    mean_corr = cross_corrs.mean()
+    return mean_corr
 
 
 
