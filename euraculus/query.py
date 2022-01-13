@@ -1,26 +1,46 @@
+"""
+This module provides a set of functions to required download data from CRSP.
+
+"""
+
 import pandas as pd
-import numpy as np
 import datetime as dt
 import sys
 
-import src
 
+def query_SQL(connection, query: str) -> pd.DataFrame:
+    """Run a SQL query through a given connection.
 
-def query_SQL(connection, query):
-    '''Runs a SQL query through a given connection.'''
+    Args:
+        connection (wrds.Connection): Connection object to CRSP.
+        query (str): SQL query as a string.
+
+    Returns:
+        df (pandas.DataFrame): The downloaded data in tabular form.
+
+    """
     t0 = dt.datetime.today()
     df = connection.raw_sql(query)
     t1 = dt.datetime.today()
-    print('collected {:.2f} MB on {} in {} seconds'\
-          .format(sys.getsizeof(df)/1e+6,
-                  str(dt.datetime.today()),
-                  (t1-t0).seconds))
+    print(
+        "collected {:.2f} MB on {} in {} seconds".format(
+            sys.getsizeof(df) / 1e6, str(dt.datetime.today()), (t1 - t0).seconds
+        )
+    )
     return df
 
 
-def create_crsp_query(year):
-    '''Creates a SQL query string to download a single year.'''
-    query = '''
+def create_crsp_query(year: int) -> str:
+    """Create a SQL query string to download a single year.
+
+    Args:
+        year (int): Year to be downloaded.
+
+    Returns:
+        query (str): SQL query to download the respective year's data.
+
+    """
+    query = """
         SELECT 
         a.permno,
         b.ticker,
@@ -45,52 +65,77 @@ def create_crsp_query(year):
         WHERE a.date BETWEEN '01/01/{}' AND '12/31/{}'
         AND b.exchcd BETWEEN 1 AND 3
         AND b.shrcd BETWEEN 10 AND 11
-        '''\
-        .format(year, year)
-    
+        """.format(
+        year, year
+    )
+
     return query
-    
-def download_crsp_year(connection, year):
-    '''Downloads a single year of CRSP dsf data and makes
-    first adjustments.
-    '''
+
+
+def download_crsp_year(connection, year: int) -> pd.DataFrame:
+    """Download a single year of CRSP dsf data and make first adjustments.
+
+    Args:
+        connection (wrds.Connection): Connection object to CRSP.
+        year (int): Year to be downloaded.
+
+    Returns:
+        df (pandas.DataFrame): The downloaded and adjusted data in tabular form.
+
+    """
     # SQL qumake_crsp_query
     query = create_crsp_query(year)
     df = query_SQL(connection, query)
-    
+
     # edit data formats
-    df['date'] = pd.to_datetime(df.date, yearfirst=True)
-    df['permno'] = df.permno.astype(int)
-    
+    df["date"] = pd.to_datetime(df.date, yearfirst=True)
+    df["permno"] = df.permno.astype(int)
+
     # adjust returns for delisting
-    df['retadj'] = (1+df['ret'].fillna(0))*(1+df['dlret'].fillna(0))-1
-    df['retadj'] = df['retadj'].where(df['ret'].notna() | df['dlret'].notna())
-    df = df.drop(columns=['ret', 'dlret'])
-    
+    df["retadj"] = (1 + df["ret"].fillna(0)) * (1 + df["dlret"].fillna(0)) - 1
+    df["retadj"] = df["retadj"].where(df["ret"].notna() | df["dlret"].notna())
+    df = df.drop(columns=["ret", "dlret"])
+
     # declare index & sort
-    df.set_index(['date','permno'], inplace=True)
+    df.set_index(["date", "permno"], inplace=True)
     df = df.sort_index()
-    
+
     return df
 
 
 def download_delisting(connection):
-    '''Downloads CRSP delisting returns.'''
-    query = '''
+    """Download CRSP delisting returns.
+
+    Args:
+        connection (wrds.Connection): Connection object to CRSP.
+
+    Returns:
+        df (pandas.DataFrame): The downloaded and adjusted data in tabular form.
+
+    """
+    query = """
         SELECT
         permno,
         dlret,
         dlstdt AS date
     
         FROM crsp.msedelist
-        '''
-    df = query_SQL(connection, query).set_index('permno')
+        """
+    df = query_SQL(connection, query).set_index("permno")
     return df
 
 
 def download_descriptive(connection):
-    '''Downloads CRSP descriptive data'''
-    query = '''
+    """Download CRSP descriptive data.
+
+    Args:
+        connection (wrds.Connection): Connection object to CRSP.
+
+    Returns:
+        df (pandas.DataFrame): The downloaded and adjusted data in tabular form.
+
+    """
+    query = """
         SELECT
         permno,
         comnam, 
@@ -100,16 +145,22 @@ def download_descriptive(connection):
         exchcd
     
         FROM crsp.msenames
-        '''
+        """
     df = query_SQL(connection, query)
-    df = df.astype({'permno': int, 'exchcd': int})\
-           .set_index('permno')
+    df = df.astype({"permno": int, "exchcd": int}).set_index("permno")
     return df
 
 
 def download_descriptive_a_stocknames(connection):
-    ''''''
-    query = '''
+    """Download full stock names from CRSP.
+
+    Args:
+        connection (wrds.Connection): Connection object to CRSP.
+
+    Returns:
+        df (pandas.DataFrame): The downloaded and adjusted data in tabular form.
+    """
+    query = """
         SELECT
         permno,
         comnam, 
@@ -119,26 +170,42 @@ def download_descriptive_a_stocknames(connection):
         exchcd
     
         FROM crsp_a_stock.stocknames
-        '''
-    df = query_SQL(connection, query).set_index('permno')
+        """
+    df = query_SQL(connection, query).set_index("permno")
     return df
 
 
 def download_famafrench(connection):
-    ''''''
-    query = '''
+    """Download Fama and French factor data from CRSP.
+
+    Args:
+        connection (wrds.Connection): Connection object to CRSP.
+
+    Returns:
+        df (pandas.DataFrame): The downloaded and adjusted data in tabular form.
+
+    """
+    query = """
         SELECT *
         FROM ff_all.factors_daily 
-        '''
+        """
     #    WHERE date BETWEEN '01/01/2000' AND '12/31/2019'
 
-    df = query_SQL(connection, query).set_index('date')
+    df = query_SQL(connection, query).set_index("date")
     return df
 
 
 def download_SPY(connection):
-    ''''''
-    query = '''
+    """Download SPY return and variance data from CRSP.
+
+    Args:
+        connection (wrds.Connection): Connection object to CRSP.
+
+    Returns:
+        df (pandas.DataFrame): The downloaded and adjusted data in tabular form.
+
+    """
+    query = """
         SELECT
         a.date,
         a.prc,
@@ -154,6 +221,6 @@ def download_SPY(connection):
         WHERE b.exchcd=4
         AND b.ticker='SPY'
         AND b.comnam='SPDR TRUST'
-        '''
-    df = query_SQL(connection, query).set_index('date')
+        """
+    df = query_SQL(connection, query).set_index("date")
     return df
