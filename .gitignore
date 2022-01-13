@@ -11,6 +11,9 @@
 !*.txt
 !*.toml
 
+# Include makefile
+!Makefile
+
 # Explicitly ignore data files
 *.pkl
 *.db
