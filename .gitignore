@@ -9,6 +9,7 @@
 !*.py
 !*.in
 !*.txt
+!*.toml
 
 # Explicitly ignore data files
 *.pkl
