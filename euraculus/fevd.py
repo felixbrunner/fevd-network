@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.core.defchararray import index
 from numpy.lib.function_base import vectorize
 import scipy as sp
 import networkx as nx
@@ -401,3 +402,45 @@ class FEVD:
 
         p_value = 1 - sp.stats.chi2.cdf(test_statistic, N * (N + 1) / 2)
         return (test_statistic, p_value)
+
+    def innovation_response_variance(self, horizon: int) -> np.array:
+        """The innovation response variance.
+
+        The H-period variance response to a vector of innovations.
+        IRV = Sum_{h=0}^{H-1} VMA_h Sigma
+
+        Args:
+            horizon (int): The horizon of accumulative innovations.
+
+        Returns:
+            innovation_response_variance (np.array): innovation response
+                variance matrix (n_series times n_series)
+
+        """
+        innovation_response_variance = np.zeros([self.n_series, self.n_series])
+        for h in range(horizon - 1):
+            innovation_response_variance += self.vma_matrix(h) @ self.error_cov
+        return innovation_response_variance
+
+    def index_variance_decomposition(self, weights: np.array, horizon: int) -> np.array:
+        """Decomposes the variance of a weighted index.
+
+        Decomposes the variance of an index created with the input index
+        weights correspoding to the FEVD constituents.
+        IVD = w' * IRV * diag(w)
+
+        Args:
+            weights (numpy.array): Index weights associated with the FEVD variables.
+            horizon (int): The horizon of accumulative innovations.
+
+        Returns:
+            index_variance_decomposition (np.array): index variance weights
+                (n_series times 1)
+        """
+        innovation_response_variance = self.innovation_response_variance(
+            horizon=horizon
+        )
+        index_variance_decomposition = (
+            weights.T @ innovation_response_variance @ np.diag(weights)
+        )
+        return index_variance_decomposition.T
