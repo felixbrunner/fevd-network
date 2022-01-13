@@ -1,0 +1,13 @@
+jupyterlab
+linearmodels
+networkx
+numpy
+pandas
+requests
+scikit-learn
+scipy
+seaborn
+SQLAlchemy
+statsmodels
+wrds
+glmnet-py

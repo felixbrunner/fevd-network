@@ -1,8 +1,8 @@
-.PHONY install requirements
+.PHONY: install requirements
 
 install:
 		pip install --upgrade pip wheel pip-tools
-		piip-sync requirements.txt
+		pip-sync requirements/requirements.txt
 		pip install -e .
 
 requirements:
