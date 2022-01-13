@@ -13,5 +13,6 @@ setup(
         "requests",
         "scipy",
         "networkx",
+        "glmnet-py",
     ],
 )
