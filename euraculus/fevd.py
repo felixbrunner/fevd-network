@@ -341,7 +341,11 @@ class FEVD:
 
     @property
     def generalized_error_cov(self):
-        """Returns the generalized innovation covariance matrix."""
+        """The generalized innovation covariance matrix.
+
+        Omega = diag(Sigma)^(1/2) * Sigma^(-1) * diag(Sigma)^(1/2)
+
+        """
         omega = (
             np.diag(np.diag(self.error_cov)) ** 0.5
             @ np.linalg.inv(self.error_cov)
@@ -352,10 +356,21 @@ class FEVD:
     def test_diagonal_generalized_innovations(
         self, t_observations: int, method: str = "ledoit-wolf"
     ):
-        """Calculate a chi2 test statistic for the null hypothesis
+        """Test diagonality of innovations.
+
+        Calculate a chi2 test statistic for the null hypothesis
         H0: Omega = Identity.
-        The test method can either be 'ledoit-wolf' or 'likelihood-ratio.
-        Returns a tuple (test_statistic, p_value).
+        The test method can either be 'ledoit-wolf' or 'likelihood-ratio'.
+
+        Args:
+            t_observations (int): Number of time observations in the sample.
+            method (str): The test statistic used,
+                either 'ledoit-wolf' or 'likelihood-ratio'.
+
+        Returns:
+            test_statistic (float): The calculated test statistic.
+            p_value (float): The corresponding p-value of the test.
+
         """
         assert method in [
             "ledoit-wolf",
@@ -363,6 +378,8 @@ class FEVD:
         ], "available methods are ledoit-wolf and likelihood-ratio"
 
         omega = self.generalized_error_cov
+        N = self.n_series
+        T = t_observations
 
         if method == "ledoit-wolf":
             test_statistic = (
@@ -378,16 +395,9 @@ class FEVD:
         elif method == "likelihood-ratio":
             df = t_observations - 1
             v = df * (
-                np.log(self.n_series)
-                - np.log(np.linalg.eigh(omega)[0].sum())
-                + np.trace(omega)
-                - self.n_series
+                np.log(N) - np.log(np.linalg.eigh(omega)[0].sum()) + np.trace(omega) - N
             )
-            test_statistic = (
-                1 - 1 / (6 * df - 1) * (2 * self.n_series + 1 - 2 / (self.n_series + 1))
-            ) * v
+            test_statistic = (1 - 1 / (6 * df - 1) * (2 * N + 1 - 2 / (N + 1))) * v
 
-        p_value = 1 - sp.stats.chi2.cdf(
-            test_statistic, self.n_series * (self.n_series + 1) / 2
-        )
+        p_value = 1 - sp.stats.chi2.cdf(test_statistic, N * (N + 1) / 2)
         return (test_statistic, p_value)
