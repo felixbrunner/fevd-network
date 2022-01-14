@@ -11,3 +11,4 @@ SQLAlchemy
 statsmodels
 wrds
 glmnet-py
+jupytext
