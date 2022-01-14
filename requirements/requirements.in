@@ -12,3 +12,4 @@ statsmodels
 wrds
 glmnet-py
 jupytext
+git+https://github.com/felixbrunner/kungfu.git
