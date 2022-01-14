@@ -312,6 +312,7 @@ def preprocess(
     # slice
     df_back = df_back[df_back.index.isin(permnos, level="permno")]
     df_forward = df_forward[df_forward.index.isin(permnos, level="permno")]
+    df_summary = df_summary[df_summary.index.isin(permnos)]
 
     # dump
     path = "../data/processed/monthly/{}/{}/".format(year, month)
@@ -319,6 +320,7 @@ def preprocess(
         os.mkdir(path)
     df_back.to_csv(path + "df_back.csv")
     df_forward.to_csv(path + "df_forward.csv")
+    df_summary.to_csv(path + "df_summary.csv")
 
 
 # def summarise_crsp_year(year: int, consider_next: bool = True) -> pd.DataFrame:
