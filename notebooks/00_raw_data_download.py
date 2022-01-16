@@ -23,34 +23,26 @@
 # %autoreload 2
 
 # %%
-import wrds
-
-import sys
-
-sys.path.append("../")
-import euraculus
+from euraculus.download import WRDSDownloader
 
 # %% [markdown]
 # ## Set up WRDS Connection
 
 # %%
-wrds_conn = wrds.Connection(wrds_username="felixbru")
-# wrds_conn.create_pgpass_file()
-# wrds_connection.close()
+db = WRDSDownloader()
+db._create_pgpass_file()
 
 # %% [markdown]
 # #### Explore database
 
 # %%
-libraries = wrds_conn.list_libraries()
-library = "crsp"
+libraries = db.list_libraries()
 
 # %%
-library_tables = wrds_conn.list_tables(library=library)
-table = "dsf"
+library_tables = db.list_tables(library="crsp")
 
 # %%
-table_description = wrds_conn.describe_table(library=library, table=table)
+table_description = db.describe_table(library="crsp", table="dsf")
 
 # %% [markdown]
 # ## Download CRSP data
@@ -69,8 +61,9 @@ table_description = wrds_conn.describe_table(library=library, table=table)
 # - 11: Ordinary common share, no special status necessary
 
 # %%
-for year in range(1993, 2021):  # range(1960, 2020):
-    df = euraculus.query.download_crsp_year(wrds_conn, year)
+# %%time
+for year in range(1993, 2022):  # range(1960, 2020):
+    df = db.download_crsp_year(year=year)
     df.to_pickle(path="../data/raw/crsp_{}.pkl".format(year))
     if year % 5 == 0:
         print("    Year {} done.".format(year))
@@ -79,14 +72,16 @@ for year in range(1993, 2021):  # range(1960, 2020):
 # ### Delisting Returns
 
 # %%
-df_delist = euraculus.query.download_delisting(wrds_conn)
+# %%time
+df_delist = db.download_delisting_returns()
 df_delist.to_pickle(path="../data/raw/delisting.pkl")
 
 # %% [markdown]
 # ### Descriptive Data
 
 # %%
-df_descriptive = euraculus.query.download_descriptive(wrds_conn)
+# %%time
+df_descriptive = db.download_stocknames()
 df_descriptive.to_pickle(path="../data/raw/descriptive.pkl")
 
 # %% [markdown]
@@ -96,12 +91,14 @@ df_descriptive.to_pickle(path="../data/raw/descriptive.pkl")
 # ### SQL Query
 
 # %%
-df_ff = euraculus.query.download_famafrench(wrds_conn)
+# %%time
+df_ff = db.download_famafrench_factors()
 df_ff.to_pickle(path="../data/raw/ff_factors.pkl")
 
 # %% [markdown]
 # ## SPDR Trust SPY Index data
 
 # %%
-df_spy = euraculus.query.download_SPY(wrds_conn)
+# %%time
+df_spy = db.download_spy_data()
 df_spy.to_pickle(path="../data/raw/spy.pkl")
