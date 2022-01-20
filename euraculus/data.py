@@ -148,29 +148,22 @@ class DataMap:
 
         # check path variables
         if not path.exists():
-            same_stem = [path.stem == f.stem for f in self.files]
-            if sum(same_stem) == 1:
-                hit = [file for file, same in zip(self.files, same_stem) if same][0]
+            hits = self.search(path.name)
+            if len(hits) == 1:
                 warnings.warn(
                     "file at '{}' does not exist, reading file '{}' from datamap instead".format(
-                        path, hit
+                        path, hits[0]
                     )
                 )
-                path = hit
+                path = hits[0]
             else:
                 raise ValueError(
                     "file at '{}' does not exist, found {} similar files in datamap: {}".format(
                         path,
-                        sum(same_stem),
-                        [
-                            str(file)
-                            for file, same in zip(self.files, same_stem)
-                            if same
-                        ],
+                        len(hits),
+                        hits if len(hits) > 0 else None,
                     )
                 )
-            # except:
-            #     raise ValueError("file at '{}' does not exist".format(path))
         extension = path.suffix
 
         # read csv
@@ -194,3 +187,32 @@ class DataMap:
             )
 
         return data
+
+    def search(self, query: str) -> list:
+        """Find filepaths in datamap corresponding to a search query.
+
+        Args:
+            query: Search term, can be filename or part of a path.
+
+        Returns:
+            hits: List of found filepaths.
+
+        """
+        querypath = Path(query)
+
+        # search for exact filename matches
+        same_name = [querypath.name == file.name for file in self.files]
+        if sum(same_name) > 0:
+            hits = [file for file, same in zip(self.files, same_name) if same]
+            return hits
+
+        # search for stem matches
+        same_stem = [querypath.stem == file.stem for file in self.files]
+        if sum(same_stem) > 0:
+            hits = [file for file, same in zip(self.files, same_stem) if same]
+            return hits
+
+        # search for partial matches
+        in_filepath = [query in str(file) for file in self.files]
+        hits = [file for file, inpath in zip(self.files, in_filepath) if inpath]
+        return hits
