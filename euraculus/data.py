@@ -1,7 +1,4 @@
-"""This module provides tools to download raw data from WRDS via SQL queries.
-
-The WRDSDownloader object will establish a connection to the database and enable
-some pre-defined queries to download the required data for the project.
+"""This module provides convenient access to the local filesystem for data.
 
 """
 
@@ -19,7 +16,7 @@ class DataMap:
     DataMap serves to manage the local data storage on disk.
 
     Attributes:
-        path (pathlib.Path): Path to the data storage directory.
+        datapath (pathlib.Path): Path to the data storage directory.
         files (list): List of paths of all files in all subdirectories.
 
     """
@@ -76,7 +73,7 @@ class DataMap:
 
         """
         # complete path
-        path = Path(path)
+        path = Path(path.strip("/"))
         if not self.datapath in path.parents:
             path = self.datapath / path
 
@@ -142,7 +139,7 @@ class DataMap:
         """
 
         # complete path
-        path = Path(path)
+        path = Path(path.strip("/"))
         if not self.datapath in path.parents:
             path = self.datapath / path
 
@@ -216,3 +213,247 @@ class DataMap:
         in_filepath = [query in str(file) for file in self.files]
         hits = [file for file, inpath in zip(self.files, in_filepath) if inpath]
         return hits
+
+    def load_famafrench_factors(
+        self, year: int = None, model: str = None
+    ) -> pd.DataFrame:
+        """Loads Fama/French factor data from drive.
+
+        Contained series are:
+            mktrf
+            smb
+            hml
+            rf
+            umd
+
+        Args:
+            year (optional): To only load observation of a single year.
+            model (optional): To load data only for one of the following options
+                ['capm', 'rf', 'ff3f', 'c4f']
+
+        Returns:
+            df_famafrench: Loaded data in tabular form.
+
+        """
+
+        # read & prepare
+        df_famafrench = self.read("raw/ff_factors.pkl")
+        df_famafrench.index = pd.to_datetime(df_famafrench.index, yearfirst=True)
+
+        # subselection of factors
+        if model:
+            if not model in ["capm", "rf", "ff3f", "c4f"]:
+                raise ValueError(
+                    "model '{}' not available, available options are ['capm', 'rf', 'ff3f', 'c4f']".format(
+                        model
+                    )
+                )
+            elif model == "capm":
+                df_famafrench = df_famafrench[["mktrf"]]
+            elif model == "rf":
+                df_famafrench = df_famafrench[["rf"]]
+            elif model == "ff3f":
+                df_famafrench = df_famafrench[["mktrf", "smb", "hml"]]
+            elif model == "c4f":
+                df_famafrench = df_famafrench[["mktrf", "smb", "hml", "umd"]]
+
+        # slice out single year
+        if year:
+            df_famafrench = df_famafrench[df_famafrench.index.year == year]
+
+        return df_famafrench
+
+    def load_spy_data(self, year: int = None, series: str = None) -> pd.DataFrame:
+        """Loads SPY data from disk.
+
+        Args:
+            year (int): Year to be loaded (optional), defaults to loading all years.
+            series (str): Column to be included in output.
+
+        Returns:
+            df (pandas.DataFrame): Selected SPY data in tabular format.
+
+        """
+        # read & prepare
+        df_spy = self.read("raw/spy.pkl")
+        df_spy.index = pd.to_datetime(df_spy.index, yearfirst=True)
+
+        # subselection of factors
+        if series:
+            if not series in df_spy.columns:
+                raise ValueError(
+                    "series '{}' not available, available options are {}".format(
+                        series, list(df_spy.columns)
+                    )
+                )
+            else:
+                df_spy = df_spy[[series]]
+
+        # slice out single year
+        if year:
+            df_spy = df_spy[df_spy.index.year == year]
+
+        return df_spy
+
+    def load_descriptive_data(self, date: str = None) -> pd.DataFrame:
+        """Loads descriptive data from disk.
+
+        Args:
+            date (optional): Reference date to filter descriptive data.
+                Can be dt.datetime or string, e.g. format 'YYYY-MM-DD'.
+
+        Returns:
+            df_descriptive: Descriptive data in tabular format.
+
+        """
+        # read & prepare
+        df_descriptive = self.read("raw/descriptive.pkl")
+        df_descriptive.index = df_descriptive.index.astype(int)
+        df_descriptive = df_descriptive.astype({"exchcd": int})
+        date_cols = ["namedt", "nameendt"]
+        df_descriptive[date_cols] = df_descriptive[date_cols].apply(
+            pd.to_datetime, format="%Y-%m-%d"
+        )
+
+        # filter at reference date
+        if date:
+            date = self._prepare_date(date)
+            df_descriptive = df_descriptive.loc[
+                (df_descriptive.namedt <= date) & (df_descriptive.nameendt >= date)
+            ]
+
+        return df_descriptive
+
+    def _prepare_date(self, dateinput: str):
+        """Transform input string into datetime object.
+
+        Args:
+            dateinput: Input date as dt.datetime or string, e.g. format 'YYYY-MM-DD'.
+
+        Returns:
+            date: Transformed input as datetime object.
+
+        """
+        try:
+            date = pd.to_datetime(dateinput)
+        except:
+            raise ValueError(
+                "date '{}' could not be converted to datetime, try format 'YYYY-MM-DD'".format(
+                    date
+                )
+            )
+
+        return date
+
+    def load_crsp_data(self, start_date, end_date):
+        """Loads raw CRSP data for a given date range from disk.
+
+        Args:
+            start_date: First date as dt.datetime or string, e.g. format 'YYYY-MM-DD'.
+            end_date: Last date as dt.datetime or string, e.g. format 'YYYY-MM-DD'.
+
+        Returns:
+            df_crsp: CRSP data in tabular format.
+
+        """
+        # set up
+        start_date = self._prepare_date(start_date)
+        end_date = self._prepare_date(end_date)
+        df_crsp = pd.DataFrame()
+
+        # read and combine
+        for year in range(start_date.year, end_date.year + 1):
+            # read raw
+            df_year = self.read("/raw/crsp_{}.pkl".format(year))
+
+            # slice dates
+            if year == start_date.year:
+                df_year = df_year.loc[
+                    (df_year.index.get_level_values("date") >= start_date)
+                ]
+            if year == end_date.year:
+                df_year = df_year.loc[
+                    (df_year.index.get_level_values("date") <= end_date)
+                ]
+
+            # append output
+            df_crsp = df_crsp.append(df_year)
+
+        return df_crsp
+
+    # def load_sampling_data(
+    #     self,
+    #     year: int,
+    #     month: int = 12,
+    #     months_back: int = 12,
+    #     months_forward: int = 12,
+    # ):
+    #     """Extract backward and forward looking data given a sampling date.
+
+    #     Load a DataFrame containing the data for the specified window.
+    #     If forward window reaches into unavailable data, this period is ignored.
+
+    #     Args:
+    #         year (int): Specifies the year of the sampling date.
+    #         month (int): Specifies the month of the sampling date.
+    #         months_back (int): Number of previous months to include.
+    #         months_forward (int): Number of subsequent months to include.
+
+    #     Returns:
+    #         df_back (pandas.DataFrame): Data of the prevous months.
+    #         df_forward (pandas.DataFrame): Data of the subsequent months.
+
+    #     """
+    #     # define parameters
+    #     steps_back = abs((month - months_back) // 12)
+    #     steps_forward = (month + months_forward - 1) // 12
+
+    #     # load complete dataframe
+    #     df = pd.DataFrame()
+    #     for y in range(year - steps_back, year + steps_forward + 1):
+    #         if y <= year:
+    #             df = df.append(euraculus.loader.load_crsp_year(y).sort_index())
+    #         else:
+    #             try:
+    #                 df = df.append(euraculus.loader.load_crsp_year(y).sort_index())
+    #             except:
+    #                 pass
+
+    #     # construct backwards dataframe
+    #     df_back = pd.DataFrame()
+    #     y = year
+    #     m = month
+    #     while months_back > 0:
+    #         df_back = df[
+    #             (df.index.get_level_values("date").year == y)
+    #             & (df.index.get_level_values("date").month == m)
+    #         ].append(df_back)
+    #         if m > 1:
+    #             m -= 1
+    #         else:
+    #             m = 12
+    #             y -= 1
+    #         months_back -= 1
+
+    #     # construct forward dataframe
+    #     df_forward = pd.DataFrame()
+    #     y = year
+    #     m = month
+    #     while months_forward > 0:
+    #         if m < 12:
+    #             m += 1
+    #         else:
+    #             m = 1
+    #             y += 1
+    #         try:
+    #             df_forward = df_forward.append(
+    #                 df[
+    #                     (df.index.get_level_values("date").year == y)
+    #                     & (df.index.get_level_values("date").month == m)
+    #                 ]
+    #             )
+    #         except:
+    #             pass
+    #         months_forward -= 1
+
+    #     return (df_back, df_forward)
