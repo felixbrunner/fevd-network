@@ -21,16 +21,19 @@ class DataMap:
 
     """
 
-    def __init__(self, datapath: str):
-        """Sets up the datamap of local filesystem.
+    def __init__(self, datapath: str = None):
+        """Set up the datamap of local filesystem.
 
         Args:
             datapath (str): Path to the topmost local data folder named 'data'.
 
         """
         # path
-        if datapath == "":
+        if not datapath:
             self.datapath = Path().cwd() / "data"
+            warnings.warn(
+                "no datapath input, setting datapath to '{}'".format(self.datapath)
+            )
         else:
             datapath = Path(datapath)
             if datapath.name != "data":
@@ -324,7 +327,8 @@ class DataMap:
 
         return df_descriptive
 
-    def _prepare_date(self, dateinput: str):
+    @staticmethod
+    def _prepare_date(dateinput: str) -> pd.Timestamp:
         """Transform input string into datetime object.
 
         Args:
@@ -345,7 +349,7 @@ class DataMap:
 
         return date
 
-    def load_crsp_data(self, start_date, end_date):
+    def load_crsp_data(self, start_date: str, end_date: str) -> pd.DataFrame:
         """Loads raw CRSP data for a given date range from disk.
 
         Args:
@@ -359,12 +363,26 @@ class DataMap:
         # set up
         start_date = self._prepare_date(start_date)
         end_date = self._prepare_date(end_date)
-        df_crsp = pd.DataFrame()
+        df_crsp = pd.DataFrame(
+            index=pd.MultiIndex.from_arrays(arrays=[[], []], names=("date", "permno"))
+        )
 
         # read and combine
         for year in range(start_date.year, end_date.year + 1):
             # read raw
-            df_year = self.read("/raw/crsp_{}.pkl".format(year))
+            try:
+                df_year = self.read("/raw/crsp_{}.pkl".format(year))
+            except ValueError:
+                warnings.warn(
+                    "CRSP data for year {} does not exist locally, will be skipped".format(
+                        year
+                    )
+                )
+                df_year = pd.DataFrame(
+                    index=pd.MultiIndex.from_arrays(
+                        arrays=[[], []], names=("date", "permno")
+                    ),
+                )
 
             # slice dates
             if year == start_date.year:
@@ -380,80 +398,3 @@ class DataMap:
             df_crsp = df_crsp.append(df_year)
 
         return df_crsp
-
-    # def load_sampling_data(
-    #     self,
-    #     year: int,
-    #     month: int = 12,
-    #     months_back: int = 12,
-    #     months_forward: int = 12,
-    # ):
-    #     """Extract backward and forward looking data given a sampling date.
-
-    #     Load a DataFrame containing the data for the specified window.
-    #     If forward window reaches into unavailable data, this period is ignored.
-
-    #     Args:
-    #         year (int): Specifies the year of the sampling date.
-    #         month (int): Specifies the month of the sampling date.
-    #         months_back (int): Number of previous months to include.
-    #         months_forward (int): Number of subsequent months to include.
-
-    #     Returns:
-    #         df_back (pandas.DataFrame): Data of the prevous months.
-    #         df_forward (pandas.DataFrame): Data of the subsequent months.
-
-    #     """
-    #     # define parameters
-    #     steps_back = abs((month - months_back) // 12)
-    #     steps_forward = (month + months_forward - 1) // 12
-
-    #     # load complete dataframe
-    #     df = pd.DataFrame()
-    #     for y in range(year - steps_back, year + steps_forward + 1):
-    #         if y <= year:
-    #             df = df.append(euraculus.loader.load_crsp_year(y).sort_index())
-    #         else:
-    #             try:
-    #                 df = df.append(euraculus.loader.load_crsp_year(y).sort_index())
-    #             except:
-    #                 pass
-
-    #     # construct backwards dataframe
-    #     df_back = pd.DataFrame()
-    #     y = year
-    #     m = month
-    #     while months_back > 0:
-    #         df_back = df[
-    #             (df.index.get_level_values("date").year == y)
-    #             & (df.index.get_level_values("date").month == m)
-    #         ].append(df_back)
-    #         if m > 1:
-    #             m -= 1
-    #         else:
-    #             m = 12
-    #             y -= 1
-    #         months_back -= 1
-
-    #     # construct forward dataframe
-    #     df_forward = pd.DataFrame()
-    #     y = year
-    #     m = month
-    #     while months_forward > 0:
-    #         if m < 12:
-    #             m += 1
-    #         else:
-    #             m = 1
-    #             y += 1
-    #         try:
-    #             df_forward = df_forward.append(
-    #                 df[
-    #                     (df.index.get_level_values("date").year == y)
-    #                     & (df.index.get_level_values("date").month == m)
-    #                 ]
-    #             )
-    #         except:
-    #             pass
-    #         months_forward -= 1
-
-    #     return (df_back, df_forward)
