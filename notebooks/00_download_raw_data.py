@@ -24,13 +24,17 @@
 
 # %%
 from euraculus.download import WRDSDownloader
+from euraculus.data import DataMap
 
 # %% [markdown]
-# ## Set up WRDS Connection
+# ## Set up WRDS Connection & DataMap
 
 # %%
 db = WRDSDownloader()
 db._create_pgpass_file()
+
+# %%
+data = DataMap('../data')
 
 # %% [markdown]
 # #### Explore database
@@ -64,7 +68,7 @@ table_description = db.describe_table(library="crsp", table="dsf")
 # %%time
 for year in range(1993, 2022):  # range(1960, 2020):
     df = db.download_crsp_year(year=year)
-    df.to_pickle(path="../data/raw/crsp_{}.pkl".format(year))
+    data.write(df, 'raw/crsp_{}.pkl'.format(year))
     if year % 5 == 0:
         print("    Year {} done.".format(year))
 
@@ -74,7 +78,7 @@ for year in range(1993, 2022):  # range(1960, 2020):
 # %%
 # %%time
 df_delist = db.download_delisting_returns()
-df_delist.to_pickle(path="../data/raw/delisting.pkl")
+data.write(df_delist, '/raw/delisting.pkl')
 
 # %% [markdown]
 # ### Descriptive Data
@@ -82,7 +86,7 @@ df_delist.to_pickle(path="../data/raw/delisting.pkl")
 # %%
 # %%time
 df_descriptive = db.download_stocknames()
-df_descriptive.to_pickle(path="../data/raw/descriptive.pkl")
+data.write(df_descriptive, '/raw/descriptive.pkl')
 
 # %% [markdown]
 # ## Download FF data
@@ -93,7 +97,7 @@ df_descriptive.to_pickle(path="../data/raw/descriptive.pkl")
 # %%
 # %%time
 df_ff = db.download_famafrench_factors()
-df_ff.to_pickle(path="../data/raw/ff_factors.pkl")
+data.write(df_ff, '/raw/ff_factors.pkl')
 
 # %% [markdown]
 # ## SPDR Trust SPY Index data
@@ -101,4 +105,4 @@ df_ff.to_pickle(path="../data/raw/ff_factors.pkl")
 # %%
 # %%time
 df_spy = db.download_spy_data()
-df_spy.to_pickle(path="../data/raw/spy.pkl")
+data.write(df_spy, '/raw/spy.pkl')

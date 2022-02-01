@@ -12,38 +12,78 @@ import pandas as pd
 # import euraculus
 
 
-def load_crsp_year(year: int) -> pd.DataFrame:
-    """Read a single year of raw crsp data.
+# # moved to datamap.load_crsp_data
+# def load_crsp_year(year: int) -> pd.DataFrame:
+#     """Read a single year of raw crsp data.
 
-    Used in the sampling step.
+#     Used in the sampling step.
+
+#     Args:
+#         year (int): Year of data to be loaded.
+
+#     Returns:
+#         df (pandas.DataFrame): Loaded data in tabular form.
+#     """
+#     df = pd.read_pickle("../data/raw/crsp_{}.pkl".format(year))
+#     return df
+
+
+# def load_spy(year: int = None, columns: list = None) -> pd.DataFrame:
+#     """Loads SPY data from disk.
+
+#     This is used in factor model step.
+
+#     Args:
+#         year (int): Year to be loaded (optional), defaults to loading all years.
+#         columns (list): Column names to be included in output.
+
+#     Returns:
+#         df (pandas.DataFrame): Selected SPY data in tabular format.
+
+#     """
+#     df = pd.read_pickle("../data/raw/spy.pkl").reset_index()
+#     df["date"] = pd.to_datetime(df["date"], yearfirst=True)
+#     df = df.set_index("date")
+#     if year:
+#         df = df[df.index.year == year]
+#     if columns:
+#         df = df[columns]
+#     return df
+
+
+# def load_factors(year: int = None) -> pd.DataFrame:
+#     """Load factor data from disk.
+
+#     Returns factor data as pandas DataFrame.
+#     Can be limited to a single year.
+
+#     Args:
+#         year (int): Year to be loaded (optional), defaults to loading all years.
+
+#     Returns:
+#         df (pandas.DataFrame): Factor data in tabular format.
+
+#     """
+#     df = pd.read_pickle("../data/raw/ff_factors.pkl").reset_index()
+#     df["date"] = pd.to_datetime(df["date"], yearfirst=True)
+#     df = df.set_index("date")
+#     if year is not None:
+#         df = df[df.index.year == year]
+#     return df
+
+
+def load_monthly_crsp(year: int, month: int, which: str = "back", column: str = None):
+    """Loads monthly sampled CRSP data from disk.
 
     Args:
-        year (int): Year of data to be loaded.
+        year (int): Year of the sampling date.
+        month (int): Month of the sampling date.
+        which (str): Defines if forward or backward looking data should be loaded.
+            Options are 'back' and 'forward'.
+        column (str): Name of a single column to be loaded (optional).
 
     Returns:
-        df (pandas.DataFrame): Loaded data in tabular form.
-    """
-    df = pd.read_pickle("../data/raw/crsp_{}.pkl".format(year))
-    return df
-
-
-def load_spy(year=None, columns=None):
-    """This is used in factor model step."""
-    df = pd.read_pickle("../data/raw/spy.pkl").reset_index()
-    df["date"] = pd.to_datetime(df["date"], yearfirst=True)
-    df = df.set_index("date")
-    if year:
-        df = df[df.index.year == year]
-    if columns:
-        df = df[columns]
-    return df
-
-
-def load_monthly_crsp(year, month, which="back", column=None):
-    """Loads a monthly sampled dataframe.
-    'year' and 'month' define the sampling date
-    'which' argument defines if forward or backward looking data should be loaded.
-    'column' argument (optional) can be specified to load a single column as data matrix.
+        df (pandas.DataFrame): CRSP data in tabular form.
     """
     # load raw
     if which == "back":
@@ -98,16 +138,6 @@ def load_monthly_estimation_data(year, month, column=None):
     return df.sort_index()
 
 
-def load_descriptive():
-    """Loads the descriptive data and returns pandas DataFrame."""
-    df_desc = pd.read_csv("../data/processed/descriptive.csv")
-    df_desc = df_desc.astype({"permno": int, "exchcd": int}).set_index("permno")
-    df_desc[["namedt", "nameendt"]] = df_desc[["namedt", "nameendt"]].apply(
-        pd.to_datetime, format="%Y-%m-%d"
-    )
-    return df_desc
-
-
 def load_year(sampling_year, data="returns", data_year=None):
     """Returns the data for a specific year.
     Can be either estimation or analysis data (next year).
@@ -150,6 +180,7 @@ def load_year(sampling_year, data="returns", data_year=None):
 #     return df
 
 
+# replaced by DataMap.load_descriptive_data
 def load_year_tickers(year):
     """Returns a dictionary"""
     tickers = pd.read_csv("../data/processed/annual/{}/tickers.csv".format(year))
@@ -157,14 +188,15 @@ def load_year_tickers(year):
     return tickers
 
 
-def load_descriptive():
-    """Loads the descriptive data and returns pandas DataFrame."""
-    df_desc = pd.read_csv("../data/processed/descriptive.csv")
-    df_desc = df_desc.astype({"permno": int, "exchcd": int}).set_index("permno")
-    df_desc[["namedt", "nameendt"]] = df_desc[["namedt", "nameendt"]].apply(
-        pd.to_datetime, format="%Y-%m-%d"
-    )
-    return df_desc
+# replaced by DataMap.load_descriptive_data
+# def load_descriptive():
+#     """Loads the descriptive data and returns pandas DataFrame."""
+#     df_desc = pd.read_csv("../data/processed/descriptive.csv")
+#     df_desc = df_desc.astype({"permno": int, "exchcd": int}).set_index("permno")
+#     df_desc[["namedt", "nameendt"]] = df_desc[["namedt", "nameendt"]].apply(
+#         pd.to_datetime, format="%Y-%m-%d"
+#     )
+#     return df_desc
 
 
 def load_rf(year=None, month=None, which="back"):
@@ -183,18 +215,6 @@ def load_rf(year=None, month=None, which="back"):
             select += 12
         df = df[df.index.to_period("M").isin(select)]
     return df.sort_index()
-
-
-def load_factors(year=None):
-    """Returns factor data as pandas DataFrame.
-    Can be limited to a single year.
-    """
-    df = pd.read_pickle("../data/raw/ff_factors.pkl").reset_index()
-    df["date"] = pd.to_datetime(df["date"], yearfirst=True)
-    df = df.set_index("date")
-    if year is not None:
-        df = df[df.index.year == year]
-    return df
 
 
 # def load_descriptive():
