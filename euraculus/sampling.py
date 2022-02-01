@@ -35,7 +35,7 @@ class LargeCapSampler:
         self.forward_offset = forward_offset
 
     @property
-    def data(self):
+    def data(self) -> DataMap:
         """DataMap object to allow local data access."""
         if self._data:
             return self._data
