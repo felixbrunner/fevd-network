@@ -229,6 +229,8 @@ class DataMap:
                 a filename, or a filename with extension.
 
         """
+        path = Path(path)
+
         # read exiting data from disk if it exists and combine
         try:
             df_left = self.read(path=path)
@@ -258,6 +260,7 @@ class DataMap:
 
         # write data to disk if no file exists
         except ValueError:
+            print("Creating file '{}' at {}.".format(path.name, path.parent))
             self.write(data, path=path)
 
     def load_famafrench_factors(
@@ -558,3 +561,45 @@ class DataMap:
             df_estimates = df_estimates[names]
 
         return df_estimates
+
+    def make_sample_indices(self, year: int, month: int, which: str = "back"):
+        """Collects excess returns data on three asset indices.
+
+        Included indices are:
+            - equally-weighted
+            - value-weighted at the beginning of the observation period
+            - the SPY index
+
+        Args:
+            year: Year of the sampling date.
+                month: Month of the sampling date.
+                which: Defines if forward or backward looking data should be loaded.
+                    Options are 'back' and 'forward'.
+
+        Returns:
+            df_indices: Index data in tabular form.
+
+        """
+        # load required data
+        df_returns = self.load_sample(
+            year=year, month=month, which=which, column="retadj"
+        )
+        df_mcaps = self.load_sample(year=year, month=month, which=which, column="mcap")
+        df_rf = self.load_rf()
+        df_spy = self.load_spy_data()[["ret"]]
+
+        # prepare data
+        df_returns -= df_rf.loc[df_returns.index].values
+        weights = df_mcaps.iloc[0] / df_mcaps.iloc[0].sum()
+
+        # outputs
+        df_indices = pd.DataFrame(
+            index=df_returns.index, columns=pd.Index(["ew", "vw", "spy"], name="index")
+        )
+        df_indices["ew"] = df_returns.mean(axis=1)
+        df_indices["vw"] = (df_returns * weights).sum(axis=1)
+        df_indices["spy"] = (
+            df_spy.loc[df_returns.index].values - df_rf.loc[df_returns.index].values
+        )
+
+        return df_indices
