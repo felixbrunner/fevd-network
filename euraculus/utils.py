@@ -1,17 +1,47 @@
 # imports
 import numpy as np
-import pandas as pd
+from string import ascii_uppercase as ALPHABET
+
+# import pandas as pd
 
 # from sklearn.model_selection import PredefinedSplit
-import euraculus
+# import euraculus
 
 
-def lookup_ticker(ticker, year):
-    """Returns descriptive data for a given ticker in a given year"""
-    data = euraculus.loader.load_descriptive().reset_index().set_index("ticker")
-    data = data[(data.namedt.dt.year <= year) & (data.nameendt.dt.year >= year)]
-    data = data.loc[ticker]
-    return data
+# def lookup_ticker(ticker, year):
+#     """Returns descriptive data for a given ticker in a given year"""
+#     data = euraculus.loader.load_descriptive().reset_index().set_index("ticker")
+#     data = data[(data.namedt.dt.year <= year) & (data.nameendt.dt.year >= year)]
+#     data = data.loc[ticker]
+#     return data
+
+
+def make_ticker_dict(tickers: list) -> dict:
+    """Create column-to-ticker dictionary and add .<ALPHA> to duplicate tickers.
+
+    Args:
+        tickers: list of ticker strings, e.g ["ABC", "XYZ", "OPQ", "ABC", "KLM"]
+
+    Returns:
+        column_to_ticker: column, ticker pairs with identifying letters appended,
+            ["ABC.A", "XYZ", "OPQ", "ABC.B", "KLM"]
+
+    """
+    # set up output
+    column_to_ticker = {i: ticker for i, ticker in enumerate(tickers)}
+
+    # find indices for each unique ticker
+    for ticker in set(tickers):
+        ticker_indices = [
+            col for col, value in column_to_ticker.items() if value == ticker
+        ]
+
+        # append if duplicate
+        if len(ticker_indices) > 1:
+            for occurence, ticker_index in enumerate(ticker_indices):
+                column_to_ticker[ticker_index] += "." + ALPHABET[occurence]
+
+    return column_to_ticker
 
 
 def calculate_nonzero_shrinkage(array, benchmark_array):

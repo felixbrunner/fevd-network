@@ -67,8 +67,6 @@ while sampling_date <= last_sampling_date:
     # increment monthly end of month
     print("Completed summary stats estimation at {}".format(sampling_date.date()))
     sampling_date += relativedelta(months=1, day=31)
-    
-    break
 
 # %% [markdown]
 # ## Indices summary stats
@@ -102,7 +100,5 @@ while sampling_date <= last_sampling_date:
     # increment monthly end of month
     print("Completed summary stats estimation at {}".format(sampling_date.date()))
     sampling_date += relativedelta(months=1, day=31)
-    
-    break
 
 # %%

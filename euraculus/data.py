@@ -241,9 +241,11 @@ class DataMap:
             duplicates = set(df_left.columns).intersection(set(data.columns))
             if len(duplicates) > 0:
                 warnings.warn(
-                    "columns {} already stored and will be ignored".format(duplicates)
+                    "columns {} already stored and will be overwritten".format(
+                        duplicates
+                    )
                 )
-            data = data.drop(columns=duplicates)
+            df_left = df_left.drop(columns=duplicates)
 
             # combine
             df_merged = (
@@ -539,7 +541,7 @@ class DataMap:
         """Read estimated values from disk.
 
         Args:
-            date (optional): Reference date to filter descriptive data.
+            date: Reference date to filter descriptive data.
                 Can be dt.datetime or string, e.g. format 'YYYY-MM-DD'.
             names: Names of the columns to be included in the output.
 
@@ -572,9 +574,9 @@ class DataMap:
 
         Args:
             year: Year of the sampling date.
-                month: Month of the sampling date.
-                which: Defines if forward or backward looking data should be loaded.
-                    Options are 'back' and 'forward'.
+            month: Month of the sampling date.
+            which: Defines if forward or backward looking data should be loaded.
+                Options are 'back' and 'forward'.
 
         Returns:
             df_indices: Index data in tabular form.
@@ -603,3 +605,24 @@ class DataMap:
         )
 
         return df_indices
+
+    def lookup_ticker(self, tickers: list, date: str) -> pd.DataFrame:
+        """Looks up information for a specific ticker on a given date.
+
+        Args:
+            ticker: The ticker to look up.
+            date: Reference date to filter descriptive data.
+                Can be dt.datetime or string, e.g. format 'YYYY-MM-DD'.
+
+        Returns:
+            ticker_data: Descriptive data for the specific ticker.
+
+        """
+        # make ticker list
+        if type(tickers) == str:
+            tickers = tickers.split(",")
+
+        # load & lookup
+        df_descriptive = self.load_descriptive_data(date=date)
+        ticker_data = df_descriptive[df_descriptive.ticker.isin(tickers)]
+        return ticker_data
