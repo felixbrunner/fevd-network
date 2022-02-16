@@ -1,5 +1,5 @@
 # %% [markdown]
-# # 03 - Data Summary Stats
+# # Data Summary Stats
 #
 #
 #
@@ -39,33 +39,34 @@ last_sampling_date = dt.datetime(year=2021, month=12, day=31)
 sampling_date = first_sampling_date
 while sampling_date <= last_sampling_date:
     # get samples
-    df_back = data.load_sample(sampling_date.year, sampling_date.month, which="back", column="retadj")
-    df_back -= df_rf.loc[df_back.index].values
+    df_historic = data.load_historic(sampling_date=sampling_date, column="retadj")
+    df_historic -= df_rf.loc[df_historic.index].values
     
     # calculate stats
-    df_stats = pd.DataFrame(index=df_back.columns)
-    df_stats["ret_excess"] = (1 + df_back).prod() - 1
-    df_stats["var_annual"] = df_back.var() * 252
+    df_stats = pd.DataFrame(index=df_historic.columns)
+    df_stats["ret_excess"] = (1 + df_historic).prod() - 1
+    df_stats["var_annual"] = df_historic.var() * 252
     
-    # get excess return samples
-    df_forward = data.load_sample(sampling_date.year, sampling_date.month, which="forward", column="retadj")
-    df_forward -= df_rf.loc[df_forward.index].values
-    
-    # slice expanding window
-    df_expanding_estimates = pd.DataFrame(index=df_forward.columns)
-    for window_length in range(1, 13):
-        end_date = sampling_date + relativedelta(months=window_length, day=31)
-        df_window = df_forward[df_forward.index <= end_date]
-    
-        # calculate stats in window
-        df_stats["ret_excess_next{}M".format(window_length)] = (1 + df_window).prod() - 1
-        df_stats["var_annual_next{}M".format(window_length)] = df_window.var() * 252
+    if sampling_date < last_sampling_date:
+        # get excess return samples
+        df_future = data.load_future(sampling_date=sampling_date, column="retadj")
+        df_future -= df_rf.loc[df_future.index].values
+
+        # slice expanding window
+        df_expanding_estimates = pd.DataFrame(index=df_future.columns)
+        for window_length in range(1, 13):
+            end_date = sampling_date + relativedelta(months=window_length, day=31)
+            df_window = df_future[df_future.index <= end_date]
+
+            # calculate stats in window
+            df_stats["ret_excess_next{}M".format(window_length)] = (1 + df_window).prod() - 1
+            df_stats["var_annual_next{}M".format(window_length)] = df_window.var() * 252
     
     # store
-    data.store(data=df_stats, path="samples/{0}{1:0=2d}/df_estimates.csv".format(sampling_date.year, sampling_date.month))
+    data.store(data=df_stats, path="samples/{:%Y-%m-%d}/asset_estimates.csv".format(sampling_date))
     
     # increment monthly end of month
-    print("Completed summary stats estimation at {}".format(sampling_date.date()))
+    print("Completed summary stats estimation at {:%Y-%m-%d}".format(sampling_date))
     sampling_date += relativedelta(months=1, day=31)
 
 # %% [markdown]
@@ -76,29 +77,29 @@ while sampling_date <= last_sampling_date:
 sampling_date = first_sampling_date
 while sampling_date <= last_sampling_date:
     # get samples
-    df_back = data.make_sample_indices(sampling_date.year, sampling_date.month, which="back")
-    df_forward = data.make_sample_indices(sampling_date.year, sampling_date.month, which="forward")
+    historic_indices, future_indices = data.make_sample_indices(sampling_date=sampling_date)
     
     # calculate stats
-    df_stats = pd.DataFrame(index=df_back.columns)
-    df_stats["ret_excess"] = (1 + df_back).prod() - 1
-    df_stats["var_annual"] = df_back.var() * 252
+    df_stats = pd.DataFrame(index=historic_indices.columns)
+    df_stats["ret_excess"] = (1 + historic_indices).prod() - 1
+    df_stats["var_annual"] = historic_indices.var() * 252
     
-    # slice expanding window
-    df_expanding_estimates = pd.DataFrame(index=df_forward.columns)
-    for window_length in range(1, 13):
-        end_date = sampling_date + relativedelta(months=window_length, day=31)
-        df_window = df_forward[df_forward.index <= end_date]
-    
-        # calculate stats in window
-        df_stats["ret_excess_next{}M".format(window_length)] = (1 + df_window).prod() - 1
-        df_stats["var_annual_next{}M".format(window_length)] = df_window.var() * 252
+    if sampling_date < last_sampling_date:
+        # slice expanding window
+        df_expanding_estimates = pd.DataFrame(index=future_indices.columns)
+        for window_length in range(1, 13):
+            end_date = sampling_date + relativedelta(months=window_length, day=31)
+            df_window = future_indices[future_indices.index <= end_date]
+
+            # calculate stats in window
+            df_stats["ret_excess_next{}M".format(window_length)] = (1 + df_window).prod() - 1
+            df_stats["var_annual_next{}M".format(window_length)] = df_window.var() * 252
     
     # store
-    data.store(data=df_stats, path="samples/{0}{1:0=2d}/df_indices.csv".format(sampling_date.year, sampling_date.month))
+    data.store(data=df_stats, path="samples/{:%Y-%m-%d}/index_estimates.csv".format(sampling_date))
     
     # increment monthly end of month
-    print("Completed summary stats estimation at {}".format(sampling_date.date()))
+    print("Completed summary stats estimation at {:%Y-%m-%d}".format(sampling_date))
     sampling_date += relativedelta(months=1, day=31)
 
 # %%

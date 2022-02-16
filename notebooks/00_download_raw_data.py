@@ -27,7 +27,10 @@ from euraculus.download import WRDSDownloader
 from euraculus.data import DataMap
 
 # %% [markdown]
-# ## Set up WRDS Connection & DataMap
+# ## Set up
+
+# %% [markdown]
+# ### WRDS Connection & DataMap
 
 # %%
 db = WRDSDownloader()
@@ -35,6 +38,13 @@ db._create_pgpass_file()
 
 # %%
 data = DataMap('../data')
+
+# %% [markdown]
+# ### Timeframe
+
+# %%
+first_year = 1993
+last_year = 2021
 
 # %% [markdown]
 # #### Explore database
@@ -63,10 +73,6 @@ table_description = db.describe_table(library="crsp", table="dsf")
 # SHRCD:
 # - 10: Ordinary common share, no special status found
 # - 11: Ordinary common share, no special status necessary
-
-# %%
-first_year = 1993
-last_year = 2021
 
 # %%
 # %%time

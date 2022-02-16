@@ -6,7 +6,6 @@
 import pandas as pd
 import numpy as np
 import euraculus
-# import kungfu as kf
 import datetime as dt
 from dateutil.relativedelta import relativedelta
 from euraculus.data import DataMap
@@ -32,8 +31,8 @@ last_sampling_date = dt.datetime(year=2021, month=12, day=31)
 sampling_date = first_sampling_date
 while sampling_date <= last_sampling_date:
     # load betas
-    df_var = data.load_sample(sampling_date.year, sampling_date.month, which="back", column="var")
-    df_betas = data.load_estimates(date=sampling_date, names=["spy_capm_spy"])
+    df_var = data.load_historic(sampling_date=sampling_date, column="var")
+    df_betas = data.load_asset_estimates(sampling_date=sampling_date, columns=["spy_capm_spy"])
     spy_data = df_spy.loc[df_var.index]
     
     # decompose
@@ -43,19 +42,19 @@ while sampling_date <= last_sampling_date:
     df_decomposition = df_decomposition.loc[:, ["sys", "idio"]].add_prefix("var_")
     
     # store
-    data.store(data=df_decomposition, path="samples/{0}{1:0=2d}/df_back.csv".format(sampling_date.year, sampling_date.month))
+    data.store(data=df_decomposition, path="samples/{:%Y-%m-%d}/historic_daily.csv".format(sampling_date))
     
     # increment monthly end of month
-    print("Completed decomposition at {}".format(sampling_date.date()))
+    print("Completed decomposition at {:%Y-%m-%d}".format(sampling_date))
     sampling_date += relativedelta(months=1, day=31)
 
 # ### Forward part as expanding window
 
 # %%time
 sampling_date = first_sampling_date
-while sampling_date <= last_sampling_date:
+while sampling_date < last_sampling_date:
     # load betas
-    df_var = data.load_sample(sampling_date.year, sampling_date.month, which="forward", column="var")
+    df_var = data.load_future(sampling_date=sampling_date, column="var")
     spy_data = df_spy.loc[df_var.index]
     
     # slice expanding window
@@ -64,7 +63,7 @@ while sampling_date <= last_sampling_date:
         end_date = sampling_date + relativedelta(months=window_length, day=31)
         df_window = df_var[df_var.index <= end_date]
         spy_window = spy_data[spy_data.index <= end_date]
-        betas_window = data.load_estimates(date=sampling_date, names=["spy_capm_spy_next{}M".format(window_length)])
+        betas_window = data.load_asset_estimates(sampling_date=sampling_date, columns=["spy_capm_spy_next{}M".format(window_length)])
     
         # decompose
         df_decomposition = euraculus.factor.decompose_variance(
@@ -76,10 +75,10 @@ while sampling_date <= last_sampling_date:
         df_expanding_decompositions = df_expanding_decompositions.join(df_decomposition)
     
     # store
-    data.store(data=df_expanding_decompositions, path="samples/{0}{1:0=2d}/df_forward.csv".format(sampling_date.year, sampling_date.month))
+    data.store(data=df_expanding_decompositions, path="samples/{:%Y-%m-%d}/future_daily.csv".format(sampling_date))
     
     # increment monthly end of month
-    print("Completed factor model estimation at {}".format(sampling_date.date()))
+    print("Completed factor model estimation at {:%Y-%m-%d}".format(sampling_date))
     sampling_date += relativedelta(months=1, day=31)
 
 
