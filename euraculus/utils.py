@@ -1,11 +1,8 @@
-# imports
+"""This module contains a collection of helper functions for the project."""
+
 import numpy as np
+import pandas as pd
 from string import ascii_uppercase as ALPHABET
-
-# import pandas as pd
-
-# from sklearn.model_selection import PredefinedSplit
-# import euraculus
 
 
 # def lookup_ticker(ticker, year):
@@ -44,22 +41,154 @@ def make_ticker_dict(tickers: list) -> dict:
     return column_to_ticker
 
 
-def calculate_nonzero_shrinkage(array, benchmark_array):
-    """Calculates the shrinkage factor of the nonzero elements in an array
-    with regards to a benchmark array of the same dimensions.
+def log_replace(
+    df: pd.DataFrame, method: str = "min", logs: bool = True
+) -> pd.DataFrame:
+    """Take logarithms of input DataFrame and fills missing values.
+
+    The method argument specifies how missing values after taking logarithms
+    are to be filled (includes negative values before taking logs).
+
+    Args:
+        df: Input data in a DataFrame.
+        method: Method to fill missing values (includes negative values
+            before taking logs). Options are ["min", "mean", "interpolate", "zero"].
+        logs: Indicates if logarithms are to be taken, defaults to True.
+
+    Returns:
+        df_: The transformed data.
+
     """
-    mean_scaling = (
-        1 - abs(array[array != 0]).mean() / abs(benchmark_array[array != 0]).mean()
-    )
-    return mean_scaling
+    # logarithms
+    if logs:
+        df_ = np.log(df)
+
+    # fill missing
+    if method == "min":
+        df_ = df_.fillna(value=df_.min())
+    elif method == "mean":
+        df_ = df_.fillna(df_.mean())
+    elif method == "interpolate":
+        df_ = df_.interpolate()
+    elif method == "zero":
+        df_ = df_.fillna(0)
+    else:
+        raise ValueError("method '{}' not defined".format(method))
+
+    return df_
 
 
-def calculate_full_shrinkage(array, benchmark_array):
-    """Calculates the scaling factor of the nonzero elements in an array
-    with regards to a benchmark array of the same dimensions.
+def matrix_asymmetry(M: np.ndarray, drop_diag: bool = False) -> float:
+    """Return a (self-built) measure of matrix asymmetry.
+
+    The measure is calculated as asymmetry = |M_a| / |M_s|, where
+        |.|: Frobenius norm of .
+        M_a: the asymmetric part of M = (M - M') / 2
+        M_s: the symmetric part of M = (M + M') / 2
+    The matrix diagonal can be excluded by setting drop_diag=True.
+
+    Args:
+        M: The (square) matrix to be analyzed.
+        drop_diag: Indicates if the diagonal should be excluded from the calculations.
+
+    Returns:
+        asymmetry: The calculated symmetry measure.
+
     """
+    M_ = M.copy()
+    if drop_diag:
+        M_diag = np.diag(np.diag(M))
+        M_ -= M_diag
+    M_s = (M_ + M_.T) / 2  # symmetric_part
+    M_a = (M_ - M_.T) / 2  # asymmetric_part
+    asymmetry = np.linalg.norm(M_a) / np.linalg.norm(M_s)
+    return asymmetry
+
+
+def shrinkage_factor(
+    array: np.ndarray,
+    benchmark_array: np.ndarray,
+    drop_zeros: bool = False,
+) -> float:
+    """Calculate the average shrinkage factor of the elements in an array.
+
+    Shrinkage is calculated with regards to a benchmark array of the same dimensions.
+    Zero values in array can be excluded by setting drop_zeros=True.
+
+    Args:
+        array: The array to be evaluated.
+        benchmark_array: A benchmark of the same array dimensions as array.
+        drop_zeros: Indicates if zero elements should be excluded from the calculations.
+
+    Returns:
+        mean_scaling: The average scaling factor of the non-zero elements.
+
+    """
+    if drop_zeros:
+        benchmark_array = benchmark_array[array != 0]
+        array = array[array != 0]
+
     mean_shrinkage = 1 - abs(array).mean() / abs(benchmark_array).mean()
+
     return mean_shrinkage
+
+
+def cov_to_corr(cov: np.ndarray) -> np.ndarray:
+    """Transform a covariance matrix into a correlation matrix.
+
+    Args:
+        cov: Covariance matrix to be transformed.
+
+    Returns:
+        corr: Correlation matrix corresponding to the input covariance matrix.
+
+    """
+    stds = np.sqrt(np.diag(cov)).reshape(-1, 1)
+    std_prod = stds @ stds.T
+    corr = cov / std_prod
+    return corr
+
+
+# def calculate_nonzero_shrinkage(
+#     array: np.ndarray,
+#     benchmark_array: np.ndarray,
+# ) -> float:
+#     """Calculate the shrinkage factor of the nonzero elements in an array.
+
+#     Shrinkage is calculated with regards to a benchmark array of the same dimensions.
+
+#     Args:
+#         array: The array to be evaluated.
+#         benchmark_array: A benchmark of the same array dimensions as array.
+
+#     Returns:
+#         mean_scaling: The average scaling factor of the non-zero elements.
+
+#     """
+#     mean_scaling = (
+#         1 - abs(array[array != 0]).mean() / abs(benchmark_array[array != 0]).mean()
+#     )
+#     return mean_scaling
+
+
+# def calculate_full_shrinkage(
+#     array: np.ndarray,
+#     benchmark_array: np.ndarray,
+# ) -> float:
+#     """Calculates the scaling factor of all elements in an array.
+
+#     Shrinkage is calculated with regards to a benchmark array of the same dimensions.
+
+#     Args:
+#         array: The array to be evaluated.
+#         benchmark_array: A benchmark of the same array dimensions as array.
+
+#     Returns:
+#         mean_scaling: The average scaling factor of the non-zero elements.
+
+#     """
+#     mean_shrinkage = 1 - abs(array).mean() / abs(benchmark_array).mean()
+#     return mean_shrinkage
 
 
 def autocorrcoef(X, lag=1):
@@ -67,14 +196,6 @@ def autocorrcoef(X, lag=1):
     N = X.shape[1]
     autocorr = np.corrcoef(X[lag:], X.shift(lag)[lag:], rowvar=False)[N:, :N]
     return autocorr
-
-
-def cov_to_corr(cov):
-    """Returns a correlation matrix corresponding to the input covariance matrix."""
-    stds = np.sqrt(np.diag(cov)).reshape(-1, 1)
-    std_prod = stds @ stds.T
-    corr = cov / std_prod
-    return corr
 
 
 def prec_to_pcorr(prec):
@@ -88,43 +209,19 @@ def prec_to_pcorr(prec):
     return pcorr
 
 
-def log_replace(df, method="mean", logs=True, **kwargs):
-    """Takes logarithms of input DataFrame and fills missing
-    values with an input fill method.
+def average_correlation(data: pd.DataFrame) -> float:
+    """Calculate the average correlation coefficient among the columns of an array.
+
+    Average correlation is calculated as the average off-diagonal value in the
+    Pearson correlation matrix.
+
+    Args:
+        data: The dataset to be evaluated.
+
+    Returns:
+        mean_corr: The calculated average correaltion.
+
     """
-    df_full = df.copy()
-
-    # logarithms
-    if logs:
-        df_full = np.log(df_full)
-
-    # fill missing
-    if method == "mean":
-        df_full = df_full.fillna(df_full.mean())
-    elif method == "interpolate":
-        df_full = df_full.interpolate()
-    elif method == "interpolate":
-        df_full = df_full.ffill(**kwargs)
-    elif method == "min":
-        df_full = df_full.fillna(value=df_full.min())
-    df_full.fillna(0)
-    return df_full
-
-
-def matrix_asymmetry(M, drop_diag=False):
-    """Returns a (self-built) measure of matrix asymmetry."""
-    M_ = M.copy()
-    if drop_diag:
-        M_diag = np.diag(np.diag(M))
-        M_ -= M_diag
-    M_s = (M_ + M_.T) / 2  # symmetric_part
-    M_a = (M_ - M_.T) / 2  # asymmetric_part
-    asymmetry = np.linalg.norm(M_a) / np.linalg.norm(M_s)
-    return asymmetry
-
-
-def average_correlation(data):
-    """Returns the average correlation coefficient among the columns of an array."""
     n = data.shape[1]
     corr = data.corr().values
     cross_corrs = corr[np.triu_indices(n, k=1)]

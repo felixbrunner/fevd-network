@@ -265,11 +265,7 @@ class DataMap:
             print("Creating file '{}' at {}.".format(path.name, path.parent))
             self.write(data, path=path)
 
-    def load_famafrench_factors(
-        self,
-        model: str = None,
-        # year: int = None
-    ) -> pd.DataFrame:
+    def load_famafrench_factors(self, model: str = None) -> pd.DataFrame:
         """Loads Fama/French factor data from drive.
 
         Contained series are:
@@ -310,17 +306,9 @@ class DataMap:
             elif model == "c4f":
                 df_famafrench = df_famafrench[["mktrf", "smb", "hml", "umd"]]
 
-        # # slice out single year
-        # if year:
-        #     df_famafrench = df_famafrench[df_famafrench.index.year == year]
-
         return df_famafrench
 
-    def load_spy_data(
-        self,
-        # year: int = None,
-        series: str = None,
-    ) -> pd.DataFrame:
+    def load_spy_data(self, series: str = None) -> pd.DataFrame:
         """Loads SPY data from disk.
 
         Args:
@@ -345,10 +333,6 @@ class DataMap:
                 )
             else:
                 df_spy = df_spy[[series]]
-
-        # # slice out single year
-        # if year:
-        #     df_spy = df_spy[df_spy.index.year == year]
 
         return df_spy
 
@@ -405,7 +389,10 @@ class DataMap:
 
     @classmethod
     def _slice_daterange(
-        cls, df: pd.DataFrame, start_date: str = None, end_date: str = None
+        cls,
+        df: pd.DataFrame,
+        start_date: str = None,
+        end_date: str = None,
     ) -> pd.DataFrame:
         """Cuts out a slice between two dates from a dataframe.
 
@@ -506,26 +493,21 @@ class DataMap:
 
         return df_rf
 
-    def load_sample(
-        self, year: int, month: int, which: str = "back", column: str = None
-    ) -> pd.DataFrame:
-        """Loads monthly sampled CRSP data from disk.
+    def load_historic(self, sampling_date: str, column: str = None) -> pd.DataFrame:
+        """Load a sample of historic CRSP data from disk.
 
         Args:
-            year: Year of the sampling date.
-            month: Month of the sampling date.
-            which: Defines if forward or backward looking data should be loaded.
-                Options are 'back' and 'forward'.
+            sampling_date: The sampling date as dt.datetime or string,
+                e.g. format 'YYYY-MM-DD'.
             column: Name of a single column to be loaded (optional).
 
         Returns:
-            df: CRSP data in tabular form.
+            df: Historic CRSP sample in tabular form.
+
         """
-        # load raw
-        if which == "back":
-            df = self.read("samples/{0}{1:0=2d}/df_back.csv".format(year, month))
-        elif which == "forward":
-            df = self.read("samples/{0}{1:0=2d}/df_forward.csv".format(year, month))
+        # prepare & load raw
+        sampling_date = self._prepare_date(sampling_date)
+        df = self.read("samples/{:%Y-%m-%d}/historic_daily.csv".format(sampling_date))
 
         # format
         df["date"] = pd.to_datetime(df["date"])
@@ -533,38 +515,225 @@ class DataMap:
 
         # return data matrix if column is chosen
         if column:
-            df = df[column].unstack()
+            if type(column) != str:
+                raise ValueError(
+                    "specify single column as a string, not {}".format(type(column))
+                )
+            order = df.index.get_level_values("permno").unique().tolist()
+            df = df[column].unstack().loc[:, order]
 
-        return df.sort_index()
+        return df
 
-    def load_estimates(self, date: str, names: list = None) -> pd.DataFrame:
-        """Read estimated values from disk.
+    def load_future(self, sampling_date: str, column: str = None) -> pd.DataFrame:
+        """Load a sample of forward looking CRSP data from disk.
 
         Args:
-            date: Reference date to filter descriptive data.
+            sampling_date: The sampling date as dt.datetime or string,
+                e.g. format 'YYYY-MM-DD'.
+            column: Name of a single column to be loaded (optional).
+
+        Returns:
+            df: Forward looking CRSP sample in tabular form.
+
+        """
+        # prepare & load raw
+        sampling_date = self._prepare_date(sampling_date)
+        df = self.read("samples/{:%Y-%m-%d}/future_daily.csv".format(sampling_date))
+
+        # format
+        df["date"] = pd.to_datetime(df["date"])
+        df = df.set_index(["date", "permno"])
+
+        # return data matrix if column is chosen
+        if column:
+            if type(column) != str:
+                raise ValueError(
+                    "specify single column as a string, not {}".format(type(column))
+                )
+            order = df.index.get_level_values("permno").unique().tolist()
+            df = df[column].unstack().loc[:, order]
+
+        return df
+
+    def load_asset_estimates(
+        self,
+        sampling_date: str = None,
+        columns: list = None,
+    ) -> pd.DataFrame:
+        """Read estimated values on asset level from disk.
+
+        Args:
+            sampling_date (optional): Reference date to filter descriptive data.
                 Can be dt.datetime or string, e.g. format 'YYYY-MM-DD'.
-            names: Names of the columns to be included in the output.
+            columns (optional): Names of the columns to be included in the output.
 
         Returns:
             df_estimates: The estimates read from disk.
 
         """
-        # read and format
-        date = self._prepare_date(date)
-        df_estimates = self.read(
-            path="samples/{0}{1:0=2d}/df_estimates.csv".format(date.year, date.month)
-        )
-        df_estimates = df_estimates.set_index("permno")
+        # read single file
+        if sampling_date:
+            sampling_date = self._prepare_date(sampling_date)
+            df_estimates = self.read(
+                path="samples/{:%Y-%m-%d}/asset_estimates.csv".format(sampling_date)
+            )
+            df_estimates = df_estimates.set_index("permno")
+
+        # read multiple files
+        else:
+            df_estimates = pd.DataFrame()
+            for sample in (self.datapath / "samples").iterdir():
+                df_sample = self.read(
+                    path="samples/{}/asset_estimates.csv".format(sample.name)
+                )
+                df_sample["sampling_date"] = pd.to_datetime(sample.name)
+                df_estimates = df_estimates.append(df_sample)
+            df_estimates = df_estimates.set_index(["sampling_date", "permno"])
 
         # slice out particular estimates
-        if names:
-            if type(names) == str:
-                names = [names]
-            df_estimates = df_estimates[names]
+        if columns:
+            if type(columns) == str:
+                columns = [columns]
+            df_estimates = df_estimates[columns]
 
         return df_estimates
 
-    def make_sample_indices(self, year: int, month: int, which: str = "back"):
+    def load_index_estimates(
+        self,
+        sampling_date: str = None,
+        columns: list = None,
+    ) -> pd.DataFrame:
+        """Read estimated values on index level from disk.
+
+        Args:
+            sampling_date (optional): Reference date to filter descriptive data.
+                Can be dt.datetime or string, e.g. format 'YYYY-MM-DD'.
+            columns (optional): Names of the columns to be included in the output.
+
+        Returns:
+            df_estimates: The estimates read from disk.
+
+        """
+        # read single file
+        if sampling_date:
+            sampling_date = self._prepare_date(sampling_date)
+            df_estimates = self.read(
+                path="samples/{:%Y-%m-%d}/index_estimates.csv".format(sampling_date)
+            )
+            df_estimates = df_estimates.set_index("index")
+
+        # read multiple files
+        else:
+            df_estimates = pd.DataFrame()
+            for sample in (self.datapath / "samples").iterdir():
+                df_sample = self.read(
+                    path="samples/{}/index_estimates.csv".format(sample.name)
+                )
+                df_sample["sampling_date"] = pd.to_datetime(sample.name)
+                df_estimates = df_estimates.append(df_sample)
+            df_estimates = df_estimates.set_index(["sampling_date", "index"])
+
+        # slice out particular estimates
+        if columns:
+            if type(columns) == str:
+                columns = [columns]
+            df_estimates = df_estimates[columns]
+
+        return df_estimates
+
+    def load_selection_summary(
+        self,
+        sampling_date: str = None,
+        columns: list = None,
+    ) -> pd.DataFrame:
+        """Read summary table used for sample selection from disk.
+
+        Args:
+            sampling_date (optional): Reference date to filter descriptive data.
+                Can be dt.datetime or string, e.g. format 'YYYY-MM-DD'.
+            columns (optional): Names of the columns to be included in the output.
+
+        Returns:
+            df_summary: The estimates read from disk.
+
+        """
+        # read single file
+        if sampling_date:
+            sampling_date = self._prepare_date(sampling_date)
+            df_summary = self.read(
+                path="samples/{:%Y-%m-%d}/selection_summary.csv".format(sampling_date)
+            )
+            df_summary = df_summary.set_index("permno")
+
+        # read multiple files
+        else:
+            df_summary = pd.DataFrame()
+            for sample in (self.datapath / "samples").iterdir():
+                if sample.name == ".ipynb_checkpoints":
+                    pass
+                else:
+                    df_sample = self.read(
+                        path="samples/{}/selection_summary.csv".format(sample.name)
+                    )
+                    df_sample["sampling_date"] = pd.to_datetime(sample.name)
+                    df_summary = df_summary.append(df_sample)
+            df_summary = df_summary.set_index(["sampling_date", "permno"])
+
+        # slice out particular column
+        if columns:
+            if type(columns) == str:
+                columns = [columns]
+            df_summary = df_summary[columns]
+
+        return df_summary
+
+    def load_estimation_summary(
+        self,
+        sampling_date: str = None,
+        columns: list = None,
+    ) -> pd.DataFrame:
+        """Read summary table from estimation from disk.
+
+        Args:
+            sampling_date (optional): Reference date to filter descriptive data.
+                Can be dt.datetime or string, e.g. format 'YYYY-MM-DD'.
+            columns (optional): Names of the columns to be included in the output.
+
+        Returns:
+            df_summary: The estimates read from disk.
+
+        """
+        # read single file
+        if sampling_date:
+            sampling_date = self._prepare_date(sampling_date)
+            df_summary = self.read(
+                path="samples/{:%Y-%m-%d}/estimation_summary.csv".format(sampling_date)
+            )
+            df_summary = df_summary.set_index("permno")
+
+        # read multiple files
+        else:
+            df_summary = pd.DataFrame()
+            for sample in (self.datapath / "samples").iterdir():
+                if sample.name == ".ipynb_checkpoints":
+                    pass
+                else:
+                    df_sample = self.read(
+                        path="samples/{}/estimation_summary.csv".format(sample.name)
+                    )
+                    df_sample["sampling_date"] = pd.to_datetime(sample.name)
+                    df_summary = df_summary.append(df_sample)
+            df_summary = df_summary.set_index(["sampling_date", "permno"])
+
+        # slice out particular column
+        if columns:
+            if type(columns) == str:
+                columns = [columns]
+            df_summary = df_summary[columns]
+
+        return df_summary
+
+    def make_sample_indices(self, sampling_date: str):
         """Collects excess returns data on three asset indices.
 
         Included indices are:
@@ -573,44 +742,72 @@ class DataMap:
             - the SPY index
 
         Args:
-            year: Year of the sampling date.
-            month: Month of the sampling date.
-            which: Defines if forward or backward looking data should be loaded.
-                Options are 'back' and 'forward'.
+            sampling_date: Reference date to filter descriptive data.
+                Can be dt.datetime or string, e.g. format 'YYYY-MM-DD'.
 
         Returns:
-            df_indices: Index data in tabular form.
+            historic_indices: Index observations for historic dates.
+            future_indices: Index observations for future dates.
 
         """
         # load required data
-        df_returns = self.load_sample(
-            year=year, month=month, which=which, column="retadj"
+        df_historic = self.load_historic(sampling_date=sampling_date, column="retadj")
+        historic_weights = self.load_historic(
+            sampling_date=sampling_date, column="mcap"
         )
-        df_mcaps = self.load_sample(year=year, month=month, which=which, column="mcap")
+        try:
+            df_future = self.load_future(sampling_date=sampling_date, column="retadj")
+            future_weights = self.load_future(
+                sampling_date=sampling_date, column="mcap"
+            )
+            future = True
+        except KeyError:
+            future = False
         df_rf = self.load_rf()
         df_spy = self.load_spy_data()[["ret"]]
 
         # prepare data
-        df_returns -= df_rf.loc[df_returns.index].values
-        weights = df_mcaps.iloc[0] / df_mcaps.iloc[0].sum()
+        df_historic -= df_rf.loc[df_historic.index].values
+        historic_weights = historic_weights / historic_weights.sum(
+            axis=1
+        ).values.reshape(-1, 1)
+        if future:
+            df_future -= df_rf.loc[df_future.index].values
+            future_weights = future_weights / future_weights.sum(axis=1).values.reshape(
+                -1, 1
+            )
 
-        # outputs
-        df_indices = pd.DataFrame(
-            index=df_returns.index, columns=pd.Index(["ew", "vw", "spy"], name="index")
+        # historic outputs
+        historic_indices = pd.DataFrame(
+            index=df_historic.index, columns=pd.Index(["ew", "vw", "spy"], name="index")
         )
-        df_indices["ew"] = df_returns.mean(axis=1)
-        df_indices["vw"] = (df_returns * weights).sum(axis=1)
-        df_indices["spy"] = (
-            df_spy.loc[df_returns.index].values - df_rf.loc[df_returns.index].values
+        historic_indices["ew"] = df_historic.mean(axis=1)
+        historic_indices["vw"] = (df_historic * historic_weights).sum(axis=1)
+        historic_indices["spy"] = (
+            df_spy.loc[df_historic.index].values - df_rf.loc[df_historic.index].values
         )
 
-        return df_indices
+        # future outputs
+        if future:
+            future_indices = pd.DataFrame(
+                index=df_future.index,
+                columns=pd.Index(["ew", "vw", "spy"], name="index"),
+            )
+            future_indices["ew"] = df_future.mean(axis=1)
+            future_indices["vw"] = (df_future * future_weights).sum(axis=1)
+            future_indices["spy"] = (
+                df_spy.loc[df_future.index].values - df_rf.loc[df_future.index].values
+            )
+        else:
+            future_indices = None
+
+        return (historic_indices, future_indices)
 
     def lookup_ticker(self, tickers: list, date: str) -> pd.DataFrame:
         """Looks up information for a specific ticker on a given date.
 
         Args:
-            ticker: The ticker to look up.
+            tickers: The tickers to look up.
             date: Reference date to filter descriptive data.
                 Can be dt.datetime or string, e.g. format 'YYYY-MM-DD'.
 
@@ -624,5 +821,30 @@ class DataMap:
 
         # load & lookup
         df_descriptive = self.load_descriptive_data(date=date)
-        ticker_data = df_descriptive[df_descriptive.ticker.isin(tickers)]
+        ticker_data = pd.DataFrame(columns=df_descriptive.columns)
+        for ticker in tickers:
+            ticker_data = ticker_data.append(
+                df_descriptive.loc[df_descriptive.ticker == ticker, :]
+            )
         return ticker_data
+
+    def lookup_permnos(self, permnos: list, date: str) -> pd.DataFrame:
+        """Looks up information for a specific ticker on a given date.
+
+        Args:
+            permnos: The permnos to look up.
+            date: Reference date to filter descriptive data.
+                Can be dt.datetime or string, e.g. format 'YYYY-MM-DD'.
+
+        Returns:
+            ticker_data: Descriptive data for the specific ticker.
+
+        """
+        # make permno list
+        if type(permnos) == int:
+            permnos = [permnos]
+
+        # load & lookup
+        df_descriptive = self.load_descriptive_data(date=date)
+        permno_data = df_descriptive.loc[permnos]
+        return permno_data

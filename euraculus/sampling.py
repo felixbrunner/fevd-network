@@ -197,6 +197,28 @@ class LargeCapSampler:
         tickers = df["ticker"].unstack().tail(1).squeeze().rename("ticker")
         return tickers
 
+    def _get_company_names(self, df: pd.DataFrame) -> pd.Series:
+        """Get company names for the data contained in dataframe.
+
+        Return a series of company names for all permos in the dataframe.
+
+        Args:
+            df: CRSP data with permnos as indices
+
+        Returns:
+            comnams: Permno, company name pairs from dataframe.
+
+        """
+        # set up
+        df_ = df["ticker"].unstack()
+        permnos = df_.columns.tolist()
+        date = df_.index[-1]
+
+        # lookup
+        comnams = self._data.lookup_permno(permnos=permnos, date=date).comnam
+        company_names = pd.Series(index=permnos, data=comnams)
+        return company_names
+
     def _describe_sampling_data(
         self, df_back: pd.DataFrame, df_forward: pd.DataFrame
     ) -> pd.DataFrame:
@@ -224,6 +246,7 @@ class LargeCapSampler:
         df_summary = (
             self._get_tickers(df_back)
             .to_frame()
+            .join(self._get_company_names(df_back))
             .join(self._has_all_days(df_back))
             .join(self._has_obs(df_back, df_forward).rename("has_next_obs"))
             .join(self._get_last_sizes(df_back))
@@ -250,7 +273,7 @@ class LargeCapSampler:
 
         return df_summary
 
-    def _select_largest(self, df_summary: pd.DataFrame, method: str = "last") -> list:
+    def _select_largest(self, df_summary: pd.DataFrame, method: str = "mean") -> list:
         """Pick N lagest companies.
 
         Return a list of permnos of the n companies
@@ -288,22 +311,31 @@ class LargeCapSampler:
            sampling_date: Sampling date as dt.datetime or string, e.g. format 'YYYY-MM-DD'.
 
         Returns:
-            df_back: Sampled data of the period prior to the sampling date.
-            df_forward: Sampled data of the period after the sampling date.
+            df_historic: Sampled data of the period prior to the sampling date.
+            df_future: Sampled data of the period after the sampling date.
             df_summary: Summary data used to determine selection.
 
         """
         # set up data
         sampling_date = self._prepare_date(sampling_date)
-        df_back, df_forward = self._load_sampling_data(sampling_date)
+        df_historic, df_future = self._load_sampling_data(sampling_date)
 
         # select assets
-        df_summary = self._describe_sampling_data(df_back, df_forward)
-        permnos = self._select_largest(df_summary)
+        df_summary = self._describe_sampling_data(df_historic, df_future)
+        permnos = self._select_largest(df_summary, method="mean")
 
         # slice
-        df_back = df_back[df_back.index.isin(permnos, level="permno")]
-        df_forward = df_forward[df_forward.index.isin(permnos, level="permno")]
-        df_summary = df_summary  # [df_summary.index.isin(permnos)]
+        df_historic = df_historic.loc[
+            pd.MultiIndex.from_product(
+                [df_historic.index.get_level_values("date").unique().tolist(), permnos],
+                names=["date", "permno"],
+            )
+        ]
+        df_future = df_future.loc[
+            pd.MultiIndex.from_product(
+                [df_future.index.get_level_values("date").unique().tolist(), permnos],
+                names=["date", "permno"],
+            )
+        ]
 
-        return (df_back, df_forward, df_summary)
+        return (df_historic, df_future, df_summary)
