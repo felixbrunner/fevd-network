@@ -3,7 +3,7 @@ import scipy as sp
 import pandas as pd
 
 from sklearn.base import BaseEstimator
-from src.net import ElasticNet
+from euraculus.net import ElasticNet
 from sklearn.linear_model import LinearRegression
 from sklearn.covariance import GraphicalLasso
 
