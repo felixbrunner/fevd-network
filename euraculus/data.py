@@ -583,11 +583,21 @@ class DataMap:
         else:
             df_estimates = pd.DataFrame()
             for sample in (self.datapath / "samples").iterdir():
-                df_sample = self.read(
-                    path="samples/{}/asset_estimates.csv".format(sample.name)
-                )
-                df_sample["sampling_date"] = pd.to_datetime(sample.name)
-                df_estimates = df_estimates.append(df_sample)
+                if sample.name == ".ipynb_checkpoints":
+                    pass
+                else:
+                    try:
+                        df_sample = self.read(
+                            path="samples/{}/asset_estimates.csv".format(sample.name)
+                        )
+                        df_sample["sampling_date"] = pd.to_datetime(sample.name)
+                        df_estimates = df_estimates.append(df_sample)
+                    except ValueError:
+                        warnings.warn(
+                            "File at 'samples/{}/asset_estimates.csv' does not exist, will be skipped".format(
+                                sample.name
+                            )
+                        )
             df_estimates = df_estimates.set_index(["sampling_date", "permno"])
 
         # slice out particular estimates
@@ -626,11 +636,21 @@ class DataMap:
         else:
             df_estimates = pd.DataFrame()
             for sample in (self.datapath / "samples").iterdir():
-                df_sample = self.read(
-                    path="samples/{}/index_estimates.csv".format(sample.name)
-                )
-                df_sample["sampling_date"] = pd.to_datetime(sample.name)
-                df_estimates = df_estimates.append(df_sample)
+                if sample.name == ".ipynb_checkpoints":
+                    pass
+                else:
+                    try:
+                        df_sample = self.read(
+                            path="samples/{}/index_estimates.csv".format(sample.name)
+                        )
+                        df_sample["sampling_date"] = pd.to_datetime(sample.name)
+                        df_estimates = df_estimates.append(df_sample)
+                    except ValueError:
+                        warnings.warn(
+                            "File at 'samples/{}/index_estimates.csv' does not exist, will be skipped".format(
+                                sample.name
+                            )
+                        )
             df_estimates = df_estimates.set_index(["sampling_date", "index"])
 
         # slice out particular estimates
@@ -672,11 +692,18 @@ class DataMap:
                 if sample.name == ".ipynb_checkpoints":
                     pass
                 else:
-                    df_sample = self.read(
-                        path="samples/{}/selection_summary.csv".format(sample.name)
-                    )
-                    df_sample["sampling_date"] = pd.to_datetime(sample.name)
-                    df_summary = df_summary.append(df_sample)
+                    try:
+                        df_sample = self.read(
+                            path="samples/{}/selection_summary.csv".format(sample.name)
+                        )
+                        df_sample["sampling_date"] = pd.to_datetime(sample.name)
+                        df_summary = df_summary.append(df_sample)
+                    except ValueError:
+                        warnings.warn(
+                            "File at 'samples/{}/selection_summary.csv' does not exist, will be skipped".format(
+                                sample.name
+                            )
+                        )
             df_summary = df_summary.set_index(["sampling_date", "permno"])
 
         # slice out particular column
@@ -707,9 +734,9 @@ class DataMap:
         if sampling_date:
             sampling_date = self._prepare_date(sampling_date)
             df_summary = self.read(
-                path="samples/{:%Y-%m-%d}/estimation_summary.csv".format(sampling_date)
+                path="samples/{:%Y-%m-%d}/estimation_stats.csv".format(sampling_date)
             )
-            df_summary = df_summary.set_index("permno")
+            df_summary = df_summary.set_index("statistic")
 
         # read multiple files
         else:
@@ -718,12 +745,20 @@ class DataMap:
                 if sample.name == ".ipynb_checkpoints":
                     pass
                 else:
-                    df_sample = self.read(
-                        path="samples/{}/estimation_summary.csv".format(sample.name)
-                    )
-                    df_sample["sampling_date"] = pd.to_datetime(sample.name)
-                    df_summary = df_summary.append(df_sample)
-            df_summary = df_summary.set_index(["sampling_date", "permno"])
+                    try:
+                        df_sample = self.read(
+                            path="samples/{}/estimation_stats.csv".format(sample.name)
+                        )
+                        df_sample = df_sample.set_index("statistic")
+                        df_sample.loc["sampling_date"] = pd.to_datetime(sample.name)
+                        df_summary = df_summary.append(df_sample.T)
+                    except ValueError:
+                        warnings.warn(
+                            "File at 'samples/{}/estimation_summary.csv' does not exist, will be skipped".format(
+                                sample.name
+                            )
+                        )
+            df_summary = df_summary.set_index("sampling_date")
 
         # slice out particular column
         if columns:

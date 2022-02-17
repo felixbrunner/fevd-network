@@ -128,6 +128,10 @@ estimates = estimates.join(euraculus.estimate.collect_fevd_estimates(fevd=fevd, 
 # ## Rolling Window
 
 # %%
+first_sampling_date = sampling_date
+last_sampling_date = sampling_date
+
+# %%
 %%time
 
 sampling_date = first_sampling_date
@@ -171,7 +175,10 @@ while sampling_date <= last_sampling_date:
     estimates = estimates.join(euraculus.estimate.collect_fevd_estimates(fevd=fevd, horizon=horizon, data=df_log_idio_var, sizes=mean_size))
     
     # store
-    data.store(data=pd.Series(stats).to_frame(), path="samples/{:%Y-%m-%d}/estimation_stats.csv".format(sampling_date))
+    data.store(data=pd.Series(stats,
+                              index=pd.Index(stats, name="statistic"),
+                              name=sampling_date),
+               path="samples/{:%Y-%m-%d}/estimation_stats.csv".format(sampling_date))
     data.store(data=estimates, path="samples/{:%Y-%m-%d}/asset_estimates.csv".format(sampling_date))
     data.store(data=fevd, path="samples/{:%Y-%m-%d}/fevd.pkl".format(sampling_date))
     
