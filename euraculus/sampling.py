@@ -215,7 +215,7 @@ class LargeCapSampler:
         date = df_.index[-1]
 
         # lookup
-        comnams = self._data.lookup_permno(permnos=permnos, date=date).comnam
+        comnams = self._data.lookup_permnos(permnos=permnos, date=date).comnam
         company_names = pd.Series(index=permnos, data=comnams)
         return company_names
 
