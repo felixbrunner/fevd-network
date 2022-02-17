@@ -1,15 +1,15 @@
-import src.utils as utils
-import src.var as var
-import src.fevd as fevd
-import src.net as net
-import src.plot as plot
-import src.loader as loader
-import src.query as query
-import src.sampling as sampling
-import src.covar as covar
-import src.estimate as estimate
-import src.factor as factor
+import euraculus.utils as utils
+import euraculus.var as var
+import euraculus.fevd as fevd
+import euraculus.net as net
+import euraculus.plot as plot
+import euraculus.loader as loader
+import euraculus.download as download
+import euraculus.sampling as sampling
+import euraculus.covar as covar
+import euraculus.estimate as estimate
+import euraculus.factor as factor
 
-from src.fevd import FEVD
-from src.var import VAR, VARX, FAVAR
-from src.net import ElasticNet
+from euraculus.fevd import FEVD
+from euraculus.var import VAR, VARX, FAVAR
+from euraculus.net import ElasticNet
