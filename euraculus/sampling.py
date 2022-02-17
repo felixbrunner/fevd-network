@@ -210,9 +210,8 @@ class LargeCapSampler:
 
         """
         # set up
-        df_ = df["ticker"].unstack()
-        permnos = df_.columns.tolist()
-        date = df_.index[-1]
+        permnos = df.index.get_level_values("permno").unique().tolist()
+        date = df.index.get_level_values("date").max()
 
         # lookup
         comnams = self._data.lookup_permnos(permnos=permnos, date=date).comnam

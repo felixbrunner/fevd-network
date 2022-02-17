@@ -881,5 +881,12 @@ class DataMap:
 
         # load & lookup
         df_descriptive = self.load_descriptive_data(date=date)
-        permno_data = df_descriptive.loc[permnos]
+        try:
+            permno_data = df_descriptive.loc[permnos]
+        except KeyError:
+            permno_data = pd.DataFrame(columns=df_descriptive.columns)
+            for permno in permnos:
+                permno_data = permno_data.append(
+                    df_descriptive.loc[df_descriptive.index == permno, :]
+                )
         return permno_data
