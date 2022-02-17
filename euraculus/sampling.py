@@ -324,10 +324,15 @@ class LargeCapSampler:
         permnos = self._select_largest(df_summary, method="mean")
 
         # slice
-        df_historic = df_historic.loc[
-            pd.MultiIndex.from_product(
-                [df_historic.index.get_level_values("date").unique().tolist(), permnos],
-                names=["date", "permno"],
+        df_historic = df_historic[
+            df_historic.index.isin(
+                pd.MultiIndex.from_product(
+                    [
+                        df_historic.index.get_level_values("date").unique().tolist(),
+                        permnos,
+                    ],
+                    names=["date", "permno"],
+                )
             )
         ]
         df_future = df_future[
