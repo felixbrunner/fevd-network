@@ -330,10 +330,15 @@ class LargeCapSampler:
                 names=["date", "permno"],
             )
         ]
-        df_future = df_future.loc[
-            pd.MultiIndex.from_product(
-                [df_future.index.get_level_values("date").unique().tolist(), permnos],
-                names=["date", "permno"],
+        df_future = df_future[
+            df_future.index.isin(
+                pd.MultiIndex.from_product(
+                    [
+                        df_future.index.get_level_values("date").unique().tolist(),
+                        permnos,
+                    ],
+                    names=["date", "permno"],
+                )
             )
         ]
 
