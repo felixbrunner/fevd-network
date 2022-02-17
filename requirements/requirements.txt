@@ -140,9 +140,13 @@ markdown-it-py==1.1.0
 markupsafe==2.0.1
     # via jinja2
 matplotlib==3.3.4
-    # via seaborn
+    # via
+    #   missingno
+    #   seaborn
 mdit-py-plugins==0.3.0
     # via jupytext
+missingno==0.5.0
+    # via -r requirements/requirements.in
 mistune==0.8.4
     # via nbconvert
 mock==4.0.3
@@ -178,6 +182,7 @@ numpy==1.19.5
     #   -r requirements/requirements.in
     #   linearmodels
     #   matplotlib
+    #   missingno
     #   pandas
     #   patsy
     #   pyhdfe
@@ -268,12 +273,15 @@ scipy==1.5.4
     # via
     #   -r requirements/requirements.in
     #   linearmodels
+    #   missingno
     #   pyhdfe
     #   scikit-learn
     #   seaborn
     #   statsmodels
 seaborn==0.11.2
-    # via -r requirements/requirements.in
+    # via
+    #   -r requirements/requirements.in
+    #   missingno
 send2trash==1.8.0
     # via
     #   jupyter-server

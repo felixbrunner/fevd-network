@@ -12,4 +12,6 @@ statsmodels
 wrds
 glmnet-py
 jupytext
+missingno
+# pandas-datareader
 git+https://github.com/felixbrunner/kungfu.git
