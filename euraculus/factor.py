@@ -161,11 +161,22 @@ class FactorModel:
         y = returns_data[observations].values
 
         # calculate
-        coef = np.linalg.inv(X.T @ X) @ (X.T @ y)
+        if observations.sum() >= X.shape[1]:
+            coef = np.linalg.inv(X.T @ X) @ (X.T @ y)
+        else:
+            coef = np.full(shape=[X.shape[1], 1], fill_value=np.nan)
+            warnings.warn(
+                "not enough observations to estimate factor loadings for {}".format(
+                    returns_data.name
+                )
+            )
         fitted = X @ coef
         resid = y - fitted
         sigma2 = (resid ** 2).sum() / (len(y) - X.shape[1])
-        se = sigma2 * np.diag(np.linalg.inv(X.T @ X))
+        if observations.sum() >= X.shape[1]:
+            se = sigma2 * np.diag(np.linalg.inv(X.T @ X))
+        else:
+            se = np.full(shape=[X.shape[1], 1], fill_value=np.nan)
         r2 = 1 - sigma2 / y.var()
 
         # collect
