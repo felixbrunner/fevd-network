@@ -37,7 +37,7 @@ db = WRDSDownloader()
 db._create_pgpass_file()
 
 # %%
-data = DataMap('../data')
+data = DataMap("../data")
 
 # %% [markdown]
 # ### Timeframe
@@ -76,9 +76,9 @@ table_description = db.describe_table(library="crsp", table="dsf")
 
 # %%
 # %%time
-for year in range(first_year, last_year+1):
+for year in range(first_year, last_year + 1):
     df = db.download_crsp_year(year=year)
-    data.write(df, 'raw/crsp_{}.pkl'.format(year))
+    data.write(df, "raw/crsp_{}.pkl".format(year))
     if year % 5 == 0:
         print("    Year {} done.".format(year))
 
@@ -88,7 +88,7 @@ for year in range(first_year, last_year+1):
 # %%
 # %%time
 df_delist = db.download_delisting_returns()
-data.write(df_delist, 'raw/delisting.pkl')
+data.write(df_delist, "raw/delisting.pkl")
 
 # %% [markdown]
 # ### Descriptive Data
@@ -96,7 +96,7 @@ data.write(df_delist, 'raw/delisting.pkl')
 # %%
 # %%time
 df_descriptive = db.download_stocknames()
-data.write(df_descriptive, 'raw/descriptive.pkl')
+data.write(df_descriptive, "raw/descriptive.pkl")
 
 # %% [markdown]
 # ## Download FF data
@@ -104,7 +104,7 @@ data.write(df_descriptive, 'raw/descriptive.pkl')
 # %%
 # %%time
 df_ff = db.download_famafrench_factors()
-data.write(df_ff, 'raw/ff_factors.pkl')
+data.write(df_ff, "raw/ff_factors.pkl")
 
 # %% [markdown]
 # ## SPDR Trust SPY Index data
@@ -112,6 +112,6 @@ data.write(df_ff, 'raw/ff_factors.pkl')
 # %%
 # %%time
 df_spy = db.download_spy_data()
-data.write(df_spy, 'raw/spy.pkl')
+data.write(df_spy, "raw/spy.pkl")
 
 # %%
