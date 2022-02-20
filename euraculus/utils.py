@@ -41,41 +41,6 @@ def make_ticker_dict(tickers: list) -> dict:
     return column_to_ticker
 
 
-def log_replace(
-    df: pd.DataFrame, method: str = "min", logs: bool = True
-) -> pd.DataFrame:
-    """Take logarithms of input DataFrame and fills missing values.
-
-    The method argument specifies how missing values after taking logarithms
-    are to be filled (includes negative values before taking logs).
-
-    Args:
-        df: Input data in a DataFrame.
-        method: Method to fill missing values (includes negative values
-            before taking logs). Options are ["min", "mean", "interpolate", "zero"].
-        logs: Indicates if logarithms are to be taken, defaults to True.
-
-    Returns:
-        df_: The transformed data.
-
-    """
-    # logarithms
-    if logs:
-        df_ = np.log(df)
-
-    # fill missing
-    if method == "min":
-        df_ = df_.fillna(value=df_.min())
-    elif method == "mean":
-        df_ = df_.fillna(df_.mean())
-    elif method == "interpolate":
-        df_ = df_.interpolate()
-    elif method == "zero":
-        df_ = df_.fillna(0)
-    else:
-        raise ValueError("method '{}' not defined".format(method))
-
-    return df_
 
 
 def matrix_asymmetry(M: np.ndarray, drop_diag: bool = False) -> float:

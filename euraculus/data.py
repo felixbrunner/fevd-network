@@ -3,6 +3,7 @@
 """
 
 from pathlib import Path
+import numpy as np
 import pandas as pd
 import pickle
 import json
@@ -890,3 +891,57 @@ class DataMap:
                     df_descriptive.loc[df_descriptive.index == permno, :]
                 )
         return permno_data
+
+    @staticmethod
+    def prepare_log_variances(
+        df_var: pd.DataFrame, df_noisevar: pd.DataFrame
+    ) -> pd.DataFrame:
+        """Fills missing intraday variances with the last bid-ask spread, then take logs.
+
+        Args:
+            df_var: Intraday variance observations.
+            df_noisevar: End of day bid-as spreads.
+
+        Returns:
+            df_log_var: Logarithms of filled intraday variances.
+
+        """
+        df_noisevar = (
+            df_noisevar.replace(0, np.nan).ffill().fillna(value=df_noisevar.min())
+        )
+        df_var[df_var == 0] = df_noisevar
+        df_log_var = np.log(df_var)
+        return df_log_var
+
+    @staticmethod
+    def log_replace(df: pd.DataFrame, method: str = "min") -> pd.DataFrame:
+        """Take logarithms of input DataFrame and fills missing values.
+
+        The method argument specifies how missing values after taking logarithms
+        are to be filled (includes negative values before taking logs).
+
+        Args:
+            df: Input data in a DataFrame.
+            method: Method to fill missing values (includes negative values
+                before taking logs). Options are ["min", "mean", "interpolate", "zero"].
+
+        Returns:
+            df_: The transformed data.
+
+        """
+        # logarithms
+        df_ = np.log(df)
+
+        # fill missing
+        if method == "min":
+            df_ = df_.fillna(value=df_.min())
+        elif method == "mean":
+            df_ = df_.fillna(df_.mean())
+        elif method == "interpolate":
+            df_ = df_.interpolate()
+        elif method == "zero":
+            df_ = df_.fillna(0)
+        else:
+            raise ValueError("method '{}' not defined".format(method))
+
+        return df_
