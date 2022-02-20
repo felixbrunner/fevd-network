@@ -150,8 +150,9 @@ while sampling_date < last_sampling_date:
 sampling_date = first_sampling_date
 while sampling_date <= last_sampling_date:
     # get excess return samples
-    df_historic = data.load_historic(sampling_date=sampling_date, column="var")
-    df_historic = np.log(df_historic)
+    df_var = data.load_historic(sampling_date=sampling_date, column="var")
+    df_noisevar = data.load_historic(sampling_date=sampling_date, column="var")
+    df_historic = data.prepare_log_variances(df_var=df_var, df_noisevar=df_noisevar)
 
     # estimate models backwards
     df_estimates, df_residuals = euraculus.factor.estimate_models(

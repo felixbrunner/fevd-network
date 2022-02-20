@@ -82,7 +82,7 @@ sampling_date = dt.datetime(year=2021, month=12, day=31)
 # load and transform idiosyncratic volatility data, load size data
 if option == "spy_capm_decomp":
     df_idio_var = data.load_historic(sampling_date=sampling_date, column="var_idio")
-    df_log_idio_var = euraculus.utils.log_replace(df_idio_var, method="min")
+    df_log_idio_var = data.log_replace(df_idio_var, method="min")
 elif option == "logvar_capm_resid":
     df_log_idio_var = data.load_historic(
         sampling_date=sampling_date, column="logvar_capm_resid"
@@ -142,9 +142,6 @@ estimates = estimates.join(
 # %% [markdown]
 # ## Rolling Window
 
-# %%
-first_sampling_date = sampling_date
-last_sampling_date = sampling_date
 
 # %%
 # %%time
@@ -154,7 +151,7 @@ while sampling_date <= last_sampling_date:
     # load and transform idiosyncratic volatility data, load size data
     if option == "spy_capm_decomp":
         df_idio_var = data.load_historic(sampling_date=sampling_date, column="var_idio")
-        df_log_idio_var = euraculus.utils.log_replace(df_idio_var, method="min")
+        df_log_idio_var = data.log_replace(df_idio_var, method="min")
     elif option == "logvar_capm_resid":
         df_log_idio_var = data.load_historic(
             sampling_date=sampling_date, column="logvar_capm_resid"

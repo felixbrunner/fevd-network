@@ -142,7 +142,7 @@ euraculus.plot.var_timeseries(
 
 # %%
 if option == "spy_capm_decomp":
-    df_log_idio_var = euraculus.utils.log_replace(df_idio_var, method="min")
+    df_log_idio_var = data.log_replace(df_idio_var, method="min")
 elif option == "logvar_capm_resid":
     df_log_idio_var = df_logvar_resid
 
