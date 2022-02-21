@@ -151,7 +151,7 @@ sampling_date = first_sampling_date
 while sampling_date <= last_sampling_date:
     # get excess return samples
     df_var = data.load_historic(sampling_date=sampling_date, column="var")
-    df_noisevar = data.load_historic(sampling_date=sampling_date, column="var")
+    df_noisevar = data.load_historic(sampling_date=sampling_date, column="noisevar")
     df_historic = data.prepare_log_variances(df_var=df_var, df_noisevar=df_noisevar)
 
     # estimate models backwards
@@ -185,8 +185,9 @@ while sampling_date <= last_sampling_date:
 sampling_date = first_sampling_date
 while sampling_date < last_sampling_date:
     # get excess return samples
-    df_future = data.load_future(sampling_date=sampling_date, column="var")
-    df_future = np.log(df_future)
+    df_var = data.load_future(sampling_date=sampling_date, column="var")
+    df_noisevar = data.load_future(sampling_date=sampling_date, column="noisevar")
+    df_future = data.prepare_log_variances(df_var=df_var, df_noisevar=df_noisevar)
 
     # slice expanding window
     df_expanding_estimates = pd.DataFrame(index=df_future.columns)

@@ -909,7 +909,8 @@ class DataMap:
         df_noisevar = (
             df_noisevar.replace(0, np.nan).ffill().fillna(value=df_noisevar.min())
         )
-        df_var[df_var == 0] = df_noisevar
+        df_var[df_var == 0 | df_var.isna()] = df_noisevar
+        df_var = df_var.fillna(method="ffill", limit=1)
         df_log_var = np.log(df_var)
         return df_log_var
 
