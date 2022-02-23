@@ -906,11 +906,16 @@ class DataMap:
             df_log_var: Logarithms of filled intraday variances.
 
         """
-        df_noisevar = (
-            df_noisevar.replace(0, np.nan).ffill().fillna(value=df_noisevar.min())
-        )
-        df_var[df_var == 0 | df_var.isna()] = df_noisevar
-        df_var = df_var.fillna(method="ffill", limit=1)
+        # prepare noisevar
+        no_noisevar = df_noisevar.bfill().isna()
+        minima = df_noisevar.min()
+        df_noisevar = df_noisevar.replace(0, np.nan).ffill().fillna(value=minima)
+        df_noisevar[no_noisevar] = np.nan
+
+        # fill in missing vars
+        df_var[(df_var == 0) | (df_var.isna())] = df_noisevar
+
+        # logarithms
         df_log_var = np.log(df_var)
         return df_log_var
 
