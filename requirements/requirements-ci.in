@@ -1,0 +1,19 @@
+-c requirements.txt
+
+tqdm
+flake8
+flake8-black
+flake8-bugbear
+flake8-comprehensions
+flake8-docstrings
+flake8-fixme
+flake8-isort
+flake8-simplify
+pep8-naming
+
+black
+isort
+mypy
+pytest
+pytest-cov
+pytest-mock

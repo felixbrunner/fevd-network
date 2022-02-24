@@ -1,7 +1,9 @@
 
 install:
 	pip install --upgrade pip wheel pip-tools
-	pip-sync requirements/requirements.txt
+	pip-sync requirements/requirements.txt \
+		requirements/requirements-ci.txt \
+		requirements/requirements-dev.txt
 	pip install -e .
 	sudo apt-get install libgfortran3
 

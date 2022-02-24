@@ -1,0 +1,5 @@
+-c requirements.txt
+-c requirements-ci.txt
+
+jupyterlab
+jupytext
