@@ -207,7 +207,7 @@ while sampling_date <= last_sampling_date:
     )
 
     # store
-    data.store(
+    data.write(
         data=pd.Series(
             stats, index=pd.Index(stats, name="statistic"), name=sampling_date
         ),
@@ -217,7 +217,7 @@ while sampling_date <= last_sampling_date:
         data=estimates,
         path="samples/{:%Y-%m-%d}/asset_estimates.csv".format(sampling_date),
     )
-    data.store(data=fevd, path="samples/{:%Y-%m-%d}/fevd.pkl".format(sampling_date))
+    data.write(data=fevd, path="samples/{:%Y-%m-%d}/fevd.pkl".format(sampling_date))
 
     # increment monthly end of month
     print("Completed estimation at {:%Y-%m-%d}".format(sampling_date))
