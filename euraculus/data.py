@@ -2,12 +2,13 @@
 
 """
 
+import json
+import pickle
+import warnings
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
-import pickle
-import json
-import warnings
 
 
 class DataMap:
@@ -908,7 +909,7 @@ class DataMap:
         """
         # prepare noisevar
         no_noisevar = df_noisevar.bfill().isna()
-        minima = df_noisevar.min()
+        minima = df_noisevar.replace(0, np.nan).min()
         df_noisevar = df_noisevar.replace(0, np.nan).ffill().fillna(value=minima)
         df_noisevar[no_noisevar] = np.nan
 
