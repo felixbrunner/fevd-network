@@ -759,7 +759,7 @@ class DataMap:
                                 sample.name
                             )
                         )
-            df_summary = df_summary.set_index("sampling_date")
+            df_summary = df_summary.set_index("sampling_date").convert_dtypes()
 
         # slice out particular column
         if columns:

@@ -492,6 +492,9 @@ def histogram(df, bins=100, title="Data distribution", save_path=None, drop_tail
         label="Scaled KDE",
         c="k",
     )
+    ax.axvline([df.mean()], color="grey", label="Sample mean", linestyle="--")
+    # normal = sp.stats.norm
+
     ax.legend()
 
     if save_path:
@@ -501,6 +504,7 @@ def histogram(df, bins=100, title="Data distribution", save_path=None, drop_tail
 def plot_estimation_summary(df, save_path=None):
     fig, axes = plt.subplots(3, 1, figsize=(20, 12))
     colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    df = df.astype(float)
 
     # hyperparameters
     ax1 = axes[0]
