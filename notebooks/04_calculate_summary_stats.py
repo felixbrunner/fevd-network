@@ -9,10 +9,12 @@
 # %load_ext autoreload
 # %autoreload 2
 
+import datetime as dt
+
 # %%
 import pandas as pd
-import datetime as dt
 from dateutil.relativedelta import relativedelta
+
 from euraculus.data import DataMap
 
 # %% [markdown]

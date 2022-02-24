@@ -11,19 +11,22 @@
 # %load_ext autoreload
 # %autoreload 2
 
+import datetime as dt
+
+import numpy as np
+
 # %%
 import pandas as pd
-import numpy as np
-import euraculus
-import datetime as dt
 from dateutil.relativedelta import relativedelta
+
+import euraculus
 from euraculus.data import DataMap
 from euraculus.factor import (
-    FactorModel,
-    SPY1FactorModel,
     CAPM,
-    FamaFrench3FactorModel,
     Carhart4FactorModel,
+    FactorModel,
+    FamaFrench3FactorModel,
+    SPY1FactorModel,
     SPYVariance1FactorModel,
 )
 

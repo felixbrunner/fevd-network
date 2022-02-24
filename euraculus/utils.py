@@ -1,9 +1,9 @@
 """This module contains a collection of helper functions for the project."""
 
-import numpy as np
-import pandas as pd
 from string import ascii_uppercase as ALPHABET
 
+import numpy as np
+import pandas as pd
 
 # def lookup_ticker(ticker, year):
 #     """Returns descriptive data for a given ticker in a given year"""
@@ -39,8 +39,6 @@ def make_ticker_dict(tickers: list) -> dict:
                 column_to_ticker[ticker_index] += "." + ALPHABET[occurence]
 
     return column_to_ticker
-
-
 
 
 def matrix_asymmetry(M: np.ndarray, drop_diag: bool = False) -> float:

@@ -1,14 +1,13 @@
-import numpy as np
-import scipy as sp
-import pandas as pd
+import sys
 
 import matplotlib.pyplot as plt
-import networkx as nx
 import missingno as mno
+import networkx as nx
+import numpy as np
+import pandas as pd
+import scipy as sp
 
 import euraculus.utils
-
-import sys
 
 sys.path.append("../../kungfu/")
 import kungfu as kf

@@ -1,14 +1,16 @@
-import numpy as np
-from numpy.core.defchararray import index
-from numpy.lib.function_base import vectorize
-import scipy as sp
 import networkx as nx
+import numpy as np
+import scipy as sp
+
+# from numpy.core.defchararray import index
+# from numpy.lib.function_base import vectorize
 
 
 class FEVD:
     """Forecast Error Variance Decomposition."""
 
     def __init__(self, var_matrices, error_cov):
+        """"""
         self.var_matrices = var_matrices
         self.error_cov = error_cov
 

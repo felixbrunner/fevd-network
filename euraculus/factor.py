@@ -3,9 +3,11 @@ This module provides functions to carry out factor analysis in general,
 and on CRSP data in particular.
 
 """
+import warnings
+
 import numpy as np
 import pandas as pd
-import warnings
+
 from euraculus.data import DataMap
 
 

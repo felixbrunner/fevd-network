@@ -5,10 +5,11 @@ some pre-defined queries to download the required data for the project.
 
 """
 
-import wrds
-import sys
-import pandas as pd
 import datetime as dt
+import sys
+
+import pandas as pd
+import wrds
 
 
 class WRDSDownloader:

@@ -6,20 +6,20 @@
 # %load_ext autoreload
 # %autoreload 2
 
-# %%
-import pandas as pd
+import datetime as dt
+
 import numpy as np
 
-import datetime as dt
+# %%
+import pandas as pd
 from dateutil.relativedelta import relativedelta
+from sklearn.model_selection import GridSearchCV
 
 import euraculus
-from sklearn.model_selection import GridSearchCV
-from euraculus.data import DataMap
-
-from euraculus.var import VAR
 from euraculus.covar import GLASSO, AdaptiveThresholdEstimator
+from euraculus.data import DataMap
 from euraculus.fevd import FEVD
+from euraculus.var import VAR
 
 # %% [markdown]
 # ## Setup

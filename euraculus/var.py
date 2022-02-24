@@ -1,15 +1,13 @@
-import numpy as np
-import scipy as sp
-import pandas as pd
-
-from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import PredefinedSplit
-from sklearn.model_selection import GridSearchCV
-from sklearn.covariance import LedoitWolf, GraphicalLassoCV, OAS
-
-from euraculus.net import ElasticNet, AdaptiveElasticNet
-
 import copy
+
+import numpy as np
+import pandas as pd
+import scipy as sp
+from sklearn.covariance import OAS, GraphicalLassoCV, LedoitWolf
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import GridSearchCV, PredefinedSplit
+
+from euraculus.net import AdaptiveElasticNet, ElasticNet
 
 
 class VAR:

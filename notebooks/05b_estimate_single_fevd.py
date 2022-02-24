@@ -7,23 +7,22 @@
 # %load_ext autoreload
 # %autoreload 2
 
-# %%
-import pandas as pd
-import numpy as np
-import scipy as sp
-
-import matplotlib.pyplot as plt
-import seaborn as sns
-import missingno as mno
-
-import networkx as nx
 import datetime as dt
 
-import euraculus
-from sklearn.model_selection import GridSearchCV
-from euraculus.data import DataMap
-
 import kungfu as kf
+import matplotlib.pyplot as plt
+import missingno as mno
+import networkx as nx
+import numpy as np
+
+# %%
+import pandas as pd
+import scipy as sp
+import seaborn as sns
+from sklearn.model_selection import GridSearchCV
+
+import euraculus
+from euraculus.data import DataMap
 
 # %% [markdown]
 # ## Set up

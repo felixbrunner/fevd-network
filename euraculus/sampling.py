@@ -4,9 +4,11 @@ CRSP data at the end of each month.
 
 """
 
-import pandas as pd
 import datetime as dt
+
+import pandas as pd
 from dateutil.relativedelta import relativedelta
+
 from euraculus.data import DataMap
 
 

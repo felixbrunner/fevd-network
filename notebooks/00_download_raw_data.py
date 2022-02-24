@@ -22,9 +22,10 @@
 # %load_ext autoreload
 # %autoreload 2
 
+from euraculus.data import DataMap
+
 # %%
 from euraculus.download import WRDSDownloader
-from euraculus.data import DataMap
 
 # %% [markdown]
 # ## Set up

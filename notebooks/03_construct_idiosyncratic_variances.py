@@ -3,10 +3,12 @@
 # %load_ext autoreload
 # %autoreload 2
 
-import pandas as pd
-import euraculus
 import datetime as dt
+
+import pandas as pd
 from dateutil.relativedelta import relativedelta
+
+import euraculus
 from euraculus.data import DataMap
 
 # ## Set up

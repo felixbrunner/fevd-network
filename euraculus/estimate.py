@@ -1,14 +1,12 @@
-import pandas as pd
+import networkx as nx
 import numpy as np
+import pandas as pd
 import scipy as sp
-
 from sklearn.model_selection import GridSearchCV
 
-import networkx as nx
+import euraculus
 
 # import matplotlib.pyplot as plt
-
-import euraculus
 
 
 def describe_data(df: pd.DataFrame) -> dict:
