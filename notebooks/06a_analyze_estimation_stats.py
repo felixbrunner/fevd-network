@@ -9,6 +9,11 @@
 # %%
 import euraculus
 from euraculus.data import DataMap
+from euraculus.plot import (
+    plot_estimation_summary,
+    plot_regularisation_summary,
+    plot_network_summary,
+)
 
 # %% [markdown]
 # ## Load data
@@ -55,18 +60,19 @@ df_estimation_stats.mean().round(2).to_frame()
 # ## Plotting
 
 # %%
-euraculus.plot.plot_estimation_summary(
-    df_estimation_stats, save_path="../reports/figures/estimation_summary.pdf"
+plot_estimation_summary(
+    df_estimation_stats,
+    save_path="../reports/figures/estimation_summary.pdf",
 )
 
 # %%
-euraculus.plot.plot_regularisation_summary(
-    df_estimation_stats, save_path="../reports/figures/regularisation_summary.pdf"
+plot_regularisation_summary(
+    df_estimation_stats,
+    save_path="../reports/figures/regularisation_summary.pdf",
 )
 
 # %%
-euraculus.plot.plot_network_summary(
-    df_estimation_stats, save_path="../reports/figures/network_summary.pdf"
+plot_network_summary(
+    df_estimation_stats,
+    save_path="../reports/figures/network_summary.pdf",
 )
-
-# %%
