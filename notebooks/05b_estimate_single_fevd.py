@@ -21,8 +21,23 @@ import scipy as sp
 import seaborn as sns
 from sklearn.model_selection import GridSearchCV
 
-import euraculus
 from euraculus.data import DataMap
+from euraculus.var import VAR
+from euraculus.covar import AdaptiveThresholdEstimator, GLASSO
+from euraculus.fevd import FEVD
+from euraculus.utils import make_ticker_dict, autocorrcoef, prec_to_pcorr
+from euraculus.plot import (
+    corr_heatmap,
+    missing_data,
+    histogram,
+    var_timeseries,
+    net_cv_contour,
+    net_scatter_losses,
+    network_graph,
+    cov_cv_contour,
+    cov_scatter_losses,
+    plot_glasso_cv,
+)
 
 # %% [markdown]
 # ## Set up
@@ -62,7 +77,7 @@ ticker_list = (
     .values.ravel()
     .tolist()
 )
-column_to_ticker = euraculus.utils.make_ticker_dict(ticker_list)
+column_to_ticker = make_ticker_dict(ticker_list)
 
 # %% [markdown]
 # Make and export table:
@@ -96,21 +111,21 @@ data.store(
 # ## Data Summary & Processing
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     df_var.corr(),
     title="Total Variance Correlations",
     save_path="../reports/figures/estimation/heatmap_total_variance_correlation.pdf",
 )
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     euraculus.utils.autocorrcoef(df_var, lag=1),
     title="Total Variance Auto-Correlations (First order)",
     save_path="../reports/figures/estimation/heatmap_total_variance_autocorrelation.pdf",
 )
 
 # %%
-euraculus.plot.missing_data(
+missing_data(
     df_idio_var,
     save_path="../reports/figures/estimation/matrix_missing.pdf",
 )
@@ -123,7 +138,7 @@ print(
 )
 
 # %%
-euraculus.plot.histogram(
+histogram(
     df_idio_var.fillna(0).stack(),
     title="Distribution of Raw Data",
     drop_tails=0.01,
@@ -132,7 +147,7 @@ euraculus.plot.histogram(
 )
 
 # %%
-euraculus.plot.var_timeseries(
+var_timeseries(
     df_idio_var,
     total_var=df_var,
     index_var=df_spy_var,
@@ -146,27 +161,27 @@ elif option == "logvar_capm_resid":
     df_log_idio_var = df_logvar_resid
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     df_log_idio_var.corr(),
     title="Idiosyncratic Variance Correlations",
     save_path="../reports/figures/estimation/heatmap_idiosyncratic_variance_correlation.pdf",
 )
 
 # %%
-euraculus.plot.corr_heatmap(
-    euraculus.utils.autocorrcoef(df_log_idio_var, lag=1),
+corr_heatmap(
+    autocorrcoef(df_log_idio_var, lag=1),
     title="Idiosyncratic Variance Auto-Correlations (First order)",
     save_path="../reports/figures/estimation/heatmap_idiosyncratic_variance_autocorrelation.pdf",
 )
 
 # %%
-pd.Series(np.diag(euraculus.utils.autocorrcoef(df_log_idio_var, lag=1))).plot(
+pd.Series(np.diag(autocorrcoef(df_log_idio_var, lag=1))).plot(
     kind="hist", title="Diagonal Autocorrelations", bins=20
 )
 plt.show()
 
 # %%
-euraculus.plot.histogram(
+histogram(
     df_log_idio_var.stack(),
     title="Distribution of Idiosyncratic Variances",
     save_path="../reports/figures/estimation/histogram_idiosyncratic_variance.pdf",
@@ -193,11 +208,11 @@ euraculus.plot.histogram(
 # weights are set to $w_{i,j} =|\hat{\beta}_{i,j,OLS}|^{-1}$
 
 # %%
-var = euraculus.VAR(add_intercepts=True, p_lags=1)
-var.fit(df_log_idio_var, method="OLS")
+var = VAR(has_intercepts=True, p_lags=1)
+var.fit(var_data=df_log_idio_var, method="OLS")
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     var.var_1_matrix_,
     title="Non-regularized VAR(1) coefficients (OLS)",
     infer_limits=True,
@@ -214,10 +229,10 @@ var_grid = {
 
 # %%
 # %%time
-var_cv = var.fit_adaptive_elastic_net_cv(df_log_idio_var, grid=var_grid, return_cv=True)
+var_cv = var.fit_adaptive_elastic_net_cv(var_data=df_log_idio_var, grid=var_grid, return_cv=True, penalize_diagonals=True)
 
 # %%
-euraculus.plot.net_cv_contour(
+net_cv_contour(
     var_cv,
     15,
     logx=True,
@@ -226,7 +241,7 @@ euraculus.plot.net_cv_contour(
 )
 
 # %%
-euraculus.plot.net_scatter_losses(
+net_scatter_losses(
     var_cv,
     save_path="../reports/figures/estimation/scatter_var.pdf",
 )
@@ -238,8 +253,7 @@ density = var.var_density_  # (gammas!=0).sum()/n_series**2*n_series
 κ = var_cv.best_params_["alpha"]
 λ = var_cv.best_params_["lambdau"]
 print("VAR(1) matrix is {:.2f}% dense.".format(density * 100))
-print("Best hyperparameters are alpha={:.2f}, lambda={:.10f}.".format(κ, λ))
-print("Best hyperparameters are alpha={}, lambda={}.".format(κ, λ))
+print("Best hyperparameters are alpha={:.4f}, lambda={:.4f}.".format(κ, λ))
 print(
     "Average VAR spillover is {:.4f}, absolute {:.4f}".format(
         gammas.mean(), abs(gammas).mean()
@@ -257,7 +271,7 @@ except:
     pass
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     var.var_1_matrix_,
     title="Regularized VAR(1) coefficients (Adaptive Elastic Net)",
     infer_limits=True,
@@ -268,7 +282,7 @@ euraculus.plot.corr_heatmap(
 vargraph = nx.convert_matrix.from_numpy_array(
     var.var_1_matrix_, create_using=nx.DiGraph
 )
-euraculus.plot.network_graph(
+network_graph(
     vargraph,
     column_to_ticker,
     linewidth=0.02,
@@ -281,15 +295,15 @@ euraculus.plot.network_graph(
 residuals = var.residuals(df_log_idio_var)
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     residuals.corr(),
     title="VAR Residual Correlation",
     save_path="../reports/figures/estimation/heatmap_VAR_residual_correlation.pdf",
 )
 
 # %%
-euraculus.plot.corr_heatmap(
-    euraculus.utils.autocorrcoef(residuals, lag=1),
+corr_heatmap(
+    autocorrcoef(residuals, lag=1),
     title="VAR Residual Auto-Correlation (First order)",
     save_path="../reports/figures/estimation/heatmap_VAR_residual_autocorrelation.pdf",
 )
@@ -298,14 +312,14 @@ euraculus.plot.corr_heatmap(
 # ### Covariance matrix estimation
 
 # %%
-euraculus.plot.histogram(
+histogram(
     residuals.stack(),
     title="Distribution of VAR Residuals",
     save_path="../reports/figures/estimation/histogram_VAR_residuals.pdf",
 )
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     residuals.cov(),
     title="Sample Estimate of the VAR Residual Covariance Matrix",
     infer_limits=True,
@@ -313,8 +327,8 @@ euraculus.plot.corr_heatmap(
 )
 
 # %%
-euraculus.plot.corr_heatmap(
-    euraculus.utils.prec_to_pcorr(np.linalg.inv(residuals.cov())),
+corr_heatmap(
+    prec_to_pcorr(np.linalg.inv(residuals.cov())),
     title="Sample Estimate of the VAR Residual Partial Correlation Matrix",
     save_path="../reports/figures/estimation/heatmap_VAR_residual_partial_corr.pdf",
 )
@@ -323,7 +337,7 @@ euraculus.plot.corr_heatmap(
 # #### Adaptive Threshold Estimation
 
 # %%
-ate = euraculus.covar.AdaptiveThresholdEstimator()
+ate = AdaptiveThresholdEstimator()
 
 # %%
 cov_grid = {"delta": np.geomspace(0.5, 1, 11), "eta": np.linspace(0, 2, 13)}
@@ -336,7 +350,7 @@ cov_cv = GridSearchCV(
 covar_ate = cov_cv.best_estimator_.covariance_
 
 # %%
-euraculus.plot.cov_cv_contour(
+cov_cv_contour(
     cov_cv,
     15,
     logx=False,
@@ -345,7 +359,7 @@ euraculus.plot.cov_cv_contour(
 )
 
 # %%
-euraculus.plot.cov_scatter_losses(
+cov_scatter_losses(
     cov_cv,
     save_path="../reports/figures/estimation/scatter_cov.pdf",
 )
@@ -364,7 +378,7 @@ print(
 
 # %%
 lim = residuals.cov().abs().values.max()
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     covar_ate,
     title="Adaptive Threshold Estimate of VAR Residual Covariance Matrix",
     vmin=-lim,
@@ -373,12 +387,12 @@ euraculus.plot.corr_heatmap(
 )
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     residuals.cov().values - covar_ate, "Shrinkage difference", infer_limits=True
 )
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     euraculus.utils.prec_to_pcorr(np.linalg.inv(covar_ate)),
     title="Adaptive Threshold Estimate of the VAR Residual Partial Correlation Matrix",
 )
@@ -387,7 +401,7 @@ euraculus.plot.corr_heatmap(
 # #### GLASSO
 
 # %%
-glasso = euraculus.covar.GLASSO()
+glasso = GLASSO()
 glasso_grid = {"alpha": np.geomspace(1e-2, 1e0, 25)}
 
 # %%
@@ -398,14 +412,14 @@ glasso_cv = GridSearchCV(
 covar = glasso_cv.best_estimator_.covariance_
 
 # %%
-euraculus.plot.plot_glasso_cv(
+plot_glasso_cv(
     glasso_cv,
     save_path="../reports/figures/estimation/line_cov_cv.pdf",
 )
 
 # %%
 lim = residuals.cov().abs().values.max()
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     covar,
     title="Graphical Lasso Estimate of VAR Residual Covariance Matrix",
     vmin=-lim,
@@ -414,19 +428,17 @@ euraculus.plot.corr_heatmap(
 )
 
 # %%
-euraculus.plot.corr_heatmap(
-    residuals.cov().values - covar, "Shrinkage difference", infer_limits=True
-)
+corr_heatmap(residuals.cov().values - covar, "Shrinkage difference", infer_limits=True)
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     glasso_cv.best_estimator_.precision_,
     infer_limits=True,
     title="Graphical Lasso Estimate of VAR Residual Precision Matrix",
 )
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     euraculus.utils.prec_to_pcorr(glasso_cv.best_estimator_.precision_),
     title="Graphical Lasso Estimate of VAR Residual Partial Correlation Matrix",
     save_path="../reports/figures/estimation/heatmap_partial_corr_matrix.pdf",
@@ -439,7 +451,7 @@ glasso_cv.best_estimator_.precision_density_
 covgraph = nx.convert_matrix.from_numpy_array(
     glasso_cv.best_estimator_.covariance_, create_using=nx.Graph
 )
-euraculus.plot.network_graph(
+network_graph(
     covgraph,
     column_to_ticker,
     linewidth=0.5,
@@ -453,7 +465,7 @@ congraph = nx.convert_matrix.from_numpy_array(
     + 2 * np.diag(np.diag(glasso_cv.best_estimator_.precision_)),
     create_using=nx.Graph,
 )
-euraculus.plot.network_graph(
+network_graph(
     congraph,
     column_to_ticker,
     linewidth=1,
@@ -467,7 +479,7 @@ euraculus.plot.network_graph(
 
 # %%
 horizon = 21
-fevd = euraculus.FEVD(var.var_1_matrix_, covar)
+fevd = FEVD(var.var_1_matrix_, covar)
 
 # %%
 lim = abs(fevd.vma_matrix(1)).max()
@@ -476,7 +488,7 @@ lim = abs(fevd.vma_matrix(1)).max()
 # #### VMA Matrices
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     fevd.vma_matrix(0),
     title="VMA(0) Matrix",
     infer_limits=True,  # , vmin=-lim, vmax=lim,
@@ -484,7 +496,7 @@ euraculus.plot.corr_heatmap(
 )
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     fevd.vma_matrix(1),
     title="VMA(1) Matrix",
     infer_limits=True,  # , vmin=-lim, vmax=lim,
@@ -492,7 +504,7 @@ euraculus.plot.corr_heatmap(
 )
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     fevd.vma_matrix(2),
     title="VMA(2) Matrix",
     infer_limits=True,  # , vmin=-lim, vmax=lim,
@@ -500,7 +512,7 @@ euraculus.plot.corr_heatmap(
 )
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     fevd.vma_matrix(3),
     title="VMA(3) Matrix",
     infer_limits=True,  # , vmin=-lim, vmax=lim,
@@ -508,7 +520,7 @@ euraculus.plot.corr_heatmap(
 )
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     fevd.vma_matrix(5),
     title="VMA(5) Matrix",
     infer_limits=True,  # , vmin=-lim, vmax=lim,
@@ -516,7 +528,7 @@ euraculus.plot.corr_heatmap(
 )
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     fevd.vma_matrix(10),
     title="VMA(10) Matrix",
     infer_limits=True,  # , vmin=-lim, vmax=lim,
@@ -524,7 +536,7 @@ euraculus.plot.corr_heatmap(
 )
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     fevd.vma_matrix(21),
     title="VMA(21) Matrix",
     infer_limits=True,  # , vmin=-lim, vmax=lim,
@@ -535,7 +547,7 @@ euraculus.plot.corr_heatmap(
 # #### Impulse Response Matrices
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     fevd.impulse_response(0),
     title="Impulse Response(0) Matrix",
     infer_limits=True,
@@ -543,7 +555,7 @@ euraculus.plot.corr_heatmap(
 )
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     fevd.impulse_response(1),
     title="Impulse Response(1) Matrix",
     infer_limits=True,
@@ -551,7 +563,7 @@ euraculus.plot.corr_heatmap(
 )
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     fevd.impulse_response(2),
     title="Impulse Response(2) Matrix",
     infer_limits=True,
@@ -559,7 +571,7 @@ euraculus.plot.corr_heatmap(
 )
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     fevd.impulse_response(3),
     title="Impulse Response(3) Matrix",
     infer_limits=True,
@@ -567,7 +579,7 @@ euraculus.plot.corr_heatmap(
 )
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     fevd.impulse_response(5),
     title="Impulse Response(5) Matrix",
     infer_limits=True,
@@ -575,7 +587,7 @@ euraculus.plot.corr_heatmap(
 )
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     fevd.impulse_response(10),
     title="Impulse Response(10) Matrix",
     infer_limits=True,
@@ -583,7 +595,7 @@ euraculus.plot.corr_heatmap(
 )
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     fevd.impulse_response(21),
     title="Impulse Response(21) Matrix",
     infer_limits=True,
@@ -594,7 +606,7 @@ euraculus.plot.corr_heatmap(
 # #### FEV Adjacency
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     pd.DataFrame(fevd.fev_single(horizon)) - np.diag(np.diag(fevd.fev_single(horizon))),
     title="FEV Single Contributions",
     vmin=0,
@@ -604,7 +616,7 @@ euraculus.plot.corr_heatmap(
 )
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     pd.DataFrame(fevd.decompose_fev(horizon=horizon, normalise=False))
     - np.diag(np.diag(fevd.decompose_fev(horizon=horizon, normalise=False))),
     title="FEV Decomposition",
@@ -615,7 +627,7 @@ euraculus.plot.corr_heatmap(
 )
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     pd.DataFrame(fevd.decompose_fev(horizon=horizon, normalise=True))
     - np.diag(np.diag(fevd.decompose_fev(horizon=horizon, normalise=True))),
     title="FEV Decomposition (row-normalised)",
@@ -629,7 +641,7 @@ euraculus.plot.corr_heatmap(
 # #### FU Adjacency
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     pd.DataFrame(fevd.fu_single(horizon)) - np.diag(np.diag(fevd.fu_single(horizon))),
     title="FU Single Contributions",
     vmin=0,
@@ -639,7 +651,7 @@ euraculus.plot.corr_heatmap(
 )
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     pd.DataFrame(fevd.decompose_fu(horizon=horizon, normalise=False))
     - np.diag(np.diag(fevd.decompose_fu(horizon=horizon, normalise=False))),
     title="FU Decomposition",
@@ -650,7 +662,7 @@ euraculus.plot.corr_heatmap(
 )
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     pd.DataFrame(fevd.decompose_fu(horizon=horizon, normalise=True))
     - np.diag(np.diag(fevd.decompose_fu(horizon=horizon, normalise=True))),
     title="FU Decomposition (row-normalised)",
@@ -667,7 +679,7 @@ euraculus.plot.corr_heatmap(
 # #### FEV Adjacency
 
 # %%
-euraculus.plot.network_graph(
+network_graph(
     fevd.to_fev_graph(horizon, normalise=False),
     column_to_ticker,
     title="FEVD Network (FEV absolute)",
@@ -677,7 +689,7 @@ euraculus.plot.network_graph(
 )
 
 # %%
-euraculus.plot.network_graph(
+network_graph(
     fevd.to_fev_graph(horizon, normalise=True),
     column_to_ticker,
     title="FEVD Network (FEV %)",
@@ -703,12 +715,12 @@ index_decomp = fevd.index_variance_decomposition(
 )
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     fevd.fev_single(horizon=21), title="FEV", infer_limits=True
 )  # weights=mean_size))
 
 # %%
-euraculus.plot.corr_heatmap(
+corr_heatmap(
     irv, title="Innovation response variance", infer_limits=True
 )  # weights=mean_size))
 
@@ -728,7 +740,7 @@ ax.bar(height=mean_size, x=range(100))
 graph = nx.convert_matrix.from_numpy_array(
     np.diag(mean_size) ** 2 @ irv, create_using=nx.DiGraph
 )
-euraculus.plot.network_graph(
+network_graph(
     graph,
     column_to_ticker,
     title="IRV Network (IRV absolute)",
@@ -739,7 +751,7 @@ euraculus.plot.network_graph(
 
 # %%
 graph = nx.convert_matrix.from_numpy_array(irv, create_using=nx.DiGraph)
-euraculus.plot.network_graph(
+network_graph(
     graph,
     column_to_ticker,
     title="IRV Network (IRV absolute)",
@@ -752,7 +764,7 @@ euraculus.plot.network_graph(
 graph = nx.convert_matrix.from_numpy_array(
     irv / irv.sum(axis=1), create_using=nx.DiGraph
 )
-euraculus.plot.network_graph(
+network_graph(
     graph,
     column_to_ticker,
     title="IRV Network (IRV %)",
@@ -765,7 +777,7 @@ euraculus.plot.network_graph(
 # #### FU Adjacency
 
 # %%
-euraculus.plot.network_graph(
+network_graph(
     fevd.to_fu_graph(horizon, normalise=False),
     column_to_ticker,
     title="FEVD Network (FU absolute)",
@@ -775,7 +787,7 @@ euraculus.plot.network_graph(
 )
 
 # %%
-euraculus.plot.network_graph(
+network_graph(
     fevd.to_fu_graph(horizon, normalise=True),
     column_to_ticker,
     title="FEVD Network (FU %)",

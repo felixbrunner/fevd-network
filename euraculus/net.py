@@ -161,7 +161,7 @@ class ElasticNet(BaseEstimator):
         self,
         X: np.ndarray,
         y: np.ndarray,
-        scorer: function = None,
+        scorer=None,
     ) -> float:
         """Calculate the score for input data X and labels y.
 
@@ -172,7 +172,7 @@ class ElasticNet(BaseEstimator):
             X: The input samples of shape (n_samples, k_features),
                 can be a sparse matrix.
             y: Labels of shape (n_samples,) corresponding to the inputs X.
-            scorer (optional): Alternative scoring function instead of MSE.
+            scorer (optional, function): Alternative scoring function instead of MSE.
 
         Returns:
             score: The calculated score for the model predictions.
@@ -260,8 +260,8 @@ class AdaptiveElasticNet(ElasticNet):
 
     Attributes:
         gamma: The exponent used to scale the penalty weights, default=1.
-        init_alpha:
-        ini_lambdau:
+        init_alpha: The ratio of L1 to L2 penalisation in the first estimation.
+        ini_lambdau: The penalty factor in the first estimation.
         penalty_weights: Coefficient penalty weights, zero if not penalised,
                 of shape (k_features,), default=None.
 
