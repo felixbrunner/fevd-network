@@ -11,15 +11,13 @@
 # %load_ext autoreload
 # %autoreload 2
 
+# %%
 import datetime as dt
-
 import numpy as np
 
-# %%
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 
-import euraculus
 from euraculus.data import DataMap
 from euraculus.factor import (
     CAPM,
@@ -29,6 +27,7 @@ from euraculus.factor import (
     SPY1FactorModel,
     SPYVariance1FactorModel,
 )
+from euraculus.factor import estimate_models
 
 # %% [markdown]
 # ## Set up
@@ -76,9 +75,7 @@ while sampling_date <= last_sampling_date:
     df_historic -= df_rf.loc[df_historic.index].values
 
     # estimate models backwards
-    df_estimates, df_residuals = euraculus.factor.estimate_models(
-        ret_models, df_historic
-    )
+    df_estimates, df_residuals = estimate_models(ret_models, df_historic)
 
     # store
     data.store(
@@ -116,9 +113,7 @@ while sampling_date < last_sampling_date:
         df_window = df_future[df_future.index <= end_date]
 
         # estimate models in window
-        df_estimates, df_residuals = euraculus.factor.estimate_models(
-            ret_models, df_window
-        )
+        df_estimates, df_residuals = estimate_models(ret_models, df_window)
 
         # collect
         df_estimates = df_estimates.add_suffix("_next{}M".format(window_length))
@@ -158,9 +153,7 @@ while sampling_date <= last_sampling_date:
     df_historic = data.prepare_log_variances(df_var=df_var, df_noisevar=df_noisevar)
 
     # estimate models backwards
-    df_estimates, df_residuals = euraculus.factor.estimate_models(
-        var_models, df_historic
-    )
+    df_estimates, df_residuals = estimate_models(var_models, df_historic)
 
     # store
     data.store(
@@ -199,9 +192,7 @@ while sampling_date < last_sampling_date:
         df_window = df_future[df_future.index <= end_date]
 
         # estimate models in window
-        df_estimates, df_residuals = euraculus.factor.estimate_models(
-            var_models, df_window
-        )
+        df_estimates, df_residuals = estimate_models(var_models, df_window)
 
         # collect
         df_estimates = df_estimates.add_suffix("_next{}M".format(window_length))
@@ -224,3 +215,5 @@ while sampling_date < last_sampling_date:
         )
     )
     sampling_date += relativedelta(months=1, day=31)
+
+# %%

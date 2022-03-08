@@ -15,11 +15,20 @@ import pandas as pd
 from dateutil.relativedelta import relativedelta
 from sklearn.model_selection import GridSearchCV
 
-import euraculus
 from euraculus.covar import GLASSO, AdaptiveThresholdEstimator
 from euraculus.data import DataMap
 from euraculus.fevd import FEVD
 from euraculus.var import VAR
+
+from euraculus.estimate import (
+    describe_data,
+    describe_var,
+    describe_cov,
+    describe_fevd,
+    collect_var_estimates,
+    collect_cov_estimates,
+    collect_fevd_estimates,
+)
 
 # %% [markdown]
 # ## Setup
@@ -93,7 +102,9 @@ mean_size = data.load_asset_estimates(
 
 # estimate var
 var = VAR(add_intercepts=True, p_lags=1)
-var_cv = var.fit_adaptive_elastic_net_cv(df_log_idio_var, grid=var_grid, return_cv=True)
+var_cv = var.fit_adaptive_elastic_net_cv(
+    var_data=df_log_idio_var, grid=var_grid, return_cv=True
+)
 residuals = var.residuals(df_log_idio_var)
 
 # estimate covariance
@@ -118,23 +129,18 @@ cov = cov_cv.best_estimator_
 # create fevd
 fevd = FEVD(var.var_1_matrix_, cov.covariance_)
 
+
 # collect estimation statistics
-stats = euraculus.estimate.describe_data(df_log_idio_var)
-stats.update(
-    euraculus.estimate.describe_var(var=var, var_cv=var_cv, data=df_log_idio_var)
-)
-stats.update(euraculus.estimate.describe_cov(cov=cov, cov_cv=cov_cv, data=residuals))
-stats.update(
-    euraculus.estimate.describe_fevd(fevd=fevd, horizon=horizon, data=df_log_idio_var)
-)
+stats = describe_data(df_log_idio_var)
+stats.update(describe_var(var=var, var_cv=var_cv, data=df_log_idio_var))
+stats.update(describe_cov(cov=cov, cov_cv=cov_cv, data=residuals))
+stats.update(describe_fevd(fevd=fevd, horizon=horizon, data=df_log_idio_var))
 
 # collect estimates
-estimates = euraculus.estimate.collect_var_estimates(var=var, data=df_log_idio_var)
+estimates = collect_var_estimates(var=var, data=df_log_idio_var)
+estimates = estimates.join(collect_cov_estimates(cov=cov, data=residuals))
 estimates = estimates.join(
-    euraculus.estimate.collect_cov_estimates(cov=cov, data=residuals)
-)
-estimates = estimates.join(
-    euraculus.estimate.collect_fevd_estimates(
+    collect_fevd_estimates(
         fevd=fevd, horizon=horizon, data=df_log_idio_var, sizes=mean_size
     )
 )
@@ -182,26 +188,16 @@ while sampling_date <= last_sampling_date:
     fevd = FEVD(var.var_1_matrix_, cov.covariance_)
 
     # collect estimation statistics
-    stats = euraculus.estimate.describe_data(df_log_idio_var)
-    stats.update(
-        euraculus.estimate.describe_var(var=var, var_cv=var_cv, data=df_log_idio_var)
-    )
-    stats.update(
-        euraculus.estimate.describe_cov(cov=cov, cov_cv=cov_cv, data=residuals)
-    )
-    stats.update(
-        euraculus.estimate.describe_fevd(
-            fevd=fevd, horizon=horizon, data=df_log_idio_var
-        )
-    )
+    stats = describe_data(df_log_idio_var)
+    stats.update(describe_var(var=var, var_cv=var_cv, data=df_log_idio_var))
+    stats.update(describe_cov(cov=cov, cov_cv=cov_cv, data=residuals))
+    stats.update(describe_fevd(fevd=fevd, horizon=horizon, data=df_log_idio_var))
 
     # collect estimates
-    estimates = euraculus.estimate.collect_var_estimates(var=var, data=df_log_idio_var)
+    estimates = collect_var_estimates(var=var, data=df_log_idio_var)
+    estimates = estimates.join(collect_cov_estimates(cov=cov, data=residuals))
     estimates = estimates.join(
-        euraculus.estimate.collect_cov_estimates(cov=cov, data=residuals)
-    )
-    estimates = estimates.join(
-        euraculus.estimate.collect_fevd_estimates(
+        collect_fevd_estimates(
             fevd=fevd, horizon=horizon, data=df_log_idio_var, sizes=mean_size
         )
     )

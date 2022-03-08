@@ -8,8 +8,8 @@ import datetime as dt
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 
-import euraculus
 from euraculus.data import DataMap
+from euraculus.factor import decompose_variance
 
 # ## Set up
 # ### Data
@@ -38,7 +38,7 @@ while sampling_date <= last_sampling_date:
     spy_data = df_spy.loc[df_var.index]
 
     # decompose
-    df_decomposition = euraculus.factor.decompose_variance(df_var, df_betas, spy_data)
+    df_decomposition = decompose_variance(df_var, df_betas, spy_data)
     df_decomposition = df_decomposition.loc[:, ["sys", "idio"]].add_prefix("var_")
 
     # store
@@ -72,9 +72,7 @@ while sampling_date < last_sampling_date:
         )
 
         # decompose
-        df_decomposition = euraculus.factor.decompose_variance(
-            df_window, betas_window, spy_window
-        )
+        df_decomposition = decompose_variance(df_window, betas_window, spy_window)
         df_decomposition = (
             df_decomposition.loc[:, ["sys", "idio"]]
             .add_prefix("var_")
