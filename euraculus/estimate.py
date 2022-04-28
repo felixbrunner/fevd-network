@@ -294,7 +294,8 @@ def collect_var_estimates(
     """
     estimates = pd.DataFrame(index=data.columns)
     estimates["var_intercept"] = var.intercepts_
-    estimates["var_factor_loadings_"] = var.factor_loadings_
+    if hasattr(var, "factor_loadings_"):
+        estimates["var_factor_loadings_"] = var.factor_loadings_
     estimates["mean_abs_var_in"] = (
         abs(var.var_1_matrix_).sum(axis=1) - abs(np.diag(var.var_1_matrix_))
     ) / (var.var_1_matrix_.shape[0] - 1)
