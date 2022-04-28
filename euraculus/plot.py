@@ -437,10 +437,10 @@ def network_graph(
         fig.savefig(save_path, format="png", dpi=fig.dpi, bbox_inches="tight")
 
 
-def missing_data(df, save_path=None):
+def missing_data(df, title="Missing Data", save_path=None):
     """Creates and saves a missingno plot."""
-    fig = plt.figure()
-    mno.matrix(df, labels=False)
+    ax = mno.matrix(df, labels=False)
+    ax.set_title(title)
     fig = plt.gcf()
     if save_path:
         fig.savefig(save_path, format="pdf", dpi=200, bbox_inches="tight")
