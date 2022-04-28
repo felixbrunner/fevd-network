@@ -59,6 +59,7 @@ data = DataMap("../data")
 #     sampling_date=sampling_date, column="logvar_capm_resid"
 # )
 df_var = data.load_historic(sampling_date=sampling_date, column="var")
+df_noisevar = data.load_historic(sampling_date=sampling_date, column="noisevar")
 df_spy_var = data.load_spy_data(series="var").loc[df_var.index]
 df_info = data.load_asset_estimates(
     sampling_date=sampling_date, columns=["ticker", "comnam", "last_size", "mean_size"]
@@ -108,6 +109,45 @@ data.store(
 # ## Data Summary & Processing
 
 # %%
+missing_data(
+    df_var.replace(0, np.nan),
+    title="Missing Data: Intraday Variances",
+    save_path="../reports/figures/estimation/matrix_missing.pdf",
+)
+
+# %%
+print("NOISEVAR")
+missing_data(
+    df_noisevar.replace(0, np.nan),
+    title="Missing Data: Bid-Ask Bounce",
+)
+
+# %%
+print(
+    "{:.2f}% of observations missing".format(
+        (df_var.replace(0, np.nan).isna()).sum().sum() / len(df_var.stack(dropna=False)) * 100
+    )
+)
+
+# %%
+histogram(
+    df_var.fillna(0).stack(),
+    title="Distribution of Raw Data",
+    drop_tails=0.01,
+    bins=100,
+    save_path="../reports/figures/estimation/histogram_raw_data.pdf",
+)
+
+# %%
+# fill missing data, convert to logs
+df_var = data.prepare_log_variances(df_var=df_var, df_noisevar=df_noisevar)
+df_spy_var = data.log_replace(df_spy_var, method="min")
+
+# add spy to network
+# df_var = df_spy_var.rename(columns={"var": "SPY"}).join(df_var)
+# df_spy_var = df_spy_var.drop(columns="var")
+
+# %%
 corr_heatmap(
     df_var.corr(),
     title="Total Variance Correlations",
@@ -119,28 +159,6 @@ corr_heatmap(
     autocorrcoef(df_var, lag=1),
     title="Total Variance Auto-Correlations (First order)",
     save_path="../reports/figures/estimation/heatmap_total_variance_autocorrelation.pdf",
-)
-
-# %%
-missing_data(
-    df_var,
-    save_path="../reports/figures/estimation/matrix_missing.pdf",
-)
-
-# %%
-print(
-    "{:.2f}% of observations missing".format(
-        (df_var.isna()).sum().sum() / len(df_var.stack(dropna=False)) * 100
-    )
-)
-
-# %%
-histogram(
-    df_var.fillna(0).stack(),
-    title="Distribution of Raw Data",
-    drop_tails=0.01,
-    bins=100,
-    save_path="../reports/figures/estimation/histogram_raw_data.pdf",
 )
 
 # %%
@@ -166,15 +184,15 @@ histogram(
 # )
 
 # %%
-pd.Series(np.diag(autocorrcoef(np.log(df_var), lag=1))).plot(
+pd.Series(np.diag(autocorrcoef(df_var, lag=1))).plot(
     kind="hist", title="Diagonal Autocorrelations", bins=20
 )
 plt.show()
 
 # %%
 histogram(
-    np.log(df_var).stack(),
-    title="Distribution of Idiosyncratic Variances",
+    df_var.stack(),
+    title="Distribution of Intraday Log Variances",
     save_path="../reports/figures/estimation/histogram_idiosyncratic_variance.pdf",
 )
 
@@ -204,7 +222,7 @@ histogram(
 
 # %%
 var = FactorVAR(has_intercepts=True, p_lags=1)
-var.fit(var_data=np.log(df_var), factor_data=np.log(df_spy_var), method="OLS")
+var.fit(var_data=df_var, factor_data=df_spy_var, method="OLS")
 
 # %%
 corr_heatmap(
@@ -236,8 +254,8 @@ var_grid = {
 
 # %%
 # %%time
-var_cv = var.fit_adaptive_elastic_net_cv(var_data=np.log(df_var),
-                                         factor_data=np.log(df_spy_var),
+var_cv = var.fit_adaptive_elastic_net_cv(var_data=df_var,
+                                         factor_data=df_spy_var,
                                          grid=var_grid,
                                          return_cv=True,
                                          penalize_diagonals=True,
@@ -308,7 +326,7 @@ network_graph(
 # residuals = var.residuals(df_log_idio_var)
 
 # %%
-residuals = var.residuals(var_data=np.log(df_var), factor_data=np.log(df_spy_var))
+residuals = var.residuals(var_data=df_var, factor_data=df_spy_var)
 
 # %%
 corr_heatmap(
@@ -826,6 +844,8 @@ network_graph(
 # %%
 data.lookup_ticker(tickers=["UNH", "XON"], date=sampling_date)
 
+
+# %%
 
 # %%
 

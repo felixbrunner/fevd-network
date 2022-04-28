@@ -90,12 +90,15 @@ sampling_date = dt.datetime(year=2021, month=12, day=31)
 
 # %%
 # %%time
-# load volatility data, load size data
+# load & preprocess data
 df_var = data.load_historic(sampling_date=sampling_date, column="var")
+df_noisevar = data.load_historic(sampling_date=sampling_date, column="noisevar")
 df_spy_var = data.load_spy_data(series="var").loc[df_var.index]
 mean_size = data.load_asset_estimates(
     sampling_date=sampling_date, columns="mean_size"
 ).values.squeeze()
+df_var = data.prepare_log_variances(df_var=df_var, df_noisevar=df_noisevar)
+df_spy_var = data.log_replace(df_spy_var, method="min")
 
 # estimate var
 var = FactorVAR(has_intercepts=True, p_lags=1)
@@ -132,10 +135,14 @@ fevd = FEVD(var.var_1_matrix_, cov.covariance_)
 
 # collect estimation statistics
 stats = describe_data(np.log(df_var))
-stats.update(describe_var(var=var, var_cv=var_cv, var_data=np.log(df_var), factor_data=np.log(df_spy_var)))
+stats.update(
+    describe_var(
+        var=var, var_cv=var_cv, var_data=np.log(df_var), factor_data=np.log(df_spy_var)
+    )
+)
 stats.update(describe_cov(cov=cov, cov_cv=cov_cv, data=residuals))
 stats.update(describe_fevd(fevd=fevd, horizon=horizon, data=np.log(df_var)))
-stats = {key + '_factor': value for key, value in stats.items()}
+stats = {key + "_factor": value for key, value in stats.items()}
 
 # collect estimates
 estimates = collect_var_estimates(var=var, data=np.log(df_var))
@@ -156,12 +163,15 @@ estimates = estimates.add_suffix("_factor")
 
 sampling_date = first_sampling_date
 while sampling_date <= last_sampling_date:
-    # load volatility data, load size data
+    # load & preprocess data
     df_var = data.load_historic(sampling_date=sampling_date, column="var")
+    df_noisevar = data.load_historic(sampling_date=sampling_date, column="noisevar")
     df_spy_var = data.load_spy_data(series="var").loc[df_var.index]
     mean_size = data.load_asset_estimates(
         sampling_date=sampling_date, columns="mean_size"
     ).values.squeeze()
+    df_var = data.prepare_log_variances(df_var=df_var, df_noisevar=df_noisevar)
+    df_spy_var = data.log_replace(df_spy_var, method="min")
 
     # estimate var
     var = FactorVAR(has_intercepts=True, p_lags=1)
@@ -172,7 +182,7 @@ while sampling_date <= last_sampling_date:
         return_cv=True,
         penalize_factors=False,
     )
-    residuals = var.residuals(var_data=np.log(df_var),factor_data=np.log(df_spy_var))
+    residuals = var.residuals(var_data=np.log(df_var), factor_data=np.log(df_spy_var))
 
     # estimate covariance
     cov_cv = GridSearchCV(
@@ -187,13 +197,20 @@ while sampling_date <= last_sampling_date:
 
     # create fevd
     fevd = FEVD(var.var_1_matrix_, cov.covariance_)
-    
+
     # collect estimation statistics
     stats = describe_data(np.log(df_var))
-    stats.update(describe_var(var=var, var_cv=var_cv, var_data=np.log(df_var), factor_data=np.log(df_spy_var)))
+    stats.update(
+        describe_var(
+            var=var,
+            var_cv=var_cv,
+            var_data=np.log(df_var),
+            factor_data=np.log(df_spy_var),
+        )
+    )
     stats.update(describe_cov(cov=cov, cov_cv=cov_cv, data=residuals))
     stats.update(describe_fevd(fevd=fevd, horizon=horizon, data=np.log(df_var)))
-    stats = {key + '_factor': value for key, value in stats.items()}
+    stats = {key + "_factor": value for key, value in stats.items()}
 
     # collect estimates
     estimates = collect_var_estimates(var=var, data=np.log(df_var))
@@ -216,7 +233,9 @@ while sampling_date <= last_sampling_date:
         data=estimates,
         path="samples/{:%Y-%m-%d}/asset_estimates.csv".format(sampling_date),
     )
-    data.write(data=fevd, path="samples/{:%Y-%m-%d}/factorfevd.pkl".format(sampling_date))
+    data.write(
+        data=fevd, path="samples/{:%Y-%m-%d}/factorfevd.pkl".format(sampling_date)
+    )
 
     # increment monthly end of month
     print("Completed estimation at {:%Y-%m-%d}".format(sampling_date))
