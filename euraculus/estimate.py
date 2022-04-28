@@ -125,8 +125,6 @@ def describe_var(
             "var_asymmetry": euraculus.utils.matrix_asymmetry(M=var.var_1_matrix_),
             "var_r2": var.r2(var_data=var_data),
             "var_r2_ols": ols_var.r2(var_data=var_data),
-            "var_factor_r2": var.factor_r2(var_data=var_data),
-            "var_factor_r2_ols": ols_var.factor_r2(var_data=var_data),
             "var_df_used": var.df_used_,
             "var_nonzero_shrinkage": euraculus.utils.shrinkage_factor(
                 array=var.var_1_matrix_,
@@ -136,16 +134,6 @@ def describe_var(
             "var_full_shrinkage": euraculus.utils.shrinkage_factor(
                 array=var.var_1_matrix_,
                 benchmark_array=ols_var.var_1_matrix_,
-                drop_zeros=False,
-            ),
-            "var_factor_shrinkage": euraculus.utils.shrinkage_factor(
-                array=var.factor_loadings_,
-                benchmark_array=ols_var.factor_loadings_,
-                drop_zeros=True,
-            ),
-            "var_full_factor_shrinkage": euraculus.utils.shrinkage_factor(
-                array=var.factor_loadings_,
-                benchmark_array=ols_var.factor_loadings_,
                 drop_zeros=False,
             ),
             "var_cv_loss": -var_cv.best_score_,
