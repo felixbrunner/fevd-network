@@ -35,7 +35,8 @@ def describe_data(df: pd.DataFrame) -> dict:
 def describe_var(
     var: euraculus.var.VAR,
     var_cv: GridSearchCV,
-    data: pd.DataFrame,
+    var_data: pd.DataFrame,
+    factor_data: pd.DataFrame,
 ) -> dict:
     """Creates descriptive statistics of a VAR estimation.
 
@@ -66,7 +67,7 @@ def describe_var(
 
     """
     ols_var = var.copy()
-    ols_var.fit_ols(data)
+    ols_var.fit_ols(var_data=var_data, factor_data=factor_data)
     stats = {
         "lambda": var_cv.best_params_["lambdau"],
         "kappa": var_cv.best_params_["alpha"],
@@ -76,8 +77,12 @@ def describe_var(
         "var_mean_connection": var.var_1_matrix_.mean(),
         "var_mean_abs_connection": abs(var.var_1_matrix_).mean(),
         "var_asymmetry": euraculus.utils.matrix_asymmetry(M=var.var_1_matrix_),
-        "var_r2": var.r2(data),
-        "var_r2_ols": ols_var.r2(data),
+        "var_r2": var.r2(var_data=var_data, factor_data=factor_data),
+        "var_r2_ols": ols_var.r2(var_data=var_data, factor_data=factor_data),
+        "var_factor_r2": var.factor_r2(var_data=var_data, factor_data=factor_data),
+        "var_factor_r2_ols": ols_var.factor_r2(
+            var_data=var_data, factor_data=factor_data
+        ),
         "var_df_used": var.df_used_,
         "var_nonzero_shrinkage": euraculus.utils.shrinkage_factor(
             array=var.var_1_matrix_,
@@ -87,6 +92,16 @@ def describe_var(
         "var_full_shrinkage": euraculus.utils.shrinkage_factor(
             array=var.var_1_matrix_,
             benchmark_array=ols_var.var_1_matrix_,
+            drop_zeros=False,
+        ),
+        "var_factor_shrinkage": euraculus.utils.shrinkage_factor(
+            array=var.factor_loadings_,
+            benchmark_array=ols_var.factor_loadings_,
+            drop_zeros=True,
+        ),
+        "var_full_factor_shrinkage": euraculus.utils.shrinkage_factor(
+            array=var.factor_loadings_,
+            benchmark_array=ols_var.factor_loadings_,
             drop_zeros=False,
         ),
         "var_cv_loss": -var_cv.best_score_,
@@ -245,6 +260,7 @@ def collect_var_estimates(
     """
     estimates = pd.DataFrame(index=data.columns)
     estimates["var_intercept"] = var.intercepts_
+    estimates["var_factor_loadings_"] = var.factor_loadings_
     estimates["mean_abs_var_in"] = (
         abs(var.var_1_matrix_).sum(axis=1) - abs(np.diag(var.var_1_matrix_))
     ) / (var.var_1_matrix_.shape[0] - 1)

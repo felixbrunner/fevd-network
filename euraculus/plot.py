@@ -7,10 +7,23 @@ import numpy as np
 import pandas as pd
 import scipy as sp
 
-import euraculus.utils
-
-sys.path.append("../../kungfu/")
 import kungfu as kf
+
+# %% Plot settings
+
+# style
+plt.style.use("seaborn")
+plt.rcParams["figure.figsize"] = [17, 8]
+
+# colors
+DARK_BLUE = "#014c63"
+DARK_GREEN = "#3b5828"
+DARK_RED = "#880000"
+ORANGE = "#ae3e00"
+DARK_YELLOW = "#ba9600"
+PURPLE = "#663a82"
+color_list = [DARK_BLUE, DARK_GREEN, DARK_RED, DARK_YELLOW, ORANGE, PURPLE]
+plt.rcParams["axes.prop_cycle"] = plt.cycler(color=color_list)
 
 
 def corr_heatmap(
@@ -503,7 +516,6 @@ def histogram(df, bins=100, title="Data distribution", save_path=None, drop_tail
 def plot_estimation_summary(df, save_path=None):
     fig, axes = plt.subplots(3, 1, figsize=(20, 12))
     colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
-    df = df.astype(float)
 
     # hyperparameters
     ax1 = axes[0]
@@ -642,6 +654,7 @@ def plot_estimation_summary(df, save_path=None):
 def plot_regularisation_summary(df, save_path=None):
     fig, axes = plt.subplots(3, 1, figsize=(20, 12))
     colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    df = df.astype(float)
 
     # Degrees of Freedom
     ax = axes[0]
