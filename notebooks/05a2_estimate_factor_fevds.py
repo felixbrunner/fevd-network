@@ -103,13 +103,13 @@ df_spy_var = data.log_replace(df_spy_var, method="min")
 # estimate var
 var = FactorVAR(has_intercepts=True, p_lags=1)
 var_cv = var.fit_adaptive_elastic_net_cv(
-    var_data=np.log(df_var),
-    factor_data=np.log(df_spy_var),
+    var_data=df_var,
+    factor_data=df_spy_var,
     grid=var_grid,
     return_cv=True,
     penalize_factors=False,
 )
-residuals = var.residuals(var_data=np.log(df_var), factor_data=np.log(df_spy_var))
+residuals = var.residuals(var_data=df_var, factor_data=df_spy_var)
 
 # estimate covariance
 cov_cv = GridSearchCV(
@@ -134,22 +134,18 @@ cov = cov_cv.best_estimator_
 fevd = FEVD(var.var_1_matrix_, cov.covariance_)
 
 # collect estimation statistics
-stats = describe_data(np.log(df_var))
-stats.update(
-    describe_var(
-        var=var, var_cv=var_cv, var_data=np.log(df_var), factor_data=np.log(df_spy_var)
-    )
-)
+stats = describe_data(df_var)
+stats.update(describe_var(var=var, var_cv=var_cv, var_data=df_var, factor_data=df_spy_var))
 stats.update(describe_cov(cov=cov, cov_cv=cov_cv, data=residuals))
-stats.update(describe_fevd(fevd=fevd, horizon=horizon, data=np.log(df_var)))
-stats = {key + "_factor": value for key, value in stats.items()}
+stats.update(describe_fevd(fevd=fevd, horizon=horizon, data=df_var))
+stats = {key + '_factor': value for key, value in stats.items()}
 
 # collect estimates
-estimates = collect_var_estimates(var=var, data=np.log(df_var))
+estimates = collect_var_estimates(var=var, data=df_var)
 estimates = estimates.join(collect_cov_estimates(cov=cov, data=residuals))
 estimates = estimates.join(
     collect_fevd_estimates(
-        fevd=fevd, horizon=horizon, data=np.log(df_var), sizes=mean_size
+        fevd=fevd, horizon=horizon, data=df_var, sizes=mean_size
     )
 )
 estimates = estimates.add_suffix("_factor")
@@ -176,13 +172,13 @@ while sampling_date <= last_sampling_date:
     # estimate var
     var = FactorVAR(has_intercepts=True, p_lags=1)
     var_cv = var.fit_adaptive_elastic_net_cv(
-        var_data=np.log(df_var),
-        factor_data=np.log(df_spy_var),
+        var_data=df_var,
+        factor_data=df_spy_var,
         grid=var_grid,
         return_cv=True,
         penalize_factors=False,
     )
-    residuals = var.residuals(var_data=np.log(df_var), factor_data=np.log(df_spy_var))
+    residuals = var.residuals(var_data=df_var,factor_data=df_spy_var)
 
     # estimate covariance
     cov_cv = GridSearchCV(
@@ -197,27 +193,20 @@ while sampling_date <= last_sampling_date:
 
     # create fevd
     fevd = FEVD(var.var_1_matrix_, cov.covariance_)
-
+    
     # collect estimation statistics
-    stats = describe_data(np.log(df_var))
-    stats.update(
-        describe_var(
-            var=var,
-            var_cv=var_cv,
-            var_data=np.log(df_var),
-            factor_data=np.log(df_spy_var),
-        )
-    )
+    stats = describe_data(df_var)
+    stats.update(describe_var(var=var, var_cv=var_cv, var_data=df_var, factor_data=df_spy_var))
     stats.update(describe_cov(cov=cov, cov_cv=cov_cv, data=residuals))
-    stats.update(describe_fevd(fevd=fevd, horizon=horizon, data=np.log(df_var)))
-    stats = {key + "_factor": value for key, value in stats.items()}
+    stats.update(describe_fevd(fevd=fevd, horizon=horizon, data=df_var))
+    stats = {key + '_factor': value for key, value in stats.items()}
 
     # collect estimates
-    estimates = collect_var_estimates(var=var, data=np.log(df_var))
+    estimates = collect_var_estimates(var=var, data=df_var)
     estimates = estimates.join(collect_cov_estimates(cov=cov, data=residuals))
     estimates = estimates.join(
         collect_fevd_estimates(
-            fevd=fevd, horizon=horizon, data=np.log(df_var), sizes=mean_size
+            fevd=fevd, horizon=horizon, data=df_var, sizes=mean_size
         )
     )
     estimates = estimates.add_suffix("_factor")
@@ -233,9 +222,7 @@ while sampling_date <= last_sampling_date:
         data=estimates,
         path="samples/{:%Y-%m-%d}/asset_estimates.csv".format(sampling_date),
     )
-    data.write(
-        data=fevd, path="samples/{:%Y-%m-%d}/factorfevd.pkl".format(sampling_date)
-    )
+    data.write(data=fevd, path="samples/{:%Y-%m-%d}/factorfevd.pkl".format(sampling_date))
 
     # increment monthly end of month
     print("Completed estimation at {:%Y-%m-%d}".format(sampling_date))
