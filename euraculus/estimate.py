@@ -67,7 +67,7 @@ def describe_var(
 
     """
     ols_var = var.copy()
-    if factor_data:
+    if factor_data is not None:
         ols_var.fit_ols(var_data=var_data, factor_data=factor_data)
         stats = {
             "lambda": var_cv.best_params_["lambdau"],
