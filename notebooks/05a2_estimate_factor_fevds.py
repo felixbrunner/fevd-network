@@ -216,7 +216,7 @@ while sampling_date <= last_sampling_date:
         data=pd.Series(
             stats, index=pd.Index(stats, name="statistic"), name=sampling_date
         ),
-        path="samples/{:%Y-%m-%d}/estimation_stats.csv".format(sampling_date),
+        path="samples/{:%Y-%m-%d}/estimation_stats_factor.csv".format(sampling_date),
     )
     data.store(
         data=estimates,
