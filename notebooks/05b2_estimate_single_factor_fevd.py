@@ -235,15 +235,12 @@ corr_heatmap(
 # %%
 # for logged data
 var_grid = {
-    "alpha": np.geomspace(1e-5, 1e0, 11),
-    "lambdau": np.geomspace(1e-2, 1e2, 13),
+    "alpha": np.geomspace(1e-6, 1e0, 13),
+    "lambdau": np.geomspace(1e-1, 1e1, 11),
     #'gamma': np.geomspace(1e-2, 1e2, 15),
 }
-
-# %%
-# for logged data
 var_grid = {
-    "alpha": np.geomspace(1e-6, 1e0, 13),
+    "alpha": np.geomspace(1e-10, 1e0, 11),
     "lambdau": np.geomspace(1e-1, 1e1, 11),
     #'gamma': np.geomspace(1e-2, 1e2, 15),
 }

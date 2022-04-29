@@ -57,7 +57,7 @@ var_grid = {
     #'gamma': np.geomspace(1e-2, 1e2, 15),
 }
 var_grid = {
-    "alpha": np.geomspace(1e-6, 1e0, 13),
+    "alpha": np.geomspace(1e-10, 1e0, 11),
     "lambdau": np.geomspace(1e-1, 1e1, 11),
     #'gamma': np.geomspace(1e-2, 1e2, 15),
 }
@@ -138,7 +138,7 @@ stats = describe_data(df_var)
 stats.update(describe_var(var=var, var_cv=var_cv, var_data=df_var, factor_data=df_spy_var))
 stats.update(describe_cov(cov=cov, cov_cv=cov_cv, data=residuals))
 stats.update(describe_fevd(fevd=fevd, horizon=horizon, data=df_var))
-stats = {key + '_factor': value for key, value in stats.items()}
+# stats = {key + '_factor': value for key, value in stats.items()}
 
 # collect estimates
 estimates = collect_var_estimates(var=var, data=df_var)
@@ -199,7 +199,7 @@ while sampling_date <= last_sampling_date:
     stats.update(describe_var(var=var, var_cv=var_cv, var_data=df_var, factor_data=df_spy_var))
     stats.update(describe_cov(cov=cov, cov_cv=cov_cv, data=residuals))
     stats.update(describe_fevd(fevd=fevd, horizon=horizon, data=df_var))
-    stats = {key + '_factor': value for key, value in stats.items()}
+#     stats = {key + '_factor': value for key, value in stats.items()}
 
     # collect estimates
     estimates = collect_var_estimates(var=var, data=df_var)

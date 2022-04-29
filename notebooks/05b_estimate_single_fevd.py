@@ -119,7 +119,7 @@ corr_heatmap(
 
 # %%
 corr_heatmap(
-    euraculus.utils.autocorrcoef(df_var, lag=1),
+    autocorrcoef(df_var, lag=1),
     title="Total Variance Auto-Correlations (First order)",
     save_path="../reports/figures/estimation/heatmap_total_variance_autocorrelation.pdf",
 )
@@ -393,7 +393,7 @@ corr_heatmap(
 
 # %%
 corr_heatmap(
-    euraculus.utils.prec_to_pcorr(np.linalg.inv(covar_ate)),
+    prec_to_pcorr(np.linalg.inv(covar_ate)),
     title="Adaptive Threshold Estimate of the VAR Residual Partial Correlation Matrix",
 )
 

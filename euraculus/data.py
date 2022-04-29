@@ -720,6 +720,7 @@ class DataMap:
         self,
         sampling_date: str = None,
         columns: list = None,
+        filename: str = "estimation_stats",
     ) -> pd.DataFrame:
         """Read summary table from estimation from disk.
 
@@ -736,7 +737,7 @@ class DataMap:
         if sampling_date:
             sampling_date = self._prepare_date(sampling_date)
             df_summary = self.read(
-                path="samples/{:%Y-%m-%d}/estimation_stats.csv".format(sampling_date)
+                path="samples/{:%Y-%m-%d}/{}.csv".format(sampling_date, filename)
             )
             df_summary = df_summary.set_index("statistic")
 
@@ -749,15 +750,15 @@ class DataMap:
                 else:
                     try:
                         df_sample = self.read(
-                            path="samples/{}/estimation_stats.csv".format(sample.name)
+                            path="samples/{}/{}.csv".format(sample.name, filename)
                         )
                         df_sample = df_sample.set_index("statistic")
                         df_sample.loc["sampling_date"] = pd.to_datetime(sample.name)
                         df_summary = df_summary.append(df_sample.T)
                     except ValueError:
                         warnings.warn(
-                            "File at 'samples/{}/estimation_summary.csv' does not exist, will be skipped".format(
-                                sample.name
+                            "File at 'samples/{}/{}.csv' does not exist, will be skipped".format(
+                                sample.name, filename
                             )
                         )
             df_summary = df_summary.set_index("sampling_date").convert_dtypes()

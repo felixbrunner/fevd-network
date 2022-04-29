@@ -101,7 +101,7 @@ mean_size = data.load_asset_estimates(
 ).values.squeeze()
 
 # estimate var
-var = VAR(add_intercepts=True, p_lags=1)
+var = VAR(has_intercepts=True, p_lags=1)
 var_cv = var.fit_adaptive_elastic_net_cv(
     var_data=df_log_idio_var, grid=var_grid, return_cv=True
 )
@@ -167,7 +167,7 @@ while sampling_date <= last_sampling_date:
     ).values.squeeze()
 
     # estimate var
-    var = VAR(add_intercepts=True, p_lags=1)
+    var = VAR(has_intercepts=True, p_lags=1)
     var_cv = var.fit_adaptive_elastic_net_cv(
         df_log_idio_var, grid=var_grid, return_cv=True
     )
