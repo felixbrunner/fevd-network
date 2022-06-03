@@ -66,6 +66,6 @@ while sampling_date <= last_sampling_date:
     )
 
     # increment monthly end of month
-    sampling_date += relativedelta(months=1, day=31)
     if sampling_date.month == 12:
         print("Done sampling year {}.".format(sampling_date.year))
+    sampling_date += relativedelta(months=1, day=31)
