@@ -343,20 +343,23 @@ class LargeCapSampler:
             .reindex(level="permno", labels=permnos)
             .dropna(how="all", subset=["mcap", "var", "noisevar", "retadj"])
         )
-        df_future = (
-            df_future[
-                df_future.index.isin(
-                    pd.MultiIndex.from_product(
-                        [
-                            df_future.index.get_level_values("date").unique().tolist(),
-                            permnos,
-                        ],
-                        names=["date", "permno"],
+        if not df_future.empty:
+            df_future = (
+                df_future[
+                    df_future.index.isin(
+                        pd.MultiIndex.from_product(
+                            [
+                                df_future.index.get_level_values("date")
+                                .unique()
+                                .tolist(),
+                                permnos,
+                            ],
+                            names=["date", "permno"],
+                        )
                     )
-                )
-            ]
-            .reindex(level="permno", labels=permnos)
-            .dropna(how="all", subset=["mcap", "var", "noisevar", "retadj"])
-        )
+                ]
+                .reindex(level="permno", labels=permnos)
+                .dropna(how="all", subset=["mcap", "var", "noisevar", "retadj"])
+            )
 
         return (df_historic, df_future, df_summary)
