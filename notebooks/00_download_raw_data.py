@@ -25,7 +25,7 @@
 from euraculus.data import DataMap
 
 # %%
-from euraculus.download import WRDSDownloader
+from euraculus.download import WRDSDownloader, download_yahoo_data
 
 # %% [markdown]
 # ## Set up
@@ -115,4 +115,29 @@ data.write(df_ff, "raw/ff_factors.pkl")
 df_spy = db.download_spy_data()
 data.write(df_spy, "raw/spy.pkl")
 
+# %% [markdown]
+# ## Yahoo data
+
+# %% [markdown]
+# ### CBOE Volatility Index (^VIX)
+
 # %%
+# %%time
+df_vix = download_yahoo_data("^VIX")
+data.write(df_vix, "raw/vix.pkl")
+
+# %% [markdown]
+# ### US Dollar/USDX - Index - Cash (DX-Y.NYB)
+
+# %%
+# %%time
+df_dxy = download_yahoo_data("DX-Y.NYB")
+data.write(df_dxy, "raw/dxy.pkl")
+
+# %% [markdown]
+# ### Treasury Yield 10 Years (^TNX)
+
+# %%
+# %%time
+df_tnx = download_yahoo_data("^TNX")
+data.write(df_tnx, "raw/tnx.pkl")

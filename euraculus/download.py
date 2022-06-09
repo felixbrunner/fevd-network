@@ -10,6 +10,7 @@ import sys
 
 import pandas as pd
 import wrds
+import yfinance
 
 
 class WRDSDownloader:
@@ -206,7 +207,7 @@ class WRDSDownloader:
         """Download CRSP delisting returns.
 
         Returns:
-            df (pandas.DataFrame): The downloaded and adjusted data in tabular form.
+            df (pandas.DataFrame): The downloaded data in tabular form.
 
         """
         query = """
@@ -262,7 +263,7 @@ class WRDSDownloader:
             connection (wrds.Connection): Connection object to CRSP.
 
         Returns:
-            df (pandas.DataFrame): The downloaded and adjusted data in tabular form.
+            df (pandas.DataFrame): The downloaded data in tabular form.
         """
         query = """
             SELECT
@@ -283,7 +284,7 @@ class WRDSDownloader:
         """Download Fama and French factor data from CRSP.
 
         Returns:
-            df (pandas.DataFrame): The downloaded and adjusted data in tabular form.
+            df (pandas.DataFrame): The downloaded data in tabular form.
 
         """
         query = """
@@ -299,7 +300,7 @@ class WRDSDownloader:
         """Download SPY return and variance data from CRSP.
 
         Returns:
-            df (pandas.DataFrame): The downloaded and adjusted data in tabular form.
+            df (pandas.DataFrame): The downloaded data in tabular form.
 
         """
         query = """
@@ -321,3 +322,17 @@ class WRDSDownloader:
             """
         df = self.query(query).set_index("date")
         return df
+
+
+def download_yahoo_data(ticker: str) -> pd.DataFrame:
+    """Download historical data from Yahoo! Finance.
+
+    Args:
+        ticker: The ticker to download as displayed on the website.
+
+    Returns:
+        df: The downloaded and adjusted data in tabular form.
+
+    """
+    df = yfinance.Ticker(ticker).history(period="max")
+    return df
