@@ -227,7 +227,7 @@ class FEVD:
     def forecast_error_variance_decomposition(
         self,
         horizon: int,
-        normalise: bool = False,
+        normalize: bool = False,
     ) -> np.ndarray:
         """Calculate the forecast error variance decomposition matrix.
 
@@ -235,7 +235,7 @@ class FEVD:
 
         Args:
             horizon: Number of periods for fevd.
-            normalise: Indicates if matrix should be row-normalised.
+            normalize: Indicates if matrix should be row-normalized.
 
         Returns:
             fevd: Forecast error variance decomposition (n_series * n_series).
@@ -249,8 +249,8 @@ class FEVD:
             horizon
         )
 
-        # row normalise if requested
-        if normalise:
+        # row normalize if requested
+        if normalize:
             fevd /= fevd.sum(axis=1).reshape(-1, 1)
         return fevd
 
@@ -289,7 +289,7 @@ class FEVD:
     def forecast_uncertainty_decomposition(
         self,
         horizon: int,
-        normalise: bool = False,
+        normalize: bool = False,
     ) -> np.ndarray:
         """Calculate the forecast uncertainty decomposition matrix.
 
@@ -297,7 +297,7 @@ class FEVD:
 
         Args:
             horizon: Number of periods for fud.
-            normalise: Indicates if matrix should be row-normalised.
+            normalize: Indicates if matrix should be row-normalized.
 
         Returns:
             fud: Forecast uncertainty decomposition (n_series * n_series).
@@ -309,8 +309,8 @@ class FEVD:
 
         fud = self.forecast_uncertainty(horizon) / self.mean_absolute_error(horizon)
 
-        # row normalise if requested
-        if normalise:
+        # row normalize if requested
+        if normalize:
             fud /= fud.sum(axis=1).reshape(-1, 1)
         return fud
 
@@ -345,13 +345,13 @@ class FEVD:
         # retrieve table
         if name == "fevd":
             table = self.forecast_error_variance_decomposition(
-                horizon=horizon, normalise=normalize
+                horizon=horizon, normalize=normalize
             )
         if name == "fev":
             table = self.forecast_error_variances(horizon=horizon)
         if name == "fud":
             table = self.forecast_uncertainty_decomposition(
-                horizon=horizon, normalise=normalize
+                horizon=horizon, normalize=normalize
             )
         if name == "fu":
             table = self.forecast_uncertainty(horizon=horizon)
@@ -483,6 +483,7 @@ class FEVD:
             **kwargs
         )
         if not others_only:
+            kwargs.pop("others_only")
             total_connectedness -= self.self_connectedness(**kwargs)
         return total_connectedness
 
