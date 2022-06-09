@@ -1,33 +1,57 @@
+"""."""
+
+import warnings
 import networkx as nx
 import numpy as np
 import scipy as sp
 
-# from numpy.core.defchararray import index
-# from numpy.lib.function_base import vectorize
-
 
 class FEVD:
-    """Forecast Error Variance Decomposition."""
+    """Forecast Error Variance Decomposition.
 
-    def __init__(self, var_matrices, error_cov):
-        """"""
+    Attributes:
+        var_matrices: The vector auto-regression coefficient matrices.
+        error_cov: The innovation covariance matrix.
+        n_series: The number of series.
+        p_lags: The order of the VAR(p).
+        generalized_error_cov: The generalized innovation covariance matrix.
+
+    """
+
+    def __init__(
+        self,
+        var_matrices: list,
+        error_cov: np.ndarray,
+    ):
+        """Initiates the FEVD object with attribute matrices.
+
+        Args:
+            var_matrices: The vector auto-regression coefficient matrices.
+            error_cov: The innovation covariance matrix.
+
+        """
         self.var_matrices = var_matrices
         self.error_cov = error_cov
 
     @property
     def var_matrices(self):
-        """A list of np.arrays."""
+        """The VAR coefficients as a list of numpy arrays."""
         return self._var_matrices
 
     @var_matrices.setter
-    def var_matrices(self, var_matrices):
+    def var_matrices(self, var_matrices: list):
         if type(var_matrices) != list:
             var_matrices = [var_matrices]
         self._check_var_matrices(var_matrices)
         self._var_matrices = var_matrices
 
-    def _check_var_matrices(self, var_matrices):
-        """Checks type and dims of VAR matrices"""
+    def _check_var_matrices(self, var_matrices: list):
+        """Checks type and dims of VAR matrices.
+
+        Args:
+            var_matrices: The vector auto-regression coefficient matrices.
+
+        """
         for var_matrix in var_matrices:
             assert type(var_matrix) == np.ndarray, "VAR matrices must be numpy arrays"
             assert (
@@ -36,11 +60,11 @@ class FEVD:
 
     @property
     def error_cov(self):
-        """A list of np.arrays."""
+        """The innovation covariance matrix as a numpy array."""
         return self._error_cov
 
     @error_cov.setter
-    def error_cov(self, error_cov):
+    def error_cov(self, error_cov: np.ndarray):
         error_cov = np.array(error_cov)
         assert (
             error_cov.shape[0] == error_cov.shape[1]
@@ -59,9 +83,18 @@ class FEVD:
         p_lags = len(self.var_matrices)
         return p_lags
 
-    def vma_matrix(self, horizon):
-        """Returns VMA coefficient matrix corresponding to
-        the set of input VAR coefficient matrices and an input horizon.
+    def vma_matrix(self, horizon: int) -> np.ndarray:
+        """Invert the VAR to obtain MA coefficients.
+
+        Returns a VMA coefficient matrix corresponding to the VAR
+        coefficients and an input horizon.
+
+        Args:
+            horizon: Number of periods for moving average coefficients.
+
+        Returns:
+            phi_h: h-step VMA matrix (n_series * n_series).
+
         """
         assert (
             type(horizon) == int and horizon >= 0
@@ -87,9 +120,18 @@ class FEVD:
                 phi_h += self.var_matrices[l] @ self.vma_matrix(horizon - l - 1)
             return phi_h
 
-    def impulse_response(self, horizon):
-        """Returns the h-step impulse response function
-        to a generalised impulse.
+    def impulse_response_functions(self, horizon: int) -> np.ndarray:
+        """Calculate h-step impulse response function matrix.
+
+        Returns the h-step impulse response functions af all series to
+        a generalised impulse.
+
+        Args:
+            horizon: Number of periods for impulse response functions.
+
+        Returns:
+            psi_h: h-step impulse response matrix (n_series * n_series).
+
         """
         assert (
             type(horizon) == int and horizon >= 0
@@ -102,24 +144,43 @@ class FEVD:
         psi_h = self.vma_matrix(horizon) @ self.error_cov @ diag_sigma
         return psi_h
 
-    def innovation_response_variance(self, horizon):
-        """Returns the sum of the h-period covariance of observations to h
-        innovations - the innovation response variance (IRV).
+    def innovation_response_variances(self, horizon: int) -> np.ndarray:
+        """Calculate h-step innovation response variance matrix.
+
+        Returns the sum of the h-period covariance of observations to h
+        innovation vectors - the innovation response variances (IRV).
+        IRV = Sum_{h=0}^{H-1} VMA_h Sigma
+
+        Args:
+            horizon: Number of periods for innovation response variances.
+
+        Returns:
+            irv_h: h-step innovation response variances (n_series * n_series).
+
         """
         assert (
             type(horizon) == int and horizon >= 0
         ), "horizon needs to be a positive integer"
 
         # accumulate period-wise covariance contributions
-        irv = np.zeros(self.error_cov.shape)
+        irv_h = np.zeros(self.error_cov.shape)
         for h in range(horizon):
-            irv += self.vma_matrix(h) @ self.error_cov
+            irv_h += self.vma_matrix(h) @ self.error_cov
 
-        return irv
+        return irv_h
 
-    def fev_single(self, horizon):
-        """Returns the h-step ahead forecast error variance matrix
-        to generalized impulses to each variable in isolation
+    def forecast_error_variances(self, horizon: int) -> np.ndarray:
+        """Calculate h-step forecast error variance matrix.
+
+        Returns the h-step ahead forecast error variance matrix
+        to generalized impulses to each variable in isolation.
+
+        Args:
+            horizon: Number of periods for forecast error variances.
+
+        Returns:
+            fev_h: h-step forecast error variance matrix (n_series * n_series).
+
         """
         assert (
             type(horizon) == int and horizon >= 0
@@ -127,16 +188,25 @@ class FEVD:
 
         # initialise
         n_series = self.n_series
-        fev_single = np.zeros([n_series, n_series])
+        fev_h = np.zeros([n_series, n_series])
 
         # accumulate
         for h in range(horizon + 1):
-            fev_single += self.impulse_response(h) ** 2
-        return fev_single
+            fev_h += self.impulse_response_functions(h) ** 2
+        return fev_h
 
-    def fev_total(self, horizon):
-        """Returns the h-step ahead forecast MSE to
+    def mean_squared_errors(self, horizon: int) -> np.ndarray:
+        """Calculate h-step mean squared error of each series.
+
+        Returns the h-step ahead forecast MSE to
         a generalised impulse to all variables.
+
+        Args:
+            horizon: Number of periods for the mean squared errors.
+
+        Returns:
+            mse_h: h-step mean squared error vector (n_series * 1).
+
         """
         assert (
             type(horizon) == int and horizon >= 0
@@ -144,209 +214,415 @@ class FEVD:
 
         # initialise
         n_series = self.n_series
-        fev_total = np.zeros([n_series, n_series])
+        mse_h = np.zeros([n_series, n_series])
 
         # accumulate
         for h in range(horizon + 1):
             phi_h = self.vma_matrix(h)
-            fev_total += phi_h @ self.error_cov @ phi_h.T
+            mse_h += phi_h @ self.error_cov @ phi_h.T
 
-        fev_total = np.diag(fev_total).reshape(-1, 1)
-        return fev_total
+        mse_h = np.diag(mse_h).reshape(-1, 1)
+        return mse_h
 
-    def fev_others(self, horizon):
-        """Returns the h-step ahead forecast error variance
-        total contributions from other variables.
+    def forecast_error_variance_decomposition(
+        self,
+        horizon: int,
+        normalise: bool = False,
+    ) -> np.ndarray:
+        """Calculate the forecast error variance decomposition matrix.
+
+        Returns the forecast MSE decomposition matrix at input horizon.
+
+        Args:
+            horizon: Number of periods for fevd.
+            normalise: Indicates if matrix should be row-normalised.
+
+        Returns:
+            fevd: Forecast error variance decomposition (n_series * n_series).
+
         """
         assert (
             type(horizon) == int and horizon >= 0
         ), "horizon needs to be a positive integer"
 
-        # initialise
-        fev_single = self.fev_single(horizon=horizon)
+        fevd = self.forecast_error_variances(horizon) / self.mean_squared_errors(
+            horizon
+        )
 
-        # sum & deduct own contribution
-        fev_others = (fev_single.sum(axis=1) - np.diag(fev_single)).reshape(-1, 1)
-        return fev_others
+        # row normalise if requested
+        if normalise:
+            fevd /= fevd.sum(axis=1).reshape(-1, 1)
+        return fevd
 
-    def fev_self(self, horizon):
-        """Returns the h-step ahead forecast error variance
-        total contributions from lags of own timeseries.
-        """
-        assert (
-            type(horizon) == int and horizon >= 0
-        ), "horizon needs to be a positive integer"
+    def forecast_uncertainty(self, horizon: int) -> np.ndarray:
+        """Calculate h-step forecast uncertainty matrix.
 
-        # initialise
-        fev_single = self.fev_single(horizon=horizon)
-
-        # sum & deduct own contribution
-        fev_self = np.diag(fev_single).reshape(-1, 1)
-        return fev_self
-
-    def fu_single(self, horizon):
-        """Returns the h-step ahead forecast uncertainty matrix
+        Returns the h-step ahead forecast uncertainty matrix
         to generalized impulses to each variable in isolation
-        """
-        fu_single = self.fev_single(horizon) ** 0.5
-        return fu_single
 
-    def fu_total(self, horizon=1):
-        """Returns the h-step ahead forecast uncertainty to
+        Args:
+            horizon: Number of periods for forecast uncertainty.
+
+        Returns:
+            fu_h: h-step forecast uncertainty matrix (n_series * n_series).
+
+        """
+        fu_h = self.forecast_error_variances(horizon) ** 0.5
+        return fu_h
+
+    def mean_absolute_error(self, horizon: int) -> np.ndarray:
+        """Calculate h-step mean absolute forecast error of each series.
+
+        Returns the h-step ahead mean absolute forecast error to
         a generalised impulse to all variables.
+
+        Args:
+            horizon: Number of periods for the mean absolute forecast error.
+
+        Returns:
+            mae_h: h-step mean absolute forecast error vector (n_series * 1).
+
         """
-        fu_total = self.fev_total(horizon) ** 0.5
-        return fu_total
+        mae_h = self.mean_squared_errors(horizon) ** 0.5
+        return mae_h
 
-    def fu_others(self, horizon):
-        """Returns the h-step ahead forecast uncertainty
-        total contributions from other variables.
+    def forecast_uncertainty_decomposition(
+        self,
+        horizon: int,
+        normalise: bool = False,
+    ) -> np.ndarray:
+        """Calculate the forecast uncertainty decomposition matrix.
+
+        Returns the forecast MAE decomposition matrix at input horizon.
+
+        Args:
+            horizon: Number of periods for fud.
+            normalise: Indicates if matrix should be row-normalised.
+
+        Returns:
+            fud: Forecast uncertainty decomposition (n_series * n_series).
+
         """
-        # initialise
-        fu_single = self.fu_single(horizon=horizon)
-
-        # sum & deduct own contribution
-        fu_others = (fu_single.sum(axis=1) - np.diag(fu_single)).reshape(-1, 1)
-        return fu_others
-
-    def fu_self(self, horizon):
-        """Returns the h-step ahead forecast error variance
-        total contributions from lags of own timeseries.
-        """
-        # initialise
-        fu_single = self.fu_single(horizon=horizon)
-
-        # sum & deduct own contribution
-        fu_self = np.diag(fu_single).reshape(-1, 1)
-        return fu_self
-
-    def decompose_fev(self, horizon, normalise=False):
-        """Returns the forecast MSE decomposition matrix at input horizon."""
         assert (
             type(horizon) == int and horizon >= 0
         ), "horizon needs to be a positive integer"
 
-        decomposition = self.fev_single(horizon) / self.fev_total(horizon)
+        fud = self.forecast_uncertainty(horizon) / self.mean_absolute_error(horizon)
 
         # row normalise if requested
         if normalise:
-            decomposition /= decomposition.sum(axis=1).reshape(-1, 1)
-        return decomposition
+            fud /= fud.sum(axis=1).reshape(-1, 1)
+        return fud
 
-    def decompose_fu(self, horizon, normalise=False):
-        """Returns the forecast MSE decomposition matrix at input horizon."""
+    def _get_table(
+        self,
+        name: str,
+        horizon: int,
+        normalize: bool = False,
+    ) -> np.ndarray:
+        """Retrieve a connectedness table from FEVD object.
+
+        Args:
+            name: Abbreviated name of the table.
+            horizon: Number of periods to compute the table.
+            normalize: Indicates if table should be row-normalized.
+
+        Returns:
+            table: The requested (n_series * n_series) connectedness table.
+
+        """
+        # verify inputs
         assert (
             type(horizon) == int and horizon >= 0
         ), "horizon needs to be a positive integer"
 
-        decomposition = self.fu_single(horizon) / self.fu_total(horizon)
+        options = ["fevd", "fev", "fud", "fu", "irv", "irf", "var", "vma"]
+        assert name in options, "name needs to be one of " + ", ".join(options)
 
-        # row normalise if requested
-        if normalise:
-            decomposition /= decomposition.sum(axis=1).reshape(-1, 1)
-        return decomposition
+        if name not in ["fevd", "fud"] and normalize:
+            warnings.warn("normalization only available for tables 'fevd' and 'fud'")
 
-    def in_connectedness(self, horizon, normalise=False, network="fev"):
-        """"""
-        assert (
-            type(horizon) == int and horizon >= 0
-        ), "horizon needs to be a positive integer"
-        assert network in ["fev", "fu"], "network needs to be either fev or fu"
+        # retrieve table
+        if name == "fevd":
+            table = self.forecast_error_variance_decomposition(
+                horizon=horizon, normalise=normalize
+            )
+        if name == "fev":
+            table = self.forecast_error_variances(horizon=horizon)
+        if name == "fud":
+            table = self.forecast_uncertainty_decomposition(
+                horizon=horizon, normalise=normalize
+            )
+        if name == "fu":
+            table = self.forecast_uncertainty(horizon=horizon)
+        if name == "irv":
+            table = self.innovation_response_variances(horizon=horizon)
+        if name == "irf":
+            table = self.impulse_response_functions(horizon=horizon)
+        if name == "var":
+            table = self.var_matrices[horizon - 1]
+        if name == "vma":
+            table = self.vma_matrix(horizon=horizon)
 
-        if network == "fev":
-            decomposition_pct = self.decompose_fev(horizon, normalise=normalise)
-        elif network == "fu":
-            decomposition_pct = self.decompose_fu(horizon, normalise=normalise)
+        return table
 
-        in_connectedness = decomposition_pct.sum(axis=1) - np.diag(decomposition_pct)
+    def in_connectedness(
+        self,
+        horizon: int,
+        table_name: str = "fevd",
+        others_only: bool = True,
+        normalize: bool = False,
+    ) -> np.ndarray:
+        """Calculate the sum of incoming links per node (row-wise).
+
+        Args:
+            table_name: Abbreviated name of the table.
+            horizon: Number of periods to compute the table.
+            others_only: Indicates wheter to include self-linkages.
+            normalize: Indicates if table should be row-normalized.
+
+        Returns:
+            in_connectedness: A (n_series * 1) vector with connectedness values.
+
+        """
+        table = self._get_table(
+            name=table_name,
+            horizon=horizon,
+            normalize=normalize,
+        )
+
+        in_connectedness = table.sum(axis=1)
+        if others_only:
+            in_connectedness -= np.diag(table)
         in_connectedness = in_connectedness.reshape(-1, 1)
         return in_connectedness
 
-    def out_connectedness(self, horizon, normalise=False, network="fev"):
-        """"""
-        assert (
-            type(horizon) == int and horizon >= 0
-        ), "horizon needs to be a positive integer"
-        assert network in ["fev", "fu"], "network needs to be either fev or fu"
+    def out_connectedness(
+        self,
+        horizon: int,
+        table_name: str = "fevd",
+        others_only: bool = True,
+        normalize: bool = False,
+    ) -> np.ndarray:
+        """Calculate the sum of outgoing links per node (column-wise).
 
-        if network == "fev":
-            decomposition_pct = self.decompose_fev(horizon, normalise=normalise)
-        elif network == "fu":
-            decomposition_pct = self.decompose_fu(horizon, normalise=normalise)
+        Args:
+            table_name: Abbreviated name of the table.
+            horizon: Number of periods to compute the table.
+            others_only: Indicates wheter to include self-linkages.
+            normalize: Indicates if table should be row-normalized.
 
-        out_connectedness = decomposition_pct.sum(axis=0) - np.diag(decomposition_pct)
+        Returns:
+            out_connectedness: A (n_series * 1) vector with connectedness values.
+
+        """
+        table = self._get_table(
+            name=table_name,
+            horizon=horizon,
+            normalize=normalize,
+        )
+
+        out_connectedness = table.sum(axis=0)
+        if others_only:
+            out_connectedness -= np.diag(table)
         out_connectedness = out_connectedness.reshape(-1, 1)
         return out_connectedness
 
-    def average_connectedness(self, horizon, normalise=False, network="fev"):
-        """"""
-        assert (
-            type(horizon) == int and horizon >= 0
-        ), "horizon needs to be a positive integer"
-        assert network in ["fev", "fu"], "network needs to be either fev or fu"
+    def self_connectedness(
+        self,
+        horizon: int,
+        table_name: str = "fevd",
+        normalize: bool = False,
+    ) -> np.ndarray:
+        """Get the links of each node with itself.
 
-        in_connectedness = self.in_connectedness(
-            horizon, normalise=normalise, network=network
+        Args:
+            table_name: Abbreviated name of the table.
+            horizon: Number of periods to compute the table.
+            others_only: Indicates wheter to include self-linkages.
+            normalize: Indicates if table should be row-normalized.
+
+        Returns:
+            self_connectedness: A (n_series * 1) vector with connectedness values.
+
+        """
+        table = self._get_table(
+            name=table_name,
+            horizon=horizon,
+            normalize=normalize,
         )
+
+        self_connectedness = np.diag(table).reshape(-1, 1)
+        return self_connectedness
+
+    def total_connectedness(
+        self,
+        horizon: int,
+        table_name: str = "fevd",
+        others_only: bool = True,
+        normalize: bool = False,
+    ) -> np.ndarray:
+        """Get the total links of each node (incoming and outgoing).
+
+        Args:
+            table_name: Abbreviated name of the table.
+            horizon: Number of periods to compute the table.
+            others_only: Indicates wheter to include self-linkages.
+            normalize: Indicates if table should be row-normalized.
+
+        Returns:
+            total_connectedness: A (n_series * 1) vector with connectedness values.
+
+        """
+        # collect arguments to pass
+        kwargs = locals()
+        kwargs.pop("self")
+
+        # calculate
+        total_connectedness = self.in_connectedness(**kwargs) + self.out_connectedness(
+            **kwargs
+        )
+        if not others_only:
+            total_connectedness -= self.self_connectedness(**kwargs)
+        return total_connectedness
+
+    def average_connectedness(
+        self,
+        horizon: int,
+        table_name: str = "fevd",
+        others_only: bool = True,
+        normalize: bool = False,
+    ) -> float:
+        """Get the total links of each node (incoming and outgoing).
+
+        Args:
+            table_name: Abbreviated name of the table.
+            horizon: Number of periods to compute the table.
+            others_only: Indicates wheter to include self-linkages.
+            normalize: Indicates if table should be row-normalized.
+
+        Returns:
+            average_connectedness: Average connectedness value in the table.
+
+        """
+        # collect arguments to pass
+        kwargs = locals()
+        kwargs.pop("self")
+
+        # calculate
+        in_connectedness = self.in_connectedness(**kwargs)
         average_connectedness = in_connectedness.mean()
         return average_connectedness
 
-    def in_entropy(self, horizon, normalise=True, network="fev"):
-        """Returns the row-wise entropy of connections.s"""
-        assert (
-            type(horizon) == int and horizon >= 0
-        ), "horizon needs to be a positive integer"
-        assert network in ["fev", "fu"], "network needs to be either fev or fu"
+    def in_entropy(
+        self,
+        horizon: int,
+        table_name: str = "fevd",
+        others_only: bool = True,
+        normalize: bool = False,
+    ) -> np.ndarray:
+        """Calculate the entropy of incoming links per node (row-wise).
 
-        if network == "fev":
-            decomposition_pct = self.decompose_fev(horizon, normalise=normalise)
-        elif network == "fu":
-            decomposition_pct = self.decompose_fu(horizon, normalise=normalise)
+        Args:
+            table_name: Abbreviated name of the table.
+            horizon: Number of periods to compute the table.
+            others_only: Indicates wheter to include self-linkages.
+            normalize: Indicates if table should be row-normalized.
 
-        # remove diagonal values & scale
-        n = decomposition_pct.shape[0]
-        decomposition_pct = decomposition_pct[~np.eye(n, dtype=bool)].reshape(n, n - 1)
-        decomposition_pct /= decomposition_pct.sum(axis=1).reshape(n, 1)
+        Returns:
+            in_entropy: A (n_series * 1) vector with entropy values.
 
-        in_entropy = sp.stats.entropy(decomposition_pct, axis=1, base=n - 1)
+        """
+        table = self._get_table(
+            name=table_name,
+            horizon=horizon,
+            normalize=normalize,
+        )
+        n = self.n_series
+
+        # remove diagonal values
+        if others_only:
+            table = table[~np.eye(n, dtype=bool)].reshape(n, n - 1)
+
+        # scale rows to one
+        table /= table.sum(axis=1).reshape(n, 1)
+
+        # calculate entropy
+        in_entropy = sp.stats.entropy(table, axis=1, base=n - others_only)
         in_entropy = in_entropy.reshape(-1, 1)
         return in_entropy
 
-    def summarize(self, horizon):
-        """Returns a summarising dictionary."""
-        summary_dict = {
-            "average_connectedness": self.average_connectedness(horizon=horizon),
-            "in_connectedness": self.in_connectedness(horizon=horizon),
-            "out_connectedness": self.out_connectedness(horizon=horizon),
-            "fev_others": self.fev_others(horizon=horizon),
-            "fev_self": self.fev_self(horizon=horizon),
-            "fev_total": self.fev_total(horizon=horizon),
-            "fev_single_sum": self.fev_single(horizon=horizon)
-            .sum(axis=1)
-            .reshape(-1, 1),
-        }
-        return summary_dict
+    def out_entropy(
+        self,
+        horizon: int,
+        table_name: str = "fevd",
+        others_only: bool = True,
+        normalize: bool = False,
+    ) -> np.ndarray:
+        """Calculate the entropy of outgoing links per node (column-wise).
 
-    def to_fev_graph(self, horizon=1, normalise=True):
-        """Returns a networkx Graph object from
-        FEV decomposition at input horizon.
+        Args:
+            table_name: Abbreviated name of the table.
+            horizon: Number of periods to compute the table.
+            others_only: Indicates wheter to include self-linkages.
+            normalize: Indicates if table should be row-normalized.
+
+        Returns:
+            out_entropy: A (n_series * 1) vector with entropy values.
+
         """
-        adjacency = self.decompose_fev(horizon=horizon, normalise=normalise)
-        graph = nx.convert_matrix.from_numpy_array(adjacency, create_using=nx.DiGraph)
-        return graph
+        table = self._get_table(
+            name=table_name,
+            horizon=horizon,
+            normalize=normalize,
+        )
+        n = self.n_series
 
-    def to_fu_graph(self, horizon=1, normalise=True):
-        """Returns a networkx Graph object from
-        FU decomposition at input horizon."""
-        adjacency = self.decompose_fu(horizon=horizon, normalise=normalise)
-        graph = nx.convert_matrix.from_numpy_array(adjacency, create_using=nx.DiGraph)
+        # remove diagonal values
+        if others_only:
+            table = table[~np.eye(n, dtype=bool)].reshape(n - 1, n)
+
+        # scale columns to one
+        table /= table.sum(axis=0).reshape(1, n)
+
+        # calculate entropy
+        out_entropy = sp.stats.entropy(table, axis=0, base=n - others_only)
+        out_entropy = out_entropy.reshape(-1, 1)
+        return out_entropy
+
+    def to_graph(
+        self,
+        horizon: int,
+        table_name: str = "fevd",
+        normalize: bool = False,
+    ) -> nx.classes.digraph.DiGraph:
+        """Create a networkx Graph object from a connectedness table.
+
+        Args:
+            table_name: Abbreviated name of the table.
+            horizon: Number of periods to compute the table.
+            normalize: Indicates if table should be row-normalized.
+
+        Returns:
+            graph: The connectedness table as a networkx DiGraph object.
+
+        """
+        table = self._get_table(
+            name=table_name,
+            horizon=horizon,
+            normalize=normalize,
+        )
+        graph = nx.convert_matrix.from_numpy_array(table, create_using=nx.DiGraph)
         return graph
 
     @property
-    def generalized_error_cov(self):
+    def generalized_error_cov(self) -> np.ndarray:
         """The generalized innovation covariance matrix.
 
         Omega = diag(Sigma)^(1/2) * Sigma^(-1) * diag(Sigma)^(1/2)
+
+        Returns:
+            omega: The generalized error covariance.
 
         """
         omega = (
@@ -357,8 +633,10 @@ class FEVD:
         return omega
 
     def test_diagonal_generalized_innovations(
-        self, t_observations: int, method: str = "ledoit-wolf"
-    ):
+        self,
+        t_observations: int,
+        method: str = "ledoit-wolf",
+    ) -> tuple:
         """Test diagonality of innovations.
 
         Calculate a chi2 test statistic for the null hypothesis
@@ -405,26 +683,11 @@ class FEVD:
         p_value = 1 - sp.stats.chi2.cdf(test_statistic, N * (N + 1) / 2)
         return (test_statistic, p_value)
 
-    def innovation_response_variance(self, horizon: int) -> np.array:
-        """The innovation response variance.
-
-        The H-period variance response to a vector of innovations.
-        IRV = Sum_{h=0}^{H-1} VMA_h Sigma
-
-        Args:
-            horizon (int): The horizon of accumulative innovations.
-
-        Returns:
-            innovation_response_variance (np.array): innovation response
-                variance matrix (n_series times n_series)
-
-        """
-        innovation_response_variance = np.zeros([self.n_series, self.n_series])
-        for h in range(horizon - 1):
-            innovation_response_variance += self.vma_matrix(h) @ self.error_cov
-        return innovation_response_variance
-
-    def index_variance_decomposition(self, weights: np.array, horizon: int) -> np.array:
+    def index_variance_decomposition(
+        self,
+        weights: np.array,
+        horizon: int,
+    ) -> np.array:
         """Decomposes the variance of a weighted index.
 
         Decomposes the variance of an index created with the input index
@@ -439,7 +702,9 @@ class FEVD:
             index_variance_decomposition (np.array): index variance weights
                 (n_series times 1)
         """
-        innovation_response_variance = self.innovation_response_variance(
+        assert weights.shape == (self.n_series, 1), "weights have wrong shape"
+
+        innovation_response_variance = self.innovation_response_variances(
             horizon=horizon
         )
         index_variance_decomposition = (
