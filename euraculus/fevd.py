@@ -1,5 +1,6 @@
 """."""
 
+from stringprep import in_table_c11
 import warnings
 import networkx as nx
 import numpy as np
@@ -616,6 +617,117 @@ class FEVD:
         graph = nx.convert_matrix.from_numpy_array(table, create_using=nx.DiGraph)
         return graph
 
+    def in_eigenvector_centrality(
+        self,
+        horizon: int,
+        table_name: str = "fevd",
+        normalize: bool = False,
+    ) -> np.ndarray:
+        """Calculate the entropy of incoming links per node (row-wise).
+
+        Args:
+            table_name: Abbreviated name of the table.
+            horizon: Number of periods to compute the table.
+            normalize: Indicates if table should be row-normalized.
+
+        Returns:
+            in_centrality: A (n_series * 1) vector with centrality values.
+
+        """
+        graph = self.to_graph(
+            table_name=table_name,
+            horizon=horizon,
+            normalize=normalize,
+        )
+        in_centrality = nx.centrality.eigenvector_centrality(
+            graph, weight="weight", max_iter=1000
+        )
+        in_centrality = np.fromiter(in_centrality.values(), dtype=float).reshape(-1, 1)
+        return in_centrality
+
+    def out_eigenvector_centrality(
+        self,
+        horizon: int,
+        table_name: str = "fevd",
+        normalize: bool = False,
+    ) -> np.ndarray:
+        """Calculate the entropy of outgoing links per node (column-wise).
+
+        Args:
+            table_name: Abbreviated name of the table.
+            horizon: Number of periods to compute the table.
+            normalize: Indicates if table should be row-normalized.
+
+        Returns:
+            out_centrality: A (n_series * 1) vector with centrality values.
+
+        """
+        graph = self.to_graph(
+            table_name=table_name,
+            horizon=horizon,
+            normalize=normalize,
+        )
+        out_centrality = nx.centrality.eigenvector_centrality(
+            graph.reverse(), weight="weight", max_iter=1000
+        )
+        out_centrality = np.fromiter(out_centrality.values(), dtype=float).reshape(
+            -1, 1
+        )
+        return out_centrality
+
+    def in_page_rank(
+        self,
+        horizon: int,
+        table_name: str = "fevd",
+        normalize: bool = False,
+    ) -> np.ndarray:
+        """Calculate the entropy of incoming links per node (row-wise).
+
+        Args:
+            table_name: Abbreviated name of the table.
+            horizon: Number of periods to compute the table.
+            normalize: Indicates if table should be row-normalized.
+
+        Returns:
+            in_rank: A (n_series * 1) vector with centrality values.
+
+        """
+        graph = self.to_graph(
+            table_name=table_name,
+            horizon=horizon,
+            normalize=normalize,
+        )
+        in_rank = nx.pagerank(graph, weight="weight", max_iter=1000)
+        in_rank = np.fromiter(in_rank.values(), dtype=float).reshape(-1, 1)
+        return in_rank
+
+    def out_page_rank(
+        self,
+        horizon: int,
+        table_name: str = "fevd",
+        normalize: bool = False,
+    ) -> np.ndarray:
+        """Calculate the entropy of outgoing links per node (column-wise).
+
+        Args:
+            table_name: Abbreviated name of the table.
+            horizon: Number of periods to compute the table.
+            others_only: Indicates wheter to include self-linkages.
+            normalize: Indicates if table should be row-normalized.
+
+        Returns:
+            out_rank: A (n_series * 1) vector with centrality values.
+
+        """
+        graph = self.to_graph(
+            table_name=table_name,
+            horizon=horizon,
+            normalize=normalize,
+        )
+        out_rank = nx.pagerank(graph.reverse(), weight="weight", max_iter=1000)
+        out_rank = np.fromiter(out_rank.values(), dtype=float).reshape(-1, 1)
+        return out_rank
+
     @property
     def generalized_error_cov(self) -> np.ndarray:
         """The generalized innovation covariance matrix.
@@ -643,6 +755,7 @@ class FEVD:
         Calculate a chi2 test statistic for the null hypothesis
         H0: Omega = Identity.
         The test method can either be 'ledoit-wolf' or 'likelihood-ratio'.
+        Reject H0 for large test statistics (p-value < alpha).
 
         Args:
             t_observations (int): Number of time observations in the sample.
