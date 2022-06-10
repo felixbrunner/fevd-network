@@ -953,3 +953,33 @@ class DataMap:
             raise ValueError("method '{}' not defined".format(method))
 
         return df_
+
+    def load_yahoo_price(self, file: str) -> pd.DataFrame:
+        """Loads yahoo! Finance closing prices from disk.
+
+        Args:
+            file: Name of the raw data file.
+
+        Returns:
+            prc: Selected price data in tabular format.
+
+        """
+        df = self.read(file)
+        prc = df[["Close"]].rename(columns={"Close": "prc"})
+        return prc
+
+    def load_yahoo_variance(self, file: str) -> pd.DataFrame:
+        """Loads yahoo! Finance variance from disk.
+
+        Args:
+            file: Name of the raw data file.
+
+        Returns:
+            var: Selected variance data in tabular format.
+
+        """
+        df = self.read(file)
+        var = pd.DataFrame(
+            data=0.3607 * (np.log(df["High"]) - np.log(df["Low"])) ** 2, columns=["var"]
+        )
+        return var
