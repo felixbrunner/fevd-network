@@ -27,9 +27,9 @@ class VAR:
         is_fitted: Indicates if the VAR model has been fitted to data.
 
     Additional attributes:
-        var_matrices_:
-        var_1_matrix_:
-        intercepts_:
+        var_matrices_: The VAR coefficient matrices.
+        var_1_matrix_: The VAR matrix corresponding to the first lag.
+        intercepts_: The model intercepts.
 
     """
 
@@ -424,7 +424,7 @@ class VAR:
                 excluded from penalization during estimation.
 
         """
-        penalty_weights = np.ones(shape=(n_series ** 2 * self.p_lags))
+        penalty_weights = np.ones(shape=(n_series**2 * self.p_lags))
         if not penalize_diagonals:
             indices = list(
                 np.concatenate(
@@ -903,11 +903,11 @@ class FactorVAR(VAR):
         is_fitted: Indicates if the VAR model has been fitted to data.
 
     Additional attributes:
-        var_matrices_:
-        var_1_matrix_:
-        intercepts_:
-        factor_loadings_:
-        k_factors_:
+        var_matrices_:The VAR coefficient matrices.
+        var_1_matrix_: The VAR matrix corresponding to the first lag.
+        intercepts_: The model intercepts.
+        factor_loadings_: The model factor loadings.
+        k_factors_: The number of factors in the model.
 
     """
 
@@ -920,7 +920,7 @@ class FactorVAR(VAR):
         VAR.__init__(self, has_intercepts=has_intercepts, p_lags=p_lags)
 
     @property
-    def factor_loadings_(self) -> list:
+    def factor_loadings_(self) -> np.ndarray:
         """Matrix with factor loadings."""
         if not self.is_fitted:
             raise ValueError("Model is not fitted")
@@ -1147,7 +1147,7 @@ class FactorVAR(VAR):
                 ]
             )
         )
-        factor_loadings = coef_[indices].reshape(-1, 1)
+        factor_loadings = coef_[indices].reshape(-1, k_factors)
         return factor_loadings
 
     def _extract_var_matrices(
@@ -1751,7 +1751,7 @@ class FactorVAR(VAR):
         residuals = self.factor_residuals(var_data=var_data, factor_data=factor_data)
         residuals -= residuals.mean()
         rss = np.nansum(
-            residuals ** 2,
+            residuals**2,
             axis=0,
         )
         if weighting == "equal":
