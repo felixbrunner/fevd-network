@@ -1161,7 +1161,10 @@ class FactorVAR(VAR):
                 ]
             )
         )
-        factor_loadings = coef_[indices].reshape(-1, k_factors)
+        if k_factors > 0:
+            factor_loadings = coef_[indices].reshape(-1, k_factors)
+        else:
+            factor_loadings = np.ndarray([n_series, 0])
         return factor_loadings
 
     def _extract_var_matrices(
