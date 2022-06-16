@@ -8,7 +8,6 @@ import numpy as np
 import pandas as pd
 import scipy as sp
 import sklearn
-from sklearn.covariance import OAS, GraphicalLassoCV, LedoitWolf
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import GridSearchCV, PredefinedSplit
 
@@ -65,6 +64,12 @@ class VAR:
         if not self.is_fitted:
             raise ValueError("Model is not fitted")
         return self._intercepts_
+
+    @property
+    def _coef_(self):
+        """The regression coefficients stacked in a vector."""
+        coef_ = np.concatenate([self.intercepts_] + self.var_matrices_, axis=1).ravel()
+        return coef_
 
     @property
     def n_series_(self) -> int:
@@ -326,13 +331,9 @@ class VAR:
         model.fit(X, y)
 
         # store coefficient estimates
-        self._coef_ = model.coef_.ravel()
-        self._intercepts_ = self._extract_intercepts(
-            coef_=self._coef_, n_series=n_series
-        )
-        self._var_matrices_ = self._extract_var_matrices(
-            coef_=self._coef_, n_series=n_series
-        )
+        coef_ = model.coef_.ravel()
+        self._intercepts_ = self._extract_intercepts(coef_=coef_, n_series=n_series)
+        self._var_matrices_ = self._extract_var_matrices(coef_=coef_, n_series=n_series)
         self.is_fitted = True
 
         # returns
@@ -494,16 +495,20 @@ class VAR:
             model: The fitted model which hold a 'coef_' vector.
 
         """
-        self._coef_ = self._scale_coefs(
+        # self._coef_ = self._scale_coefs(
+        #     model=model,
+        #     var_data=var_data,
+        # )
+        coef_ = self._scale_coefs(
             model=model,
             var_data=var_data,
         )
         self._intercepts_ = self._extract_intercepts(
-            coef_=self._coef_,
+            coef_=coef_,
             n_series=n_series,
         )
         self._var_matrices_ = self._extract_var_matrices(
-            coef_=self._coef_,
+            coef_=coef_,
             n_series=n_series,
         )
 
@@ -835,9 +840,10 @@ class VAR:
 
         # make predictions
         y_pred = (X @ self._coef_).reshape(t_periods, n_series, order="F")
-        y_pred = pd.DataFrame(
-            y_pred, index=var_data.index[self.p_lags :], columns=var_data.columns
-        )
+        if type(var_data) == pd.DataFrame:
+            y_pred = pd.DataFrame(
+                y_pred, index=var_data.index[self.p_lags :], columns=var_data.columns
+            )
         return y_pred
 
     def residuals(self, var_data: np.ndarray, **kwargs) -> pd.DataFrame:
@@ -925,6 +931,14 @@ class FactorVAR(VAR):
         if not self.is_fitted:
             raise ValueError("Model is not fitted")
         return self._factor_loadings_
+
+    @property
+    def _coef_(self):
+        """The regression coefficients stacked in a vector."""
+        coef_ = np.concatenate(
+            [self.intercepts_, self.factor_loadings_] + self.var_matrices_, axis=1
+        ).ravel()
+        return coef_
 
     @property
     def k_factors_(self) -> int:
@@ -1220,15 +1234,15 @@ class FactorVAR(VAR):
         model.fit(X, y)
 
         # store coefficient estimates
-        self._coef_ = model.coef_.ravel()
+        coef_ = model.coef_.ravel()
         self._intercepts_ = self._extract_intercepts(
-            coef_=self._coef_, n_series=n_series, k_factors=k_factors
+            coef_=coef_, n_series=n_series, k_factors=k_factors
         )
         self._factor_loadings_ = self._extract_factor_loadings(
-            coef_=self._coef_, n_series=n_series, k_factors=k_factors
+            coef_=coef_, n_series=n_series, k_factors=k_factors
         )
         self._var_matrices_ = self._extract_var_matrices(
-            coef_=self._coef_, n_series=n_series, k_factors=k_factors
+            coef_=coef_, n_series=n_series, k_factors=k_factors
         )
         self.is_fitted = True
 
@@ -1408,19 +1422,19 @@ class FactorVAR(VAR):
             model: The fitted model which hold a 'coef_' vector.
 
         """
-        self._coef_ = self._scale_coefs(
+        coef_ = self._scale_coefs(
             model=model,
             var_data=var_data,
             factor_data=factor_data,
         )
         self._intercepts_ = self._extract_intercepts(
-            coef_=self._coef_, n_series=n_series, k_factors=k_factors
+            coef_=coef_, n_series=n_series, k_factors=k_factors
         )
         self._factor_loadings_ = self._extract_factor_loadings(
-            coef_=self._coef_, n_series=n_series, k_factors=k_factors
+            coef_=coef_, n_series=n_series, k_factors=k_factors
         )
         self._var_matrices_ = self._extract_var_matrices(
-            coef_=self._coef_, n_series=n_series, k_factors=k_factors
+            coef_=coef_, n_series=n_series, k_factors=k_factors
         )
 
     def fit_elastic_net(
@@ -1718,11 +1732,12 @@ class FactorVAR(VAR):
 
         """
         factor_predictions = self.factor_predict(factor_data=factor_data)
-        residuals = pd.DataFrame(
-            var_data[self.p_lags :].values - factor_predictions.values,
-            index=var_data[self.p_lags :].index,
-            columns=var_data.columns,
-        )
+        if type(var_data) == pd.DataFrame:
+            residuals = pd.DataFrame(
+                var_data[self.p_lags :].values - factor_predictions.values,
+                index=var_data[self.p_lags :].index,
+                columns=var_data.columns,
+            )
         return residuals
 
     def factor_r2(
@@ -1764,3 +1779,166 @@ class FactorVAR(VAR):
         else:
             raise ValueError("weighting method '{}' not available".format(weighting))
         return factor_r2
+
+    def partial_r2s(
+        self,
+        var_data: np.ndarray,
+        factor_data: np.ndarray,
+        weighting: str = "equal",
+    ) -> dict:
+        """Calculate partial goodness of fit for each factor, all factors, and the VAR.
+
+        Args:
+            var_data: (t_periods, n_series) array with observations.
+            factor_data: (t_periods, k_factors) array with factor observations.
+            weighting: Indicates how to weigh dependent variables. Available
+                options are ["equal", "variance", "granular"].
+
+        Returns:
+            partial_r2s: The partial goodness of fit statistics.
+
+        """
+
+        # full model
+        residuals = self.residuals(var_data=var_data, factor_data=factor_data)
+        ss_full = np.nansum((residuals - residuals.mean()) ** 2, axis=0)
+
+        # single factor restricted models
+        ss_partial = []
+        for i_factor in range(factor_data.shape[1]):
+            restricted_model = self.copy()
+            restricted_model._factor_loadings_[:, i_factor] = 0
+            residuals = restricted_model.residuals(
+                var_data=var_data, factor_data=factor_data
+            )
+            ss_partial += [np.nansum((residuals - residuals.mean()) ** 2, axis=0)]
+
+        # no factors model
+        restricted_model = self.copy()
+        restricted_model._factor_loadings_[:] = 0
+        residuals = restricted_model.residuals(
+            var_data=var_data, factor_data=factor_data
+        )
+        ss_partial += [np.nansum((residuals - residuals.mean()) ** 2, axis=0)]
+
+        # no var model
+        restricted_model = self.copy()
+        restricted_model._var_matrices_ = [
+            np.zeros(m.shape) for m in restricted_model._var_matrices_
+        ]
+        residuals = restricted_model.residuals(
+            var_data=var_data, factor_data=factor_data
+        )
+        ss_partial += [np.nansum((residuals - residuals.mean()) ** 2, axis=0)]
+
+        # calculate partial r2
+        partial_r2s = []
+        if weighting == "equal":
+            for ss_restricted in ss_partial:
+                partial_r2s += [1 - ss_full.sum() / ss_restricted.sum()]
+        elif weighting == "variance":
+            for ss_restricted in ss_partial:
+                variances = var_data[self.p_lags :].mean().values
+                partial_r2s += [
+                    1 - (ss_full / variances).sum() / (ss_restricted / variances).sum()
+                ]
+        elif weighting == "granular":
+            for ss_restricted in ss_partial:
+                partial_r2s += [1 - ss_full / ss_restricted]
+        else:
+            raise ValueError("weighting method '{}' not available".format(weighting))
+
+        # create output
+        if type(factor_data) == pd.DataFrame:
+            keys = factor_data.columns.tolist()
+        else:
+            keys = [f"factor_{i}" for i in range(factor_data.shape[1])]
+        keys += ["factors", "var"]
+        partial_r2s = {k: v for (k, v) in zip(keys, partial_r2s)}
+        return partial_r2s
+
+    def component_r2s(
+        self,
+        var_data: np.ndarray,
+        factor_data: np.ndarray,
+        weighting: str = "equal",
+    ) -> dict:
+        """Calculate goodness of fit for each factor, all factors, and the VAR.
+
+        Args:
+            var_data: (t_periods, n_series) array with observations.
+            factor_data: (t_periods, k_factors) array with factor observations.
+            weighting: Indicates how to weigh dependent variables. Available
+                options are ["equal", "variance", "granular"].
+
+        Returns:
+            partial_r2s: The partial goodness of fit statistics.
+
+        """
+
+        # total variation
+        levels = var_data[self.p_lags :].mean().values
+        tss = np.nansum(
+            (var_data[self.p_lags :] - levels) ** 2,
+            axis=0,
+        )
+
+        # single factor models
+        ss_component = []
+        for i_factor in range(factor_data.shape[1]):
+            component_model = self.copy()
+            component_model._factor_loadings_[:] = 0
+            component_model._var_matrices_ = [
+                np.zeros(m.shape) for m in component_model._var_matrices_
+            ]
+            component_model._factor_loadings_[:, i_factor] = self._factor_loadings_[
+                :, i_factor
+            ]
+            residuals = component_model.residuals(
+                var_data=var_data, factor_data=factor_data
+            )
+            ss_component += [np.nansum((residuals - residuals.mean()) ** 2, axis=0)]
+
+        # pure factor model
+        component_model = self.copy()
+        component_model._var_matrices_ = [
+            np.zeros(m.shape) for m in component_model._var_matrices_
+        ]
+        residuals = component_model.residuals(
+            var_data=var_data, factor_data=factor_data
+        )
+        ss_component += [np.nansum((residuals - residuals.mean()) ** 2, axis=0)]
+
+        # pure var model
+        component_model = self.copy()
+        component_model._factor_loadings_[:] = 0
+        residuals = component_model.residuals(
+            var_data=var_data, factor_data=factor_data
+        )
+        ss_component += [np.nansum((residuals - residuals.mean()) ** 2, axis=0)]
+
+        # calculate partial r2
+        component_r2s = []
+        if weighting == "equal":
+            for ss_restricted in ss_component:
+                component_r2s += [1 - ss_restricted.sum() / tss.sum()]
+        elif weighting == "variance":
+            for ss_restricted in ss_component:
+                variances = var_data[self.p_lags :].mean().values
+                component_r2s += [
+                    1 - (ss_restricted / variances).sum() / (tss / variances).sum()
+                ]
+        elif weighting == "granular":
+            for ss_restricted in ss_component:
+                component_r2s += [1 - ss_restricted / tss]
+        else:
+            raise ValueError("weighting method '{}' not available".format(weighting))
+
+        # create output
+        if type(factor_data) == pd.DataFrame:
+            keys = factor_data.columns.tolist()
+        else:
+            keys = [f"factor_{i}" for i in range(factor_data.shape[1])]
+        keys += ["factors", "var"]
+        component_r2s = {k: v for (k, v) in zip(keys, component_r2s)}
+        return component_r2s
