@@ -13,3 +13,4 @@ glmnet-py
 missingno
 # pandas-datareader
 git+https://github.com/felixbrunner/kungfu.git
+yfinance
