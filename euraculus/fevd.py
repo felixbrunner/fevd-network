@@ -1,8 +1,8 @@
 """."""
 
-from stringprep import in_table_c11
 import warnings
 import networkx as nx
+from networkx import PowerIterationFailedConvergence
 import numpy as np
 import scipy as sp
 
@@ -639,9 +639,13 @@ class FEVD:
             horizon=horizon,
             normalize=normalize,
         )
-        in_centrality = nx.centrality.eigenvector_centrality(
-            graph, weight="weight", max_iter=1000
-        )
+        try:
+            in_centrality = nx.centrality.eigenvector_centrality_numpy(
+                graph, weight="weight", max_iter=500
+            )
+        except PowerIterationFailedConvergence:
+            warnings.warn("in-eigenvector-centrality calculation did not converge")
+            in_centrality = {node: np.nan for node in list(graph.nodes)}
         in_centrality = np.fromiter(in_centrality.values(), dtype=float).reshape(-1, 1)
         return in_centrality
 
@@ -666,10 +670,14 @@ class FEVD:
             table_name=table_name,
             horizon=horizon,
             normalize=normalize,
-        )
-        out_centrality = nx.centrality.eigenvector_centrality(
-            graph.reverse(), weight="weight", max_iter=1000
-        )
+        ).reverse()
+        try:
+            out_centrality = nx.centrality.eigenvector_centrality_numpy(
+                graph, weight="weight", max_iter=500
+            )
+        except PowerIterationFailedConvergence:
+            warnings.warn("out-eigenvector-centrality calculation did not converge")
+            out_centrality = {node: np.nan for node in list(graph.nodes)}
         out_centrality = np.fromiter(out_centrality.values(), dtype=float).reshape(
             -1, 1
         )
@@ -697,7 +705,11 @@ class FEVD:
             horizon=horizon,
             normalize=normalize,
         )
-        in_rank = nx.pagerank(graph, weight="weight", max_iter=1000)
+        try:
+            in_rank = nx.pagerank_numpy(graph, weight="weight", alpha=0.85)
+        except PowerIterationFailedConvergence:
+            warnings.warn("in-page-rank calculation did not converge")
+            in_rank = {node: np.nan for node in list(graph.nodes)}
         in_rank = np.fromiter(in_rank.values(), dtype=float).reshape(-1, 1)
         return in_rank
 
@@ -723,8 +735,12 @@ class FEVD:
             table_name=table_name,
             horizon=horizon,
             normalize=normalize,
-        )
-        out_rank = nx.pagerank(graph.reverse(), weight="weight", max_iter=1000)
+        ).reverse()
+        try:
+            out_rank = nx.pagerank_numpy(graph, weight="weight", alpha=0.85)
+        except PowerIterationFailedConvergence:
+            warnings.warn("out-page-rank calculation did not converge")
+            out_rank = {node: np.nan for node in list(graph.nodes)}
         out_rank = np.fromiter(out_rank.values(), dtype=float).reshape(-1, 1)
         return out_rank
 
