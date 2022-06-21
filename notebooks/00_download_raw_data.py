@@ -123,21 +123,24 @@ data.write(df_spy, "raw/spy.pkl")
 
 # %%
 # %%time
-df_vix = download_yahoo_data("^VIX")
-data.write(df_vix, "raw/vix.pkl")
+ticker = "^VIX"
+df_vix = download_yahoo_data(ticker)
+data.write(df_vix, f"raw/{ticker}.pkl")
 
 # %% [markdown]
 # ### US Dollar/USDX - Index - Cash (DX-Y.NYB)
 
 # %%
 # %%time
-df_dxy = download_yahoo_data("DX-Y.NYB")
-data.write(df_dxy, "raw/dxy.pkl")
+ticker = "DX-Y.NYB"
+df_dxy = download_yahoo_data(ticker)
+data.write(df_dxy, f"raw/{ticker}.pkl")
 
 # %% [markdown]
 # ### Treasury Yield 10 Years (^TNX)
 
 # %%
 # %%time
-df_tnx = download_yahoo_data("^TNX")
-data.write(df_tnx, "raw/tnx.pkl")
+ticker = "^TNX"
+df_tnx = download_yahoo_data(ticker)
+data.write(df_tnx, f"raw/{ticker}.pkl")

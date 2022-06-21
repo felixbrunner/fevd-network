@@ -894,92 +894,15 @@ class DataMap:
                 )
         return permno_data
 
-    @staticmethod
-    def prepare_log_variances(
-        df_var: pd.DataFrame, df_noisevar: pd.DataFrame
-    ) -> pd.DataFrame:
-        """Fills missing intraday variances with the last bid-ask spread, then take logs.
-
-        Args:
-            df_var: Intraday variance observations.
-            df_noisevar: End of day bid-as spreads.
-
-        Returns:
-            df_log_var: Logarithms of filled intraday variances.
-
-        """
-        # prepare noisevar
-        no_noisevar = df_noisevar.bfill().isna()
-        minima = df_noisevar.replace(0, np.nan).min()
-        df_noisevar = df_noisevar.replace(0, np.nan).ffill().fillna(value=minima)
-        df_noisevar[no_noisevar] = np.nan
-
-        # fill in missing vars
-        df_var[(df_var == 0) | (df_var.isna())] = df_noisevar
-
-        # logarithms
-        df_log_var = np.log(df_var)
-        return df_log_var
-
-    @staticmethod
-    def log_replace(df: pd.DataFrame, method: str = "min") -> pd.DataFrame:
-        """Take logarithms of input DataFrame and fills missing values.
-
-        The method argument specifies how missing values after taking logarithms
-        are to be filled (includes negative values before taking logs).
-
-        Args:
-            df: Input data in a DataFrame.
-            method: Method to fill missing values (includes negative values
-                before taking logs). Options are ["min", "mean", "interpolate", "zero"].
-
-        Returns:
-            df_: The transformed data.
-
-        """
-        # logarithms
-        df_ = np.log(df)
-
-        # fill missing
-        if method == "min":
-            df_ = df_.fillna(value=df_.min())
-        elif method == "mean":
-            df_ = df_.fillna(df_.mean())
-        elif method == "interpolate":
-            df_ = df_.interpolate()
-        elif method == "zero":
-            df_ = df_.fillna(0)
-        else:
-            raise ValueError("method '{}' not defined".format(method))
-
-        return df_
-
-    def load_yahoo_price(self, file: str) -> pd.DataFrame:
+    def load_yahoo(self, ticker: str) -> pd.DataFrame:
         """Loads yahoo! Finance closing prices from disk.
 
         Args:
-            file: Name of the raw data file.
+            ticker: Name of the raw data file.
 
         Returns:
-            prc: Selected price data in tabular format.
+            df: Selected price data in tabular format.
 
         """
-        df = self.read(file)
-        prc = df[["Close"]].rename(columns={"Close": "prc"})
-        return prc
-
-    def load_yahoo_variance(self, file: str) -> pd.DataFrame:
-        """Loads yahoo! Finance variance from disk.
-
-        Args:
-            file: Name of the raw data file.
-
-        Returns:
-            var: Selected variance data in tabular format.
-
-        """
-        df = self.read(file)
-        var = pd.DataFrame(
-            data=0.3607 * (np.log(df["High"]) - np.log(df["Low"])) ** 2, columns=["var"]
-        )
-        return var
+        df = self.read(f"raw/{ticker}.pkl")
+        return df
