@@ -32,3 +32,6 @@
 # Specifically ignore folders
 data/
 dropbox/
+euraculus/.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+euraculus.egg-info/
