@@ -121,7 +121,9 @@ class FEVD:
                 phi_h += self.var_matrices[l] @ self.vma_matrix(horizon - l - 1)
             return phi_h
 
-    def impulse_response_functions(self, horizon: int) -> np.ndarray:
+    def impulse_response_functions(
+        self, horizon: int, use_sqrtm: bool = True
+    ) -> np.ndarray:
         """Calculate h-step impulse response function matrix.
 
         Returns the h-step impulse response functions af all series to
@@ -129,6 +131,7 @@ class FEVD:
 
         Args:
             horizon: Number of periods for impulse response functions.
+            use_sqrtm: Indicates if matrix square root should be used.
 
         Returns:
             psi_h: h-step impulse response matrix (n_series * n_series).
@@ -138,11 +141,15 @@ class FEVD:
             type(horizon) == int and horizon >= 0
         ), "horizon needs to be a positive integer"
 
-        # diagonal impulses
-        diag_sigma = np.diag(np.diag(self.error_cov) ** -0.5)
+        # sqrtm version
+        if use_sqrtm:
+            psi_h = self.vma_matrix(horizon) @ sp.linalg.sqrtm(self.error_cov)
 
-        # transmission matrix
-        psi_h = self.vma_matrix(horizon) @ self.error_cov @ diag_sigma
+        # transmission matrix from diagonal impulses
+        else:
+            diag_sigma = np.diag(np.diag(self.error_cov) ** -0.5)
+            psi_h = self.vma_matrix(horizon) @ self.error_cov @ diag_sigma
+
         return psi_h
 
     def innovation_response_variances(self, horizon: int) -> np.ndarray:
@@ -832,7 +839,7 @@ class FEVD:
             index_variance_decomposition (np.array): index variance weights
                 (n_series times 1)
         """
-        assert weights.shape == (self.n_series, 1), "weights have wrong shape"
+        assert weights.shape == (self.n_series,), "weights have wrong shape"
 
         innovation_response_variance = self.innovation_response_variances(
             horizon=horizon
