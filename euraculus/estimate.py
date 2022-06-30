@@ -1,4 +1,5 @@
 import warnings
+from string import ascii_uppercase as ALPHABET
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -13,6 +14,54 @@ from euraculus.utils import matrix_asymmetry, shrinkage_factor
 import datetime as dt
 
 import euraculus
+
+
+def make_tickers_unique(tickers: pd.Series) -> pd.Series:
+    """Adds alphabetic suffixes to duplicate tickers.
+
+    If tickers are not unique, add .<ALPHA> to duplicate tickers.
+
+    Args:
+        tickers: Series with tickers as values.
+
+    Args:
+        tickers: Series of unique tickers.
+
+    """
+    # find indices for each unique ticker
+    for ticker in set(tickers):
+        ticker_indices = [
+            col for (col, value) in tickers.iteritems() if value == ticker
+        ]
+
+        # append if duplicate
+        if len(ticker_indices) > 1:
+            for occurence, ticker_index in enumerate(ticker_indices):
+                tickers.at[ticker_index] += "." + ALPHABET[occurence]
+
+    return tickers
+
+
+def map_columns(
+    df: pd.DataFrame,
+    mapping: pd.Series,
+    mapping_name: str = None,
+) -> pd.DataFrame:
+    """Transform column index from given a mapping.
+
+    Args:
+        df: Original DataFrame with permnos as columns.
+        mapping: Series with column mapping.
+        mapping_name: The name of the new mapping
+
+    Returns:
+        df_: Relabeled DataFrame with newly mapped columns.
+
+    """
+    df_ = df.rename(columns=dict(mapping))
+    df_.columns.name = "ticker"
+
+    return df_
 
 
 def prepare_log_data(df_data: pd.DataFrame, df_fill: pd.DataFrame) -> pd.DataFrame:
@@ -108,6 +157,7 @@ def load_estimation_data(data: DataMap, sampling_date: dt.datetime) -> dict:
         sampling_date=sampling_date,
         columns=["ticker", "comnam", "last_size", "mean_size"],
     )
+    df_info["ticker"] = make_tickers_unique(df_info["ticker"])
 
     # prepare asset data
     df_vola = np.sqrt(df_var)
@@ -116,6 +166,9 @@ def load_estimation_data(data: DataMap, sampling_date: dt.datetime) -> dict:
     df_log_vola = prepare_log_data(df_data=df_vola, df_fill=df_noisevola)
     df_log_mcap = log_replace(df=df_lagged_mcap, method="ffill")
     df_log_mcap_vola = df_log_vola + df_log_mcap
+    df_log_mcap_vola = map_columns(
+        df_log_mcap_vola, mapping=df_info["ticker"], mapping_name="ticker"
+    )
 
     # factor data
     df_factors = pd.DataFrame(index=df_var.index)
