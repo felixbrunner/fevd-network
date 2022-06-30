@@ -67,7 +67,7 @@ class DataMap:
         self.files = []
         self._explore_path(self.datapath)
 
-    def write(self, data: object, path: str):
+    def dump(self, data: object, path: str):
         """Save data on disk and extend map to new file.
 
         Args:
@@ -259,13 +259,13 @@ class DataMap:
             )
 
             # write combined data to disk
-            self.write(df_merged, path=path)
+            self.dump(df_merged, path=path)
             del self.files[-1]
 
         # write data to disk if no file exists
         except ValueError:
             print("Creating file '{}' at {}.".format(path.name, path.parent))
-            self.write(data, path=path)
+            self.dump(data, path=path)
 
     def load_famafrench_factors(self, model: str = None) -> pd.DataFrame:
         """Loads Fama/French factor data from drive.
