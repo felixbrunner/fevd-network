@@ -5,6 +5,7 @@ import networkx as nx
 from networkx import PowerIterationFailedConvergence
 import numpy as np
 import scipy as sp
+from euraculus.utils import herfindahl_index
 
 
 class FEVD:
@@ -523,14 +524,14 @@ class FEVD:
         average_connectedness = in_connectedness.mean()
         return average_connectedness
 
-    def in_entropy(
+    def in_concentration(
         self,
         horizon: int,
         table_name: str = "fevd",
         others_only: bool = True,
         normalize: bool = False,
     ) -> np.ndarray:
-        """Calculate the entropy of incoming links per node (row-wise).
+        """Calculate the concentration of incoming links per node (row-wise).
 
         Args:
             table_name: Abbreviated name of the table.
@@ -539,7 +540,7 @@ class FEVD:
             normalize: Indicates if table should be row-normalized.
 
         Returns:
-            in_entropy: A (n_series * 1) vector with entropy values.
+            in_concentration: A (n_series * 1) vector with concentration values.
 
         """
         table = self._get_table(
@@ -556,19 +557,20 @@ class FEVD:
         # scale rows to one
         table /= table.sum(axis=1).reshape(n, 1)
 
-        # calculate entropy
-        in_entropy = sp.stats.entropy(table, axis=1, base=n - others_only)
-        in_entropy = in_entropy.reshape(-1, 1)
-        return in_entropy
+        # calculate concentration
+        in_concentration = herfindahl_index(table, axis=1)
+        # in_concentration = sp.stats.entropy(table, axis=1, base=n - others_only)
+        in_concentration = in_concentration.reshape(-1, 1)
+        return in_concentration
 
-    def out_entropy(
+    def out_concentration(
         self,
         horizon: int,
         table_name: str = "fevd",
         others_only: bool = True,
         normalize: bool = False,
     ) -> np.ndarray:
-        """Calculate the entropy of outgoing links per node (column-wise).
+        """Calculate the concentration of outgoing links per node (column-wise).
 
         Args:
             table_name: Abbreviated name of the table.
@@ -577,7 +579,7 @@ class FEVD:
             normalize: Indicates if table should be row-normalized.
 
         Returns:
-            out_entropy: A (n_series * 1) vector with entropy values.
+            out_concentration: A (n_series * 1) vector with concentration values.
 
         """
         table = self._get_table(
@@ -594,10 +596,11 @@ class FEVD:
         # scale columns to one
         table /= table.sum(axis=0).reshape(1, n)
 
-        # calculate entropy
-        out_entropy = sp.stats.entropy(table, axis=0, base=n - others_only)
-        out_entropy = out_entropy.reshape(-1, 1)
-        return out_entropy
+        # calculate concentration
+        out_concentration = herfindahl_index(table, axis=0)
+        # out_concentration = sp.stats.entropy(table, axis=0, base=n - others_only)
+        out_concentration = out_concentration.reshape(-1, 1)
+        return out_concentration
 
     def to_graph(
         self,
@@ -630,7 +633,7 @@ class FEVD:
         table_name: str = "fevd",
         normalize: bool = False,
     ) -> np.ndarray:
-        """Calculate the entropy of incoming links per node (row-wise).
+        """Calculate the eigenvector centrality of incoming links per node (row-wise).
 
         Args:
             table_name: Abbreviated name of the table.
@@ -662,7 +665,7 @@ class FEVD:
         table_name: str = "fevd",
         normalize: bool = False,
     ) -> np.ndarray:
-        """Calculate the entropy of outgoing links per node (column-wise).
+        """Calculate the eigenvector centrality of outgoing links per node (column-wise).
 
         Args:
             table_name: Abbreviated name of the table.
@@ -696,7 +699,7 @@ class FEVD:
         table_name: str = "fevd",
         normalize: bool = False,
     ) -> np.ndarray:
-        """Calculate the entropy of incoming links per node (row-wise).
+        """Calculate the page rank of incoming links per node (row-wise).
 
         Args:
             table_name: Abbreviated name of the table.
@@ -726,7 +729,7 @@ class FEVD:
         table_name: str = "fevd",
         normalize: bool = False,
     ) -> np.ndarray:
-        """Calculate the entropy of outgoing links per node (column-wise).
+        """Calculate the page rank of outgoing links per node (column-wise).
 
         Args:
             table_name: Abbreviated name of the table.
