@@ -1,4 +1,5 @@
 import warnings
+from dateutil.relativedelta import relativedelta
 from string import ascii_uppercase as ALPHABET
 import networkx as nx
 import numpy as np
@@ -10,7 +11,7 @@ from euraculus.data import DataMap
 from euraculus.var import FactorVAR
 from euraculus.covar import GLASSO
 from euraculus.fevd import FEVD
-from euraculus.utils import matrix_asymmetry, shrinkage_factor
+from euraculus.utils import matrix_asymmetry, shrinkage_factor, herfindahl_index
 import datetime as dt
 
 import euraculus
@@ -135,6 +136,51 @@ def log_replace(df: pd.DataFrame, method: str = "min") -> pd.DataFrame:
     return df_
 
 
+def construct_crsp_index(sampling_date: dt.datetime, data: DataMap) -> pd.Series:
+    """Constructs an equally weighted log wealth volatility index across the CRSP universe.
+
+    Args:
+        data: DataMap to load data from.
+        sampling_date: Last day in the sample.
+
+    Returns:
+        index: Constructed index series.
+
+    """
+    # set parameters
+    start_date = sampling_date - relativedelta(years=1) + relativedelta(days=1)
+
+    # load data
+    df_var = data.load_crsp_data(
+        start_date=start_date, end_date=sampling_date, column="var"
+    )
+    df_noisevar = data.load_crsp_data(
+        start_date=start_date, end_date=sampling_date, column="noisevar"
+    )
+    df_ret = data.load_crsp_data(
+        start_date=start_date, end_date=sampling_date, column="retadj"
+    )
+    df_mcap = data.load_crsp_data(
+        start_date=start_date, end_date=sampling_date, column="mcap"
+    )
+
+    # process data
+    df_var[df_var == 0] = df_noisevar
+    df_vola = np.sqrt(df_var.replace(0, np.nan))
+    df_lagged_mcap = df_mcap / (df_ret + 1)
+    df_lagged_mcap[df_lagged_mcap <= 0] = np.nan
+    df_log_mcap_vola = np.log(df_vola) + np.log(df_lagged_mcap)
+
+    # build index
+    index = (
+        df_log_mcap_vola.sub(df_log_mcap_vola.mean())
+        .div(df_log_mcap_vola.std())
+        .mean(axis=1)
+        .rename("crsp")
+    )
+    return index
+
+
 def load_estimation_data(data: DataMap, sampling_date: dt.datetime) -> dict:
     """Load the data necessary for estimation from disk.
 
@@ -185,9 +231,20 @@ def load_estimation_data(data: DataMap, sampling_date: dt.datetime) -> dict:
         factor = log_replace(open_prc * std, method="min").rename("yahoo")
         return factor
 
+    def prepare_ew_factor(df_obs):
+        factor = df_obs.sub(df_obs.mean()).div(df_obs.std()).mean(axis=1).rename("ew")
+        return factor
+
     df_spy = data.load_spy_data().reindex(df_var.index)
     spy_factor = prepare_spy_factor(df_spy)
     df_factors = df_factors.join(spy_factor)
+
+    ew_factor = prepare_ew_factor(df_log_mcap_vola)
+    df_factors = df_factors.join(ew_factor)
+
+    crsp_factor = construct_crsp_index(sampling_date=sampling_date, data=data)
+    df_factors = df_factors.join(crsp_factor)
+
     for ticker in ["^VIX", "DX-Y.NYB", "^TNX"]:
         df_yahoo = data.load_yahoo(ticker).reindex(df_var.index)
         factor = prepare_yahoo_factor(df_yahoo).rename(ticker)
@@ -214,6 +271,33 @@ def construct_pca_factors(df: pd.DataFrame, n_factors: int) -> pd.DataFrame:
         columns=[f"pca_{i+1}" for i in range(n_factors)],
     )
     return df_pca
+
+
+def build_lookup_table(df_info: pd.DataFrame) -> pd.DataFrame:
+    """Build a lookup table for company names from tickers.
+
+    Args:
+        df_info: Dataframe that contains columns 'ticker' and 'comnam'.
+
+    Returns:
+        df_lookup: Lookup table with tickers as index and company names as values.
+
+    """
+    column_dict = {
+        "ticker": "Tickers",
+        "comnam": "Company Name",
+    }
+    df_lookup = (
+        df_info[["ticker", "comnam"]]
+        .rename(columns=column_dict)
+        .set_index("Tickers")
+        .sort_index()
+    )
+    df_lookup["Company Name"] = (
+        df_lookup["Company Name"].str.title().str.replace("&", "\&")
+    )
+
+    return df_lookup
 
 
 def estimate_fevd(
@@ -473,6 +557,28 @@ def describe_fevd(
         fevd_asymmetry_normalized: Asymmetry of row-normalized FEVD table.
         fev_asymmetry: Asymmetry of FEV table.
         irv_asymmetry: Asymmetry of IRV table.
+        fevd_asymmetry_offdiag: Off-diagonal asymmetry of FEVD table.
+        fevd_asymmetry_normalized_offdiag: Off-diagonal asymmetry of row-normalized FEVD table.
+        fev_asymmetry_offdiag: Off-diagonal asymmetry of FEV table.
+        irv_asymmetry_offdiag: Off-diagonal asymmetry of IRV table.
+        fevd_concentration_in_connectedness:
+        fev_concentration_in_connectedness:
+        irv_concentration_in_connectedness:
+        fevd_concentration_out_connectedness:
+        fev_concentration_out_connectedness:
+        irv_concentration_out_connectedness:
+        fevd_concentration_in_eigenvector_centrality:
+        fev_concentration_in_eigenvector_centrality:
+        irv_concentration_in_eigenvector_centrality:
+        fevd_concentration_out_eigenvector_centrality:
+        fev_concentration_out_eigenvector_centrality:
+        irv_concentration_out_eigenvector_centrality:
+        fevd_concentration_in_page_rank:
+        fev_concentration_in_page_rank:
+        irv_concentration_in_page_rank:
+        fevd_concentration_out_page_rank:
+        fev_concentration_out_page_rank:
+        irv_concentration_out_page_rank:
         innovation_diagonality_test_stat': Ledoit-Wolf test statistic for diagonality of innovations.
         innovation_diagonality_p_value': P-value for Ledoit-Wolf test statistic.
 
@@ -509,6 +615,88 @@ def describe_fevd(
         ),
         "irv_asymmetry": matrix_asymmetry(
             fevd.innovation_response_variances(horizon=horizon)
+        ),
+        "fevd_asymmetry_offdiag": matrix_asymmetry(
+            fevd.forecast_error_variance_decomposition(
+                horizon=horizon, normalize=False
+            ),
+            drop_diag=True,
+        ),
+        "fevd_asymmetry_normalized_offdiag": matrix_asymmetry(
+            fevd.forecast_error_variance_decomposition(horizon=horizon, normalize=True),
+            drop_diag=True,
+        ),
+        "fev_asymmetry_offdiag": matrix_asymmetry(
+            fevd.forecast_error_variances(horizon=horizon), drop_diag=True
+        ),
+        "irv_asymmetry_offdiag": matrix_asymmetry(
+            fevd.innovation_response_variances(horizon=horizon), drop_diag=True
+        ),
+        "fevd_concentration_in_connectedness": herfindahl_index(
+            fevd.in_connectedness(horizon=horizon, table_name="fevd", normalize=False),
+        ),
+        "fev_concentration_in_connectedness": herfindahl_index(
+            fevd.in_connectedness(horizon=horizon, table_name="fev", normalize=False),
+        ),
+        "irv_concentration_in_connectedness": herfindahl_index(
+            fevd.in_connectedness(horizon=horizon, table_name="irv", normalize=False),
+        ),
+        "fevd_concentration_out_connectedness": herfindahl_index(
+            fevd.out_connectedness(horizon=horizon, table_name="fevd", normalize=False),
+        ),
+        "fev_concentration_out_connectedness": herfindahl_index(
+            fevd.out_connectedness(horizon=horizon, table_name="fev", normalize=False),
+        ),
+        "irv_concentration_out_connectedness": herfindahl_index(
+            fevd.out_connectedness(horizon=horizon, table_name="irv", normalize=False),
+        ),
+        "fevd_concentration_in_eigenvector_centrality": herfindahl_index(
+            fevd.in_eigenvector_centrality(
+                horizon=horizon, table_name="fevd", normalize=False
+            ),
+        ),
+        "fev_concentration_in_eigenvector_centrality": herfindahl_index(
+            fevd.in_eigenvector_centrality(
+                horizon=horizon, table_name="fev", normalize=False
+            ),
+        ),
+        "irv_concentration_in_eigenvector_centrality": herfindahl_index(
+            fevd.in_eigenvector_centrality(
+                horizon=horizon, table_name="irv", normalize=False
+            ),
+        ),
+        "fevd_concentration_out_eigenvector_centrality": herfindahl_index(
+            fevd.out_eigenvector_centrality(
+                horizon=horizon, table_name="fevd", normalize=False
+            ),
+        ),
+        "fev_concentration_out_eigenvector_centrality": herfindahl_index(
+            fevd.out_eigenvector_centrality(
+                horizon=horizon, table_name="fev", normalize=False
+            ),
+        ),
+        "irv_concentration_out_eigenvector_centrality": herfindahl_index(
+            fevd.out_eigenvector_centrality(
+                horizon=horizon, table_name="irv", normalize=False
+            ),
+        ),
+        "fevd_concentration_in_page_rank": herfindahl_index(
+            fevd.in_page_rank(horizon=horizon, table_name="fevd", normalize=False),
+        ),
+        "fev_concentration_in_page_rank": herfindahl_index(
+            fevd.in_page_rank(horizon=horizon, table_name="fev", normalize=False),
+        ),
+        "irv_concentration_in_page_rank": herfindahl_index(
+            fevd.in_page_rank(horizon=horizon, table_name="irv", normalize=False),
+        ),
+        "fevd_concentration_out_page_rank": herfindahl_index(
+            fevd.out_page_rank(horizon=horizon, table_name="fevd", normalize=False),
+        ),
+        "fev_concentration_out_page_rank": herfindahl_index(
+            fevd.out_page_rank(horizon=horizon, table_name="fev", normalize=False),
+        ),
+        "irv_concentration_out_page_rank": herfindahl_index(
+            fevd.out_page_rank(horizon=horizon, table_name="irv", normalize=False),
         ),
     }
     (
@@ -601,7 +789,7 @@ def collect_fevd_estimates(
         fevd_out_connectedness:
         fevd_eigenvector_centrality:
         fevd_closeness_centrality:
-        fevd_in_entropy:
+        fevd_in_concentration:
         fevd_in_connectedness_normalized:
         fevd_out_connectedness_normalized:
         fevd_eigenvector_centrality_normalized:
@@ -613,7 +801,7 @@ def collect_fevd_estimates(
         fud_out_connectedness:
         fud_eigenvector_centrality:
         fud_closeness_centrality:
-        fud_in_entropy:
+        fud_in_concentration:
         fud_in_connectedness_normalized:
         fud_out_connectedness_normalized:
         fud_eigenvector_centrality_normalized:
@@ -649,10 +837,10 @@ def collect_fevd_estimates(
         estimates[f"{table}_total_connectedness"] = fevd.total_connectedness(
             horizon=horizon, table_name=table, normalize=normalize
         )
-        estimates[f"{table}_in_entropy"] = fevd.in_entropy(
+        estimates[f"{table}_in_concentration"] = fevd.in_concentration(
             horizon=horizon, table_name=table, normalize=normalize
         )
-        estimates[f"{table}_out_entropy"] = fevd.out_entropy(
+        estimates[f"{table}_out_concentration"] = fevd.out_concentration(
             horizon=horizon, table_name=table, normalize=normalize
         )
         estimates[
