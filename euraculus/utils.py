@@ -1,7 +1,8 @@
 """This module contains a collection of helper functions for the project."""
 
-from string import ascii_uppercase as ALPHABET
+# from string import ascii_uppercase as ALPHABET
 
+import datetime as dt
 import numpy as np
 import pandas as pd
 
@@ -13,32 +14,32 @@ import pandas as pd
 #     return data
 
 
-def make_ticker_dict(tickers: list) -> dict:
-    """Create column-to-ticker dictionary and add .<ALPHA> to duplicate tickers.
+# def make_ticker_dict(tickers: list) -> dict:
+#     """Create column-to-ticker dictionary and add .<ALPHA> to duplicate tickers.
 
-    Args:
-        tickers: list of ticker strings, e.g ["ABC", "XYZ", "OPQ", "ABC", "KLM"]
+#     Args:
+#         tickers: list of ticker strings, e.g ["ABC", "XYZ", "OPQ", "ABC", "KLM"]
 
-    Returns:
-        column_to_ticker: column, ticker pairs with identifying letters appended,
-            ["ABC.A", "XYZ", "OPQ", "ABC.B", "KLM"]
+#     Returns:
+#         column_to_ticker: column, ticker pairs with identifying letters appended,
+#             ["ABC.A", "XYZ", "OPQ", "ABC.B", "KLM"]
 
-    """
-    # set up output
-    column_to_ticker = {i: ticker for i, ticker in enumerate(tickers)}
+#     """
+#     # set up output
+#     column_to_ticker = {i: ticker for i, ticker in enumerate(tickers)}
 
-    # find indices for each unique ticker
-    for ticker in set(tickers):
-        ticker_indices = [
-            col for col, value in column_to_ticker.items() if value == ticker
-        ]
+#     # find indices for each unique ticker
+#     for ticker in set(tickers):
+#         ticker_indices = [
+#             col for col, value in column_to_ticker.items() if value == ticker
+#         ]
 
-        # append if duplicate
-        if len(ticker_indices) > 1:
-            for occurence, ticker_index in enumerate(ticker_indices):
-                column_to_ticker[ticker_index] += "." + ALPHABET[occurence]
+#         # append if duplicate
+#         if len(ticker_indices) > 1:
+#             for occurence, ticker_index in enumerate(ticker_indices):
+#                 column_to_ticker[ticker_index] += "." + ALPHABET[occurence]
 
-    return column_to_ticker
+#     return column_to_ticker
 
 
 def matrix_asymmetry(M: np.ndarray, drop_diag: bool = False) -> float:
@@ -158,6 +159,8 @@ def autocorrcoef(X, lag=1):
     """Returns the autocorrelation matrix with input number of lags."""
     N = X.shape[1]
     autocorr = np.corrcoef(X[lag:], X.shift(lag)[lag:], rowvar=False)[N:, :N]
+    if type(X) == pd.DataFrame:
+        autocorr = pd.DataFrame(data=autocorr, index=X.columns, columns=X.columns)
     return autocorr
 
 
@@ -251,3 +254,36 @@ def map_column_to_ticker(df_timeseries, df_descriptive):
 #     df_stats.loc["vw", "var"] = df_aggregate["vw_ret"].var() * 252
 
 #     return df_stats
+
+
+def months_difference(start_date: dt.datetime, end_date: dt.datetime) -> int:
+    """Get the difference of two datetime objects in calendar months.
+
+    Args:
+        start_date: Earlier datetime.
+        end_date: Later datetime
+
+    Returns:
+        delta: Difference of dates in full months.
+
+    """
+    delta = 12 * (end_date.year - start_date.year) + (end_date.month - start_date.month)
+    return delta
+
+
+def herfindahl_index(values: np.ndarray, axis: int = 0) -> float:
+    """Calculate the Herfindahl-Hirschman index of concentration over an array of values.
+
+    Args:
+        values: Array containing the values.
+        axis: The axis along which to calculate the index.
+
+    Returns:
+        hhi: The Herfindahl-Hirschman index of concentration.
+
+    """
+    weights = values / values.sum(axis=axis, keepdims=True)
+    hhi = (weights**2).sum(axis=axis)
+    if hhi.size == 1:
+        hhi = hhi[0]
+    return hhi
