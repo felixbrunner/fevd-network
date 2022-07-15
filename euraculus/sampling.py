@@ -311,16 +311,19 @@ class LargeCapSampler:
         If tickers are not unique, add .<ALPHA> to duplicate tickers.
 
         Args:
-            df: Dataframe with column 'tickers'.
+            df: Multiindexed dataframe with column 'tickers'.
 
         Returns:
-            df_: Transformed dataframe with transformed 'tickers'.
+            df_: Transformed dataframe with unique 'tickers'.
 
         """
         df_ = df.copy()
+        if isinstance(df_.index, pd.MultiIndex):
+            tickers = df_["ticker"].unstack().iloc[0, :]
+        else:
+            tickers = df_["ticker"]
 
         # find keys for each unique ticker
-        tickers = df_["ticker"].unstack().iloc[0, :]
         for ticker in tickers.unique():
             ticker_keys = [
                 key for (key, value) in tickers.iteritems() if value == ticker
