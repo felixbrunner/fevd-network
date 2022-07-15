@@ -1,5 +1,5 @@
 # %% [markdown]
-# # 02 - Factor models estimation & decomposition
+# # Factor models estimation & residuals
 # This notebook contains:
 # - monthly factor model estimation for:
 #     - returns
@@ -27,7 +27,9 @@ from euraculus.factor import (
     SPY1FactorModel,
     SPYVariance1FactorModel,
 )
+from euraculus.estimate import prepare_log_data
 from euraculus.factor import estimate_models
+from euraculus.utils import months_difference
 
 # %% [markdown]
 # ## Set up
@@ -109,15 +111,19 @@ while sampling_date < last_sampling_date:
     # slice expanding window
     df_expanding_estimates = pd.DataFrame(index=df_future.columns)
     for window_length in range(1, 13):
-        end_date = sampling_date + relativedelta(months=window_length, day=31)
-        df_window = df_future[df_future.index <= end_date]
+        if (
+            months_difference(end_date=last_sampling_date, start_date=sampling_date)
+            >= window_length
+        ):
+            end_date = sampling_date + relativedelta(months=window_length, day=31)
+            df_window = df_future[df_future.index <= end_date]
 
-        # estimate models in window
-        df_estimates, df_residuals = estimate_models(ret_models, df_window)
+            # estimate models in window
+            df_estimates, df_residuals = estimate_models(ret_models, df_window)
 
-        # collect
-        df_estimates = df_estimates.add_suffix("_next{}M".format(window_length))
-        df_expanding_estimates = df_expanding_estimates.join(df_estimates)
+            # collect
+            df_estimates = df_estimates.add_suffix("_next{}M".format(window_length))
+            df_expanding_estimates = df_expanding_estimates.join(df_estimates)
 
     # store
     data.store(
@@ -150,7 +156,7 @@ while sampling_date <= last_sampling_date:
     # get excess return samples
     df_var = data.load_historic(sampling_date=sampling_date, column="var")
     df_noisevar = data.load_historic(sampling_date=sampling_date, column="noisevar")
-    df_historic = data.prepare_log_variances(df_var=df_var, df_noisevar=df_noisevar)
+    df_historic = prepare_log_data(df_data=df_var, df_fill=df_noisevar)
 
     # estimate models backwards
     df_estimates, df_residuals = estimate_models(var_models, df_historic)
@@ -183,20 +189,24 @@ while sampling_date < last_sampling_date:
     # get excess return samples
     df_var = data.load_future(sampling_date=sampling_date, column="var")
     df_noisevar = data.load_future(sampling_date=sampling_date, column="noisevar")
-    df_future = data.prepare_log_variances(df_var=df_var, df_noisevar=df_noisevar)
+    df_future = prepare_log_data(df_data=df_var, df_fill=df_noisevar)
 
     # slice expanding window
     df_expanding_estimates = pd.DataFrame(index=df_future.columns)
     for window_length in range(1, 13):
-        end_date = sampling_date + relativedelta(months=window_length, day=31)
-        df_window = df_future[df_future.index <= end_date]
+        if (
+            months_difference(end_date=last_sampling_date, start_date=sampling_date)
+            >= window_length
+        ):
+            end_date = sampling_date + relativedelta(months=window_length, day=31)
+            df_window = df_future[df_future.index <= end_date]
 
-        # estimate models in window
-        df_estimates, df_residuals = estimate_models(var_models, df_window)
+            # estimate models in window
+            df_estimates, df_residuals = estimate_models(var_models, df_window)
 
-        # collect
-        df_estimates = df_estimates.add_suffix("_next{}M".format(window_length))
-        df_expanding_estimates = df_expanding_estimates.join(df_estimates)
+            # collect
+            df_estimates = df_estimates.add_suffix("_next{}M".format(window_length))
+            df_expanding_estimates = df_expanding_estimates.join(df_estimates)
 
     # store
     data.store(
@@ -215,5 +225,3 @@ while sampling_date < last_sampling_date:
         )
     )
     sampling_date += relativedelta(months=1, day=31)
-
-# %%
