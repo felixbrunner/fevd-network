@@ -1,5 +1,5 @@
 # %% [markdown]
-# # 00 - Raw Data Download
+# # Raw Data Download
 # ## Description
 #
 # This notebook downloads the daily stock file data from CRSP to output tables containing the following variables:
@@ -12,8 +12,9 @@
 # Additionally, the following data is downloaded:
 # - Fama-French Factor data
 # - SPDR TRUST S&P500 ETF ("SPY")
+# - Index data from Yahoo! Finance
 #
-# Code to perform the steps is mainly in the `query.py` module
+# Code to perform the steps is mainly in the `download.py` module
 
 # %% [markdown]
 # ## Imports
@@ -23,8 +24,6 @@
 # %autoreload 2
 
 from euraculus.data import DataMap
-
-# %%
 from euraculus.download import WRDSDownloader, download_yahoo_data
 
 # %% [markdown]
@@ -79,7 +78,7 @@ table_description = db.describe_table(library="crsp", table="dsf")
 # %%time
 for year in range(first_year, last_year + 1):
     df = db.download_crsp_year(year=year)
-    data.write(df, "raw/crsp_{}.pkl".format(year))
+    data.dump(df, "raw/crsp_{}.pkl".format(year))
     if year % 5 == 0:
         print("    Year {} done.".format(year))
 
@@ -89,7 +88,7 @@ for year in range(first_year, last_year + 1):
 # %%
 # %%time
 df_delist = db.download_delisting_returns()
-data.write(df_delist, "raw/delisting.pkl")
+data.dump(df_delist, "raw/delisting.pkl")
 
 # %% [markdown]
 # ### Descriptive Data
@@ -97,7 +96,7 @@ data.write(df_delist, "raw/delisting.pkl")
 # %%
 # %%time
 df_descriptive = db.download_stocknames()
-data.write(df_descriptive, "raw/descriptive.pkl")
+data.dump(df_descriptive, "raw/descriptive.pkl")
 
 # %% [markdown]
 # ## Download FF data
@@ -105,7 +104,7 @@ data.write(df_descriptive, "raw/descriptive.pkl")
 # %%
 # %%time
 df_ff = db.download_famafrench_factors()
-data.write(df_ff, "raw/ff_factors.pkl")
+data.dump(df_ff, "raw/ff_factors.pkl")
 
 # %% [markdown]
 # ## SPDR Trust SPY Index data
@@ -113,7 +112,7 @@ data.write(df_ff, "raw/ff_factors.pkl")
 # %%
 # %%time
 df_spy = db.download_spy_data()
-data.write(df_spy, "raw/spy.pkl")
+data.dump(df_spy, "raw/spy.pkl")
 
 # %% [markdown]
 # ## Yahoo data
@@ -125,7 +124,7 @@ data.write(df_spy, "raw/spy.pkl")
 # %%time
 ticker = "^VIX"
 df_vix = download_yahoo_data(ticker)
-data.write(df_vix, f"raw/{ticker}.pkl")
+data.dump(df_vix, f"raw/{ticker}.pkl")
 
 # %% [markdown]
 # ### US Dollar/USDX - Index - Cash (DX-Y.NYB)
@@ -134,7 +133,7 @@ data.write(df_vix, f"raw/{ticker}.pkl")
 # %%time
 ticker = "DX-Y.NYB"
 df_dxy = download_yahoo_data(ticker)
-data.write(df_dxy, f"raw/{ticker}.pkl")
+data.dump(df_dxy, f"raw/{ticker}.pkl")
 
 # %% [markdown]
 # ### Treasury Yield 10 Years (^TNX)
@@ -143,4 +142,4 @@ data.write(df_dxy, f"raw/{ticker}.pkl")
 # %%time
 ticker = "^TNX"
 df_tnx = download_yahoo_data(ticker)
-data.write(df_tnx, f"raw/{ticker}.pkl")
+data.dump(df_tnx, f"raw/{ticker}.pkl")
