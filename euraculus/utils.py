@@ -287,3 +287,33 @@ def herfindahl_index(values: np.ndarray, axis: int = 0) -> float:
     if hhi.size == 1:
         hhi = hhi[0]
     return hhi
+
+
+def power_law_exponent(
+    sample: np.ndarray,
+    axis: int = 0,
+    invert: bool = False,
+) -> float:
+    """Calculate the exponent in a Pareto distributed sample.
+
+    Args:
+        sample: Array of values making up the sample.
+        axis: The axis along which to calculate the exponent.
+        invert: Indicates if exponent should be inverted to measure concentration.
+
+    Returns:
+        alpha: The exponent of the power law distribution.
+
+    """
+    # keep only positive values
+    sample[sample <= 0] = np.nan
+
+    # calculate
+    n = (~np.isnan(sample)).sum(axis=axis, keepdims=True)
+    v_min = np.nanmin(sample, axis=axis, keepdims=True)
+    alpha = 1 + n * np.nansum(np.log(sample / v_min), axis=axis, keepdims=True) ** -1
+    if invert:
+        alpha **= -1
+    if alpha.size == 1:
+        alpha = alpha.flat[0]
+    return alpha
