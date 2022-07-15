@@ -5,6 +5,7 @@ CRSP data at the end of each month.
 """
 
 import datetime as dt
+from string import ascii_uppercase as ALPHABET
 
 import pandas as pd
 from dateutil.relativedelta import relativedelta
@@ -303,6 +304,36 @@ class LargeCapSampler:
         )
         return permnos
 
+    @staticmethod
+    def _make_tickers_unique(df: pd.DataFrame) -> pd.DataFrame:
+        """Adds alphabetic suffixes to duplicate tickers.
+
+        If tickers are not unique, add .<ALPHA> to duplicate tickers.
+
+        Args:
+            df: Dataframe with column 'tickers'.
+
+        Returns:
+            df_: Transformed dataframe with transformed 'tickers'.
+
+        """
+        df_ = df.copy()
+
+        # find keys for each unique ticker
+        tickers = df_["ticker"].unstack().iloc[0, :]
+        for ticker in tickers.unique():
+            ticker_keys = [
+                key for (key, value) in tickers.iteritems() if value == ticker
+            ]
+
+            # append letter if duplicate
+            if len(ticker_keys) > 1:
+                for occurence, ticker_key in enumerate(ticker_keys):
+                    rows = df_.index.get_level_values("permno") == ticker_key
+                    df_.loc[rows, "ticker"] = ticker + "." + ALPHABET[occurence]
+
+        return df_
+
     def sample(self, sampling_date: str) -> tuple:
         """Preprocess CRSP data to provide sample of large caps.
 
@@ -343,6 +374,8 @@ class LargeCapSampler:
             .reindex(level="permno", labels=permnos)
             .dropna(how="all", subset=["mcap", "var", "noisevar", "retadj"])
         )
+        df_historic = self._make_tickers_unique(df_historic)
+
         if not df_future.empty:
             df_future = (
                 df_future[
@@ -361,5 +394,6 @@ class LargeCapSampler:
                 .reindex(level="permno", labels=permnos)
                 .dropna(how="all", subset=["mcap", "var", "noisevar", "retadj"])
             )
+            df_future = self._make_tickers_unique(df_future)
 
         return (df_historic, df_future, df_summary)
