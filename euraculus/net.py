@@ -267,7 +267,7 @@ class AdaptiveElasticNet(ElasticNet):
 
     Attributes inherited from ElasticNet:
         lambdau: The penalty factor over all penalty terms, default=0.1.
-        alpha: The ratio of L1 penalisation to L2 penalisation, default=0.1.
+        alpha: The ratio of L1 penalisation to L2 penalisation, default=0 (ridge).
         standardize: Indicates whether features should be standardized
             before estimation, default=False.
         intercept: Indicates whether to include an intercept, default=False.
@@ -281,7 +281,7 @@ class AdaptiveElasticNet(ElasticNet):
         alpha: float = 0.1,
         lambdau: float = 0.1,
         gamma: float = 1.0,
-        ini_alpha: float = 0.01,
+        ini_alpha: float = 0,  # 1e-4,
         ini_lambdau: float = None,
         penalty_weights: np.ndarray = None,
         **kwargs,
