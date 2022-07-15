@@ -319,7 +319,7 @@ class LargeCapSampler:
         """
         df_ = df.copy()
         if isinstance(df_.index, pd.MultiIndex):
-            tickers = df_["ticker"].unstack().iloc[0, :]
+            tickers = df_["ticker"].unstack().iloc[-1, :]
         else:
             tickers = df_["ticker"]
 
