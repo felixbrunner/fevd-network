@@ -1,5 +1,5 @@
 # %% [markdown]
-# # 01 - Data Sampling & Preparation
+# # Data Sampling & Preparation
 # This notebook serves to perform the sampling of the largest companies by market capitalization at the end of each month.
 
 # %% [markdown]
@@ -12,8 +12,6 @@
 import datetime as dt
 
 import numpy as np
-
-# %%
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 
@@ -46,6 +44,8 @@ sampling_date = first_sampling_date
 while sampling_date <= last_sampling_date:
     # get sample
     df_historic, df_future, df_summary = sampler.sample(sampling_date)
+    df_estimates = df_summary.loc[df_historic.index.get_level_values("permno").unique()]
+    df_estimates["ticker"] = df_historic["ticker"].unstack().iloc[-1, :].values
 
     # dump
     data.store(
@@ -61,7 +61,7 @@ while sampling_date <= last_sampling_date:
         "samples/{:%Y-%m-%d}/selection_summary.csv".format(sampling_date),
     )
     data.store(
-        df_summary.loc[df_historic.index.get_level_values("permno").unique()],
+        df_estimates,
         "samples/{:%Y-%m-%d}/asset_estimates.csv".format(sampling_date),
     )
 
