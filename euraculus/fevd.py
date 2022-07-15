@@ -5,7 +5,7 @@ import networkx as nx
 from networkx import PowerIterationFailedConvergence
 import numpy as np
 import scipy as sp
-from euraculus.utils import herfindahl_index
+from euraculus.utils import herfindahl_index, power_law_exponent
 
 
 class FEVD:
@@ -530,6 +530,7 @@ class FEVD:
         table_name: str = "fevd",
         others_only: bool = True,
         normalize: bool = False,
+        measure: str = "power_law_exponent",
     ) -> np.ndarray:
         """Calculate the concentration of incoming links per node (row-wise).
 
@@ -538,11 +539,16 @@ class FEVD:
             horizon: Number of periods to compute the table.
             others_only: Indicates wheter to include self-linkages.
             normalize: Indicates if table should be row-normalized.
+            measure: One of 'power_law_exponent', 'herfindahl_index', 'entropy'.
 
         Returns:
             in_concentration: A (n_series * 1) vector with concentration values.
 
         """
+        if measure not in ["power_law_exponent", "herfindahl_index", "entropy"]:
+            raise ValueError(
+                "measure neets to be one of 'power_law_exponent', 'herfindahl_index', 'entropy'"
+            )
         table = self._get_table(
             name=table_name,
             horizon=horizon,
@@ -558,9 +564,18 @@ class FEVD:
         table /= table.sum(axis=1).reshape(n, 1)
 
         # calculate concentration
-        in_concentration = herfindahl_index(table, axis=1)
-        # in_concentration = sp.stats.entropy(table, axis=1, base=n - others_only)
+        if measure == "power_law_exponent":
+            in_concentration = power_law_exponent(
+                table,
+                axis=1,
+                invert=True,
+            )
+        elif measure == "herfindahl_index":
+            in_concentration = herfindahl_index(table, axis=1)
+        elif measure == "entropy":
+            in_concentration = sp.stats.entropy(table, axis=1, base=n - others_only)
         in_concentration = in_concentration.reshape(-1, 1)
+
         return in_concentration
 
     def out_concentration(
@@ -569,6 +584,7 @@ class FEVD:
         table_name: str = "fevd",
         others_only: bool = True,
         normalize: bool = False,
+        measure: str = "power_law_exponent",
     ) -> np.ndarray:
         """Calculate the concentration of outgoing links per node (column-wise).
 
@@ -577,11 +593,16 @@ class FEVD:
             horizon: Number of periods to compute the table.
             others_only: Indicates wheter to include self-linkages.
             normalize: Indicates if table should be row-normalized.
+            measure: One of 'power_law_exponent', 'herfindahl_index', 'entropy'.
 
         Returns:
             out_concentration: A (n_series * 1) vector with concentration values.
 
         """
+        if measure not in ["power_law_exponent", "herfindahl_index", "entropy"]:
+            raise ValueError(
+                "measure neets to be one of 'power_law_exponent', 'herfindahl_index', 'entropy'"
+            )
         table = self._get_table(
             name=table_name,
             horizon=horizon,
@@ -597,9 +618,18 @@ class FEVD:
         table /= table.sum(axis=0).reshape(1, n)
 
         # calculate concentration
-        out_concentration = herfindahl_index(table, axis=0)
-        # out_concentration = sp.stats.entropy(table, axis=0, base=n - others_only)
+        if measure == "power_law_exponent":
+            out_concentration = power_law_exponent(
+                table,
+                axis=0,
+                invert=True,
+            )
+        elif measure == "herfindahl_index":
+            out_concentration = herfindahl_index(table, axis=0)
+        elif measure == "entropy":
+            out_concentration = sp.stats.entropy(table, axis=0, base=n - others_only)
         out_concentration = out_concentration.reshape(-1, 1)
+
         return out_concentration
 
     def to_graph(
