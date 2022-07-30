@@ -99,6 +99,18 @@ df_descriptive = db.download_stocknames()
 data.dump(df_descriptive, "raw/descriptive.pkl")
 
 # %% [markdown]
+# ### Industry Code Data
+
+# %%
+# %%time
+df_sic = db.download_sic_table()
+data.dump(df_sic, "raw/sic.pkl")
+df_naics = db.download_naics_table()
+data.dump(df_naics, "raw/naics.pkl")
+df_gics = db.download_gics_table()
+data.dump(df_gics, "raw/gics.pkl")
+
+# %% [markdown]
 # ## Download FF data
 
 # %%

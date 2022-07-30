@@ -143,7 +143,7 @@ class WRDSDownloader:
             query (str): SQL query to download the respective year's data.
 
         """
-        query = """
+        query = f"""
             SELECT 
             a.permno,
             b.ticker,
@@ -165,12 +165,51 @@ class WRDSDownloader:
             ON a.permno=c.permno
             AND a.date=c.dlstdt
         
-            WHERE a.date BETWEEN '01/01/{}' AND '12/31/{}'
+            WHERE a.date BETWEEN '01/01/{year}' AND '12/31/{year}'
             AND b.exchcd BETWEEN 1 AND 3
             AND b.shrcd BETWEEN 10 AND 11
-            """.format(
-            year, year
-        )
+            """
+        query = f"""
+            SELECT
+            dsf.date,
+            dsf.permno,
+            mn.ticker,
+            mn.siccd AS crsp_sic,
+            COALESCE(cn1.sic, cn2.sic) AS comp_sic,
+            mn.naics AS crsp_naics,
+            COALESCE(cn1.naics, cn2.naics) AS comp_naics,
+            COALESCE(cn1.gsubind, cn2.gsubind) AS gic,
+            dsf.ret,
+            del.dlret,
+            dsf.shrout * dsf.prc AS mcap,
+            (0.3607) * POWER(LOG(NULLIF(dsf.askhi, 0)) - LOG(NULLIF(dsf.bidlo, 0)), 2) AS var,
+            (0.3607) * POWER(LOG(NULLIF(dsf.ask, 0)) - LOG(NULLIF(dsf.bid, 0)), 2) AS noisevar
+
+            FROM crsp.dsf AS dsf
+
+            LEFT JOIN crsp.msenames AS mn
+            ON dsf.permno=mn.permno
+            AND mn.namedt<=dsf.date
+            AND dsf.date<=mn.nameendt
+
+            LEFT JOIN crsp.msedelist AS del
+            ON dsf.permno=del.permno
+            AND dsf.date=del.dlstdt
+
+            LEFT JOIN comp.names AS cn1
+            ON mn.ncusip = substr(cn1.cusip, 1, 8)
+            and cn1.year1 <= extract(year from dsf.date)
+            and extract(year from dsf.date) <= cn1.year2
+
+            LEFT JOIN comp.names AS cn2
+            ON mn.cusip = substr(cn2.cusip, 1, 8)
+            and cn2.year1 <= extract(year from dsf.date)
+            and extract(year from dsf.date) <= cn2.year2
+
+            WHERE dsf.date BETWEEN '01/01/{year}' AND '12/31/{year}'
+            AND mn.exchcd BETWEEN 1 AND 3
+            AND mn.shrcd BETWEEN 10 AND 11
+            """
 
         return query
 
@@ -321,6 +360,48 @@ class WRDSDownloader:
             AND b.comnam='SPDR TRUST'
             """
         df = self.query(query).set_index("date")
+        return df
+
+    def download_gics_table(self) -> pd.core.frame.DataFrame:
+        """Download the GICS industry classification codes & names from Compustat.
+
+        Returns:
+            df (pandas.DataFrame): The downloaded summary table.
+
+        """
+        query = """
+            SELECT *
+            FROM comp.r_giccd
+            """
+        df = self.query(query).astype({"giccd": int}).set_index("giccd")
+        return df
+
+    def download_sic_table(self) -> pd.core.frame.DataFrame:
+        """Download the SIC industry classification codes & names from Compustat.
+
+        Returns:
+            df (pandas.DataFrame): The downloaded summary table.
+
+        """
+        query = """
+            SELECT *
+            FROM comp.r_siccd
+            """
+        df = self.query(query).astype({"siccd": int}).set_index("siccd")
+        return df
+
+    def download_naics_table(self) -> pd.core.frame.DataFrame:
+        """Download the NAICS industry classification codes & names from Compustat.
+
+        Returns:
+            df (pandas.DataFrame): The downloaded summary table.
+
+        """
+        query = """
+            SELECT *
+            FROM comp.r_naiccd
+            """
+        df = self.query(query).astype({"naicscd": int}).set_index("naicscd")
         return df
 
 

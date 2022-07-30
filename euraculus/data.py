@@ -3,9 +3,11 @@
 """
 
 import json
+import math
 import pickle
 import warnings
 from pathlib import Path
+from collections import defaultdict
 
 import numpy as np
 import pandas as pd
@@ -906,3 +908,90 @@ class DataMap:
         """
         df = self.read(f"raw/{ticker}.pkl")
         return df
+
+    def load_sic_table(self) -> pd.DataFrame:
+        """Load SIC sector code table from disk.
+
+        Returns:
+            df: Table with SIC code translations.
+
+        """
+        df = self.read("raw/sic.pkl")
+        return df
+
+    def load_naics_table(self) -> pd.DataFrame:
+        """Load NAICS sector code table from disk.
+
+        Returns:
+            df: Table with NAICS code translations.
+
+        """
+        df = self.read("raw/naics.pkl")
+        return df
+
+    def load_gics_table(self) -> pd.DataFrame:
+        """Load GICS sector code table from disk.
+
+        Returns:
+            df: Table with GICS code translations.
+
+        """
+        df = self.read("raw/gics.pkl")
+        return df
+
+    def lookup_sic_divisions(self, codes: list) -> list:
+        """Map a list of SIC codes into the division strings.
+
+        Args:
+            codes: A list-like of SIC integer codes.
+
+        Returns:
+            divisions: A list of strings with corresponding divisions.
+
+        """
+        # create lookup dictionary
+        sic_divisions = [
+            (range(100, 1000), "Agriculture, Forestry and Fishing"),
+            (range(1000, 1500), "Mining"),
+            (range(1500, 1800), "Construction"),
+            (range(2000, 4000), "Manufacturing"),
+            (
+                range(4000, 5000),
+                "Transportation, Communications, Electric, Gas and Sanitary service",
+            ),
+            (range(5000, 5200), "Wholesale Trade"),
+            (range(5200, 6000), "Retail Trade"),
+            (range(6000, 6800), "Finance, Insurance and Real Estate"),
+            (range(7000, 9000), "Services"),
+            (range(9100, 9730), "Public Administration"),
+            (range(9900, 10000), "Nonclassifiable"),
+        ]
+        sic_names = defaultdict(lambda: "N/A")
+        for code_range, division in sic_divisions:
+            sic_names.update(dict.fromkeys(code_range, division))
+
+        # lookup inputs
+        divisions = [sic_names[code] for code in codes]
+        return divisions
+
+    def lookup_gics_sectors(self, codes: list) -> list:
+        """Map a list of GICS codes into the sector strings.
+
+        Args:
+            codes: A list-like of GICS integer codes.
+
+        Returns:
+            divisions: A list of strings with corresponding divisions.
+
+        """
+        # create lookup dictionary
+        gics = self.load_gics_table()
+        gics_sectors = defaultdict(lambda: "N/A")
+        gics_sectors.update(gics[gics["gictype"] == "GSECTOR"]["gicdesc"].to_dict())
+
+        # lookup inputs
+        sector_codes = [
+            int(str(code)[:2]) if str(code).isnumeric() else math.nan for code in codes
+        ]
+        sectors = [gics_sectors[code] for code in sector_codes]
+        return sectors

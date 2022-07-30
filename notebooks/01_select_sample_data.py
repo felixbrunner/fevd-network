@@ -38,7 +38,26 @@ last_sampling_date = dt.datetime(year=2021, month=12, day=31)
 # %% [markdown]
 # ## Conduct monthly sampling
 
+# %% [markdown]
+# ### Test single window
+
 # %%
+# %%time
+sampling_date = dt.datetime(year=2005, month=1, day=31)
+df_historic, df_future, df_summary = sampler.sample(sampling_date)
+df_estimates = df_summary.loc[df_historic.index.get_level_values("permno").unique()]
+df_estimates["ticker"] = df_historic["ticker"].unstack().iloc[-1, :].values
+df_estimates["sic"] = df_historic["crsp_sic"].unstack().iloc[-1, :].astype(int).values
+df_estimates["naics"] = df_historic["crsp_naics"].unstack().iloc[-1, :].values
+df_estimates["gics"] = df_historic["gic"].unstack().iloc[-1, :].values
+df_estimates["sic_division"] = data.lookup_sic_divisions(df_estimates["sic"].values)
+df_estimates["gics_sector"] = data.lookup_gics_sectors(df_estimates["gics"].values)
+
+# %% [markdown]
+# ### Rolling window
+
+# %%
+# %%time
 # perform monthly sampling and store samples locally
 sampling_date = first_sampling_date
 while sampling_date <= last_sampling_date:
@@ -46,6 +65,11 @@ while sampling_date <= last_sampling_date:
     df_historic, df_future, df_summary = sampler.sample(sampling_date)
     df_estimates = df_summary.loc[df_historic.index.get_level_values("permno").unique()]
     df_estimates["ticker"] = df_historic["ticker"].unstack().iloc[-1, :].values
+    df_estimates["sic"] = df_historic["crsp_sic"].unstack().iloc[-1, :].astype(int).values
+    df_estimates["naics"] = df_historic["crsp_naics"].unstack().iloc[-1, :].values
+    df_estimates["gics"] = df_historic["gic"].unstack().iloc[-1, :].values
+    df_estimates["sic_division"] = data.lookup_sic_divisions(df_estimates["sic"].values)
+    df_estimates["gics_sector"] = data.lookup_gics_sectors(df_estimates["gics"].values)
 
     # dump
     data.store(
