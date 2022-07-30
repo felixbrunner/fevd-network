@@ -144,32 +144,6 @@ class WRDSDownloader:
 
         """
         query = f"""
-            SELECT 
-            a.permno,
-            b.ticker,
-            a.date,
-            a.ret,
-            c.dlret,
-            a.shrout * a.prc AS mcap,
-            (0.3607) * POWER(LOG(NULLIF(a.askhi, 0)) - LOG(NULLIF(a.bidlo, 0)), 2) AS var,
-            (0.3607) * POWER(LOG(NULLIF(a.ask, 0)) - LOG(NULLIF(a.bid, 0)), 2) AS noisevar
-        
-            FROM crsp.dsf AS a
-        
-            LEFT JOIN crsp.msenames AS b
-            ON a.permno=b.permno
-            AND b.namedt<=a.date
-            AND a.date<=b.nameendt
-        
-            LEFT JOIN crsp.msedelist AS c
-            ON a.permno=c.permno
-            AND a.date=c.dlstdt
-        
-            WHERE a.date BETWEEN '01/01/{year}' AND '12/31/{year}'
-            AND b.exchcd BETWEEN 1 AND 3
-            AND b.shrcd BETWEEN 10 AND 11
-            """
-        query = f"""
             SELECT
             dsf.date,
             dsf.permno,
