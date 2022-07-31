@@ -52,6 +52,7 @@ df_estimates["naics"] = df_historic["comp_naics"].fillna(df_historic["crsp_naics
 df_estimates["gics"] = df_historic["gic"].unstack().iloc[-1, :].values
 df_estimates["sic_division"] = data.lookup_sic_divisions(df_estimates["sic"].values)
 df_estimates["ff_sector"] = data.lookup_famafrench_sectors(df_estimates["sic"].values)
+df_estimates["ff_sector_ticker"] = data.lookup_famafrench_sectors(df_estimates["sic"].values, return_tickers=True)
 df_estimates["gics_sector"] = data.lookup_gics_sectors(df_estimates["gics"].values)
 
 # %% [markdown]
@@ -71,6 +72,7 @@ while sampling_date <= last_sampling_date:
     df_estimates["gics"] = df_historic["gic"].unstack().iloc[-1, :].values
     df_estimates["sic_division"] = data.lookup_sic_divisions(df_estimates["sic"].values)
     df_estimates["ff_sector"] = data.lookup_famafrench_sectors(df_estimates["sic"].values)
+    df_estimates["ff_sector_ticker"] = data.lookup_famafrench_sectors(df_estimates["sic"].values, return_tickers=True)
     df_estimates["gics_sector"] = data.lookup_gics_sectors(df_estimates["gics"].values)
 
     # dump
