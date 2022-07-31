@@ -995,3 +995,228 @@ class DataMap:
         ]
         sectors = [gics_sectors[code] for code in sector_codes]
         return sectors
+
+    def lookup_famafrench_sectors(
+        self, codes: list, return_tickers: bool = False
+    ) -> list:
+        """Map a list of SIC codes into Fama/French's 12 sector definition.
+
+        Mapping is taken from:
+        http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/det_12_ind_port.html
+
+        Args:
+            codes: A list-like of SIC integer codes.
+            return_tickers: Request tickers instead of full names.
+
+        Returns:
+            sectors: A list of strings with corresponding sectors.
+
+        """
+        # create lookup dictionary
+        ff_sectors = [
+            (
+                range(100, 1000),
+                "Consumer Nondurables -- Food, Tobacco, Textiles, Apparel, Leather, Toys",
+                "NoDur",
+            ),
+            (
+                range(2000, 2400),
+                "Consumer Nondurables -- Food, Tobacco, Textiles, Apparel, Leather, Toys",
+                "NoDur",
+            ),
+            (
+                range(2700, 2750),
+                "Consumer Nondurables -- Food, Tobacco, Textiles, Apparel, Leather, Toys",
+                "NoDur",
+            ),
+            (
+                range(2770, 2800),
+                "Consumer Nondurables -- Food, Tobacco, Textiles, Apparel, Leather, Toys",
+                "NoDur",
+            ),
+            (
+                range(3100, 3200),
+                "Consumer Nondurables -- Food, Tobacco, Textiles, Apparel, Leather, Toys",
+                "NoDur",
+            ),
+            (
+                range(3940, 3990),
+                "Consumer Nondurables -- Food, Tobacco, Textiles, Apparel, Leather, Toys",
+                "NoDur",
+            ),
+            (
+                range(2500, 2520),
+                "Consumer Durables -- Cars, TVs, Furniture, Household Appliances",
+                "Durbl",
+            ),
+            (
+                range(2590, 2600),
+                "Consumer Durables -- Cars, TVs, Furniture, Household Appliances",
+                "Durbl",
+            ),
+            (
+                range(3630, 3660),
+                "Consumer Durables -- Cars, TVs, Furniture, Household Appliances",
+                "Durbl",
+            ),
+            (
+                range(3710, 3712),
+                "Consumer Durables -- Cars, TVs, Furniture, Household Appliances",
+                "Durbl",
+            ),
+            (
+                [3710, 3711, 3714, 3716],
+                "Consumer Durables -- Cars, TVs, Furniture, Household Appliances",
+                "Durbl",
+            ),
+            (
+                [3750, 3751],
+                "Consumer Durables -- Cars, TVs, Furniture, Household Appliances",
+                "Durbl",
+            ),
+            (
+                [3792],
+                "Consumer Durables -- Cars, TVs, Furniture, Household Appliances",
+                "Durbl",
+            ),
+            (
+                range(3900, 3940),
+                "Consumer Durables -- Cars, TVs, Furniture, Household Appliances",
+                "Durbl",
+            ),
+            (
+                range(3990, 4000),
+                "Consumer Durables -- Cars, TVs, Furniture, Household Appliances",
+                "Durbl",
+            ),
+            (
+                range(2520, 2590),
+                "Manufacturing -- Machinery, Trucks, Planes, Off Furn, Paper, Com Printing",
+                "Manuf",
+            ),
+            (
+                range(2600, 2700),
+                "Manufacturing -- Machinery, Trucks, Planes, Off Furn, Paper, Com Printing",
+                "Manuf",
+            ),
+            (
+                range(2750, 2770),
+                "Manufacturing -- Machinery, Trucks, Planes, Off Furn, Paper, Com Printing",
+                "Manuf",
+            ),
+            (
+                range(3000, 3100),
+                "Manufacturing -- Machinery, Trucks, Planes, Off Furn, Paper, Com Printing",
+                "Manuf",
+            ),
+            (
+                range(3200, 3570),
+                "Manufacturing -- Machinery, Trucks, Planes, Off Furn, Paper, Com Printing",
+                "Manuf",
+            ),
+            (
+                range(3580, 3630),
+                "Manufacturing -- Machinery, Trucks, Planes, Off Furn, Paper, Com Printing",
+                "Manuf",
+            ),
+            (
+                range(3700, 3710),
+                "Manufacturing -- Machinery, Trucks, Planes, Off Furn, Paper, Com Printing",
+                "Manuf",
+            ),
+            (
+                [3712, 3713, 3715],
+                "Manufacturing -- Machinery, Trucks, Planes, Off Furn, Paper, Com Printing",
+                "Manuf",
+            ),
+            (
+                range(3717, 3750),
+                "Manufacturing -- Machinery, Trucks, Planes, Off Furn, Paper, Com Printing",
+                "Manuf",
+            ),
+            (
+                range(3752, 3792),
+                "Manufacturing -- Machinery, Trucks, Planes, Off Furn, Paper, Com Printing",
+                "Manuf",
+            ),
+            (
+                range(3793, 3800),
+                "Manufacturing -- Machinery, Trucks, Planes, Off Furn, Paper, Com Printing",
+                "Manuf",
+            ),
+            (
+                range(3830, 3840),
+                "Manufacturing -- Machinery, Trucks, Planes, Off Furn, Paper, Com Printing",
+                "Manuf",
+            ),
+            (
+                range(3860, 3900),
+                "Manufacturing -- Machinery, Trucks, Planes, Off Furn, Paper, Com Printing",
+                "Manuf",
+            ),
+            (range(1200, 1400), "Oil, Gas, and Coal Extraction and Products", "Enrgy"),
+            (range(2900, 3000), "Oil, Gas, and Coal Extraction and Products", "Enrgy"),
+            (range(2800, 2830), "Chemicals and Allied Products", "Chems"),
+            (range(2840, 2900), "Chemicals and Allied Products", "Chems"),
+            (
+                range(3570, 3580),
+                "Business Equipment -- Computers, Software, and Electronic Equipment",
+                "BusEq",
+            ),
+            (
+                range(3660, 3693),
+                "Business Equipment -- Computers, Software, and Electronic Equipment",
+                "BusEq",
+            ),
+            (
+                range(3694, 3700),
+                "Business Equipment -- Computers, Software, and Electronic Equipment",
+                "BusEq",
+            ),
+            (
+                range(3810, 3830),
+                "Business Equipment -- Computers, Software, and Electronic Equipment",
+                "BusEq",
+            ),
+            (
+                range(7370, 7380),
+                "Business Equipment -- Computers, Software, and Electronic Equipment",
+                "BusEq",
+            ),
+            (range(4800, 4900), "Telephone and Television Transmission", "Telcm"),
+            (range(4900, 4950), "Utilities", "Utils"),
+            (
+                range(5000, 6000),
+                "Wholesale, Retail, and Some Services (Laundries, Repair Shops)",
+                "Shops",
+            ),
+            (
+                range(7200, 7300),
+                "Wholesale, Retail, and Some Services (Laundries, Repair Shops)",
+                "Shops",
+            ),
+            (
+                range(7600, 7700),
+                "Wholesale, Retail, and Some Services (Laundries, Repair Shops)",
+                "Shops",
+            ),
+            (range(2830, 2840), "Healthcare, Medical Equipment, and Drugs", "Hlth"),
+            ([3693], "Healthcare, Medical Equipment, and Drugs", "Hlth"),
+            (range(3840, 3860), "Healthcare, Medical Equipment, and Drugs", "Hlth"),
+            (range(8000, 8100), "Healthcare, Medical Equipment, and Drugs", "Hlth"),
+            (range(6000, 7000), "Finance", "Money"),
+        ]
+        ff_names = defaultdict(
+            lambda: "Other -- Mines, Constr, BldMt, Trans, Hotels, Bus Serv, Entertainment"
+        )
+        ff_tickers = defaultdict(lambda: "Other")
+        for code_range, name, ticker in ff_sectors:
+            ff_names.update(dict.fromkeys(code_range, name))
+            ff_tickers.update(dict.fromkeys(code_range, ticker))
+
+        # lookup inputs
+        if return_tickers:
+            sectors = [ff_tickers[code] for code in codes]
+        else:
+            sectors = [ff_names[code] for code in codes]
+        return sectors
