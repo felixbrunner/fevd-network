@@ -1,13 +1,16 @@
 import sys
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import missingno as mno
 import networkx as nx
 import numpy as np
 import pandas as pd
 import scipy as sp
+from sklearn.decomposition import PCA
 
 import kungfu as kf
+from kungfu.plotting import add_recession_bars
 
 # %% Plot settings
 
@@ -27,16 +30,32 @@ plt.rcParams["axes.prop_cycle"] = plt.cycler(color=color_list)
 
 
 def corr_heatmap(
-    data,
-    title="Correlation Matrix",
-    vmin=-1,
-    vmax=1,
-    cmap="seismic",
-    save_path=None,
-    infer_limits=False,
-    infer_vmax=False,
+    data: np.ndarray,
+    title: str = "Correlation Matrix",
+    labels: list = None,
+    secondary_labels: list = None,
+    vmin: float = -1.0,
+    vmax: float = 1.0,
+    cmap: str = "seismic",
+    save_path: str = None,
+    infer_limits: bool = False,
+    infer_vmax: bool = False,
 ):
-    """Plots a numpy array or pandas dataframe as a heatmap."""
+    """Plots a numpy array or pandas dataframe as a heatmap.
+
+    Args:
+        data: Square data matrix.
+        title: Title string.
+        labels: List of labels for the primary axes.
+        secondary_labels: List of grouped labels for the secondary axes.
+        vmin: Minimum value for the coloring of the heatmap, default=-1.
+        vmax: Maximum value for the coloring of the heatmap, default=1.
+        cmap: Colormap, default="seismic"
+        save_path: Path to save the figure.
+        infer_limits: Indicates if heatmap range is inferred, default=False.
+        infer_vmax: Indicates if heatmap maximum is inferred, default=False.
+
+    """
     if type(data) == pd.DataFrame:
         data = data.values
 
@@ -49,11 +68,60 @@ def corr_heatmap(
         vmin = 0
 
     # create plot
-    fig = plt.figure(figsize=(12, 10))
-    plt.matshow(data, fignum=fig.number, cmap=cmap, vmin=vmin, vmax=vmax)
-    cb = plt.colorbar()
+    fig, ax = plt.subplots(1, 1, figsize=(12, 10))
+    mat = ax.matshow(data, cmap=cmap, vmin=vmin, vmax=vmax)
+    ax.scatter(*reversed(np.where(data == 0)), marker="$0$", color="gray", s=5)
+    ax.set_title(title, fontsize=16)
+
+    # add colorbar
+    cb = plt.colorbar(mat)
     cb.ax.tick_params(labelsize=14)
-    plt.title(title, fontsize=16)
+
+    # add primary labels
+    if labels is not None:
+        ax.set_xticks(np.arange(len(data)))
+        ax.set_xticklabels(labels, rotation=90, fontsize=7)
+        ax.set_yticks(np.arange(len(data)))
+        ax.set_yticklabels(labels, rotation=0, fontsize=7)
+        ax.grid(False)
+
+    # add secondary labels
+    if secondary_labels is not None:
+        lim = len(secondary_labels)
+        group_labels = list(dict.fromkeys(secondary_labels))
+        group_divisions = [secondary_labels.index(sec) for sec in group_labels] + [lim]
+        text_locations = [
+            (a + b) / 2 for a, b in zip(group_divisions[:-1], group_divisions[1:])
+        ]
+
+        for div in group_divisions[1:-1]:
+            ax.axvline(div - 0.5, color="w", linewidth=1, linestyle="-")
+            ax.axhline(div - 0.5, color="w", linewidth=1, linestyle="-")
+            ax.axvline(div - 0.5, color="k", linewidth=1, linestyle=(0, (5, 5)))
+            ax.axhline(div - 0.5, color="k", linewidth=1, linestyle=(0, (5, 5)))
+
+        for label, location in zip(group_labels, text_locations):
+            ax.text(
+                location,
+                lim,
+                s=label,
+                rotation=90,
+                fontsize=7,
+                rotation_mode="anchor",
+                horizontalalignment="right",
+                verticalalignment="center",
+            )
+            ax.text(
+                lim,
+                location,
+                s=label,
+                fontsize=7,
+                horizontalalignment="left",
+                verticalalignment="center",
+            )
+        ax.grid(False)
+
+    # save
     if save_path:
         fig.savefig(save_path, format="pdf", dpi=200, bbox_inches="tight")
 
@@ -116,7 +184,7 @@ def net_cv_contour(cv, levels=12, logx=False, logy=False, save_path=None):
         marker="x",
         s=150,
         color="k",
-        zorder=2
+        zorder=2,
     )
 
     # labels & legend
@@ -312,7 +380,7 @@ def cov_scatter_losses(cv, save_path=None):
     color_legend = ax.legend(
         *sc.legend_elements(prop="colors", num=colors.nunique()),
         loc="upper left",
-        title="δ"
+        title="δ",
     )
     ax.add_artist(color_legend)
     handles, _ = sc.legend_elements(prop="sizes", alpha=0.6, num=sizes.nunique())
@@ -332,7 +400,7 @@ def plot_glasso_cv(cv, save_path=None):
     # create plot
     fig, ax = plt.subplots(1, 1)
     ax.set_xscale("log")
-    ax.set_xlabel("ρ (0=sample cov, $\infty = I_N \cdot diag(\hat{\Sigma}$))")
+    ax.set_xlabel("ρ (0=sample cov, $\infty = diag(\hat{\Sigma}$))")
     ax.set_ylabel("Mean Cross-Validation Loss")
     ax.set_title("Graphical Lasso Hyper-Parameter Search Grid")
 
@@ -396,52 +464,196 @@ def get_edge_colors(graph, percentage=5, col1="grey", col2="firebrick"):
     return colors
 
 
-def network_graph(
-    graph,
-    name_mapping=None,
-    title=None,
-    red_percent=0,
-    save_path=None,
-    linewidth=0.2,
-    **kwargs
-):
-    """"""
-    # relabel
-    if name_mapping is not None:
-        graph = nx.relabel_nodes(graph, name_mapping)
+def draw_fevd_as_network(
+    fevd,
+    df_info,
+    horizon: int,
+    table_name: str = "fevd",
+    normalize: bool = False,
+    title: str = "Network",
+    save_path: str = None,
+    pos: dict = None,
+    **kwargs,
+) -> dict:
+    """Draw FEVD as a force layout network plot.
 
-    # line weights
-    weights = np.array([graph[i][j]["weight"] for i, j in graph.edges()])
-    weights /= weights.mean() / linewidth
+    Args:
+        fevd: Forecast error variance decomposition object.
+        df_info: Accompanying information in a dataframe.
+        horizon: Horizon to construct connectedness table.
+        table_name: Name of the table to be plotted.
+        normalize: Indicates if the table shall be row-normalized.
+        title: Title of the plot, default="Network".
+        save_path: Path to save the figure.
+        pos: Dictionary with initial locations for all/some nodes.
 
-    # line colors
-    colors = get_edge_colors(graph, percentage=red_percent)
+    Returns:
+        layout: A dictionary of positions keyed by node.
+
+    """
+    # set up graph
+    ticker_dict = {i: tick for (i, tick) in enumerate(df_info["ticker"].values)}
+    g = fevd.to_graph(horizon=horizon, table_name=table_name, normalize=normalize)
+    g = nx.relabel_nodes(g, ticker_dict)
+    table = fevd._get_table(name="fev", horizon=horizon, normalize=normalize)
+
+    # set layout
+    if pos is None:
+        layout = nx.fruchterman_reingold_layout(
+            G=g, k=None, iterations=1000, dim=2, seed=0
+        )
+    else:
+        # add new nodes to old graph, then fix 10% of nodes to stop rotation
+        fixed = [p for p in pos if (p in g.nodes())]
+        pos = nx.fruchterman_reingold_layout(
+            G=g, k=None, iterations=500, dim=2, seed=0, pos=pos, fixed=fixed
+        )
+        fixed = np.random.choice(list(pos), len(pos) // 10)
+        pos = nx.fruchterman_reingold_layout(
+            G=g, k=None, iterations=500, dim=2, seed=0, pos=pos, fixed=fixed
+        )
+        layout = nx.fruchterman_reingold_layout(
+            G=g, k=None, iterations=500, dim=2, seed=0, pos=pos
+        )
+
+    # set up node colors
+    sector_colors = plt.get_cmap("Paired")(np.linspace(0, 1, 12))
+    ff_sector_tickers = [
+        "NoDur",
+        "Durbl",
+        "Manuf",
+        "Enrgy",
+        "Chems",
+        "BusEq",
+        "Telcm",
+        "Utils",
+        "Shops",
+        "Hlth",
+        "Money",
+        "Other",
+    ]
+    ff_sector_codes = {tick: i for i, tick in enumerate(ff_sector_tickers)}
+
+    # calculations to highlight nodes/edges
+    out_cent = fevd.out_page_rank(horizon=horizon, table_name=table_name)
+    in_cent = fevd.in_page_rank(horizon=horizon, table_name=table_name)
+    include_edges = table > np.percentile(table, q=90, axis=None, keepdims=True)
 
     # plot
     fig, ax = plt.subplots(1, 1, figsize=[22, 12])
-    options = {
-        "node_color": "white",
-        "edge_color": colors,
-        "node_size": 0,
-        "linewidths": 0,
-        "with_labels": True,
-        "width": weights,
-        "font_weight": "bold",
-        "arrows": False,
-    }
-    nx.draw(graph, ax=ax, **options, **kwargs)
     ax.set_title(title)
+    ax.grid(False)
+
+    # draw nodes
+    node_options = {
+        "node_size": 500
+        + (df_info["mean_size"] / df_info["mean_size"].mean()).values * 200,
+        "node_color": [
+            sector_colors[ff_sector_codes[i]]
+            for i in df_info["ff_sector_ticker"].values
+        ],
+        "linewidths": [
+            4
+            if o > np.percentile(out_cent, 80) or i > np.percentile(in_cent, 80)
+            else 0
+            for (o, i) in zip(out_cent, in_cent)
+        ],
+        "alpha": 0.9,
+        "edgecolors": [
+            "w"
+            if o > np.percentile(out_cent, 80)
+            else "grey"
+            if i > np.percentile(in_cent, 80)
+            else "r"
+            for (o, i) in zip(out_cent, in_cent)
+        ],
+        "node_shape": "o",
+    }
+    nx.draw_networkx_nodes(G=g, pos=layout, ax=ax, **node_options)
+
+    # label nodes
+    label_options = {
+        # "labels": {i: tick for i, tick in enumerate(df_info["ticker"].values)},
+        "font_weight": "bold",
+        "font_size": 8,
+    }
+    nx.draw_networkx_labels(G=g, pos=layout, ax=ax, **label_options)
+
+    # draw edges
+    edge_options = {
+        "arrows": True,  # False,#True,
+        "connectionstyle": "arc3,rad=0.2",
+        "node_size": node_options["node_size"],
+        "arrowsize": 10,
+        # "edgelist": [(x, y) for x, y in zip(*np.where(include_edges.T))],
+        "edgelist": [
+            (ticker_dict[x], ticker_dict[y]) for x, y in zip(*np.where(include_edges.T))
+        ],
+        "width": (table.T.flatten() / (0.25 * table[include_edges.T].mean()))[
+            include_edges.T.flatten()
+        ],
+        # "edge_color": "grey",
+        # "edge_cmap": "binary",
+    }
+    nx.draw_networkx_edges(G=g, pos=layout, ax=ax, **edge_options)
+
+    # legends
+    sector_legend = ax.legend(
+        handles=[
+            mpl.patches.Patch(facecolor=sector_colors[i], label=ticker)
+            for ticker, i in ff_sector_codes.items()
+        ],
+        title="Sectors",
+    )
+    influence_legend = ax.legend(
+        handles=[
+            mpl.lines.Line2D(
+                [0],
+                [0],
+                marker="o",
+                markerfacecolor="none",
+                markeredgewidth=2,
+                markeredgecolor="w",
+                label="Highest outgoing",
+                markersize=10,
+                linewidth=0,
+            ),
+            mpl.lines.Line2D(
+                [0],
+                [0],
+                marker="o",
+                markerfacecolor="none",
+                markeredgewidth=2,
+                markeredgecolor="grey",
+                label="Highest incoming",
+                markersize=10,
+                linewidth=0,
+            ),
+        ],
+        title="Page rank",
+        loc="lower right",
+    )
+    ax.add_artist(sector_legend)
+    ax.add_artist(influence_legend)
 
     # save
     if save_path:
         fig.savefig(save_path, format="png", dpi=fig.dpi, bbox_inches="tight")
 
+    return layout
 
-def missing_data(df, title="Missing Data", save_path=None):
+
+def missing_data(df, title: str = "Missing Data", save_path: str = None):
     """Creates and saves a missingno plot."""
+    # plot
     ax = mno.matrix(df, labels=False)
-    ax.set_title(title)
     fig = plt.gcf()
+
+    # label
+    ax.set_title(title, fontsize=16)
+    plt.xticks(np.arange(100), df.columns, rotation=90, fontsize=12)
+
+    # save
     if save_path:
         fig.savefig(save_path, format="pdf", dpi=200, bbox_inches="tight")
 
@@ -478,7 +690,7 @@ def var_timeseries(idio_var, total_var=None, index_var=None, save_path=None):
     ax.plot(index_var, c=colors[2], label="SPY variance", linestyle="--", alpha=0.6)
 
     ax.legend()
-    #     kf.add_recession_bars(ax, startdate=idio_volas.index[0], enddate=idio_volas.index[-1])
+    #     add_recession_bars(ax, startdate=idio_volas.index[0], enddate=idio_volas.index[-1])
     if save_path:
         fig.savefig(save_path, format="pdf", dpi=200, bbox_inches="tight")
 
@@ -528,33 +740,32 @@ def plot_estimation_summary(df, save_path=None):
         c=colors[0],
     )
     l2 = ax1.plot(
-        df["kappa"],
-        linestyle="--",
-        label="κ, mean={:.1e}".format(df["kappa"].mean()),
-        c=colors[1],
-    )
-    l3 = ax2.plot(
         df["rho"],
         linestyle="-.",
         label="ρ, mean={}".format(df["rho"].mean().round(2)),
+        c=colors[1],
+    )
+    l3 = ax2.plot(
+        df["kappa"],
+        linestyle="--",
+        label="κ, mean={:.1e}".format(df["kappa"].mean()),
         c=colors[2],
     )
+
     # l4 = ax2.plot(df['eta'], linestyle=':', label='η, mean={}'.format(df['eta'].mean().round(2)), c=colors[3])
-    ax1.set_ylim([1e-5, 1e2])
-    ax2.set_ylim([1e-2, 1e0])
+    ax1.set_ylim([1e-3, 1e1])
+    ax2.set_ylim([1e-5, 1e0])
     ax1.set_yscale("log")
     ax2.set_yscale("log")
     ax2.grid(None)
-    ax1.set_ylabel("VAR hyperparameters", color=colors[0])
+    ax1.set_ylabel("Penalty hyperparameters (λ, ρ)", color=colors[0])
     ax1.tick_params(axis="y", labelcolor=colors[0])
-    ax2.set_ylabel("Covariance hyperparamters", color=colors[2])
+    ax2.set_ylabel("L1 hyperparameter (κ)", color=colors[2])
     ax2.tick_params(axis="y", labelcolor=colors[2])
     lines = l1 + l2 + l3  # +l4
     labels = [l.get_label() for l in lines]
     ax1.legend(lines, labels, bbox_to_anchor=(1.05, 0.5), loc="center left")
-    kf.plotting.add_recession_bars(
-        ax1, freq="M", startdate=df.index[0], enddate=df.index[-1]
-    )
+    add_recession_bars(ax1, freq="M", startdate=df.index[0], enddate=df.index[-1])
 
     # Losses
     ax1 = axes[1]
@@ -598,9 +809,7 @@ def plot_estimation_summary(df, save_path=None):
     lines = l11 + l12 + l21 + l22
     labels = [l.get_label() for l in lines]
     ax1.legend(lines, labels, bbox_to_anchor=(1.05, 0.5), loc="center left")
-    kf.plotting.add_recession_bars(
-        ax1, freq="M", startdate=df.index[0], enddate=df.index[-1]
-    )
+    add_recession_bars(ax1, freq="M", startdate=df.index[0], enddate=df.index[-1])
 
     # R2
     ax1 = axes[2]
@@ -643,9 +852,7 @@ def plot_estimation_summary(df, save_path=None):
     lines = l11 + l12 + l21 + l22
     labels = [l.get_label() for l in lines]
     ax1.legend(lines, labels, bbox_to_anchor=(1.05, 0.5), loc="center left")
-    kf.plotting.add_recession_bars(
-        ax1, freq="M", startdate=df.index[0], enddate=df.index[-1]
-    )
+    add_recession_bars(ax1, freq="M", startdate=df.index[0], enddate=df.index[-1])
 
     if save_path:
         fig.savefig(save_path, format="pdf", dpi=200, bbox_inches="tight")
@@ -715,9 +922,7 @@ def plot_regularisation_summary(df, save_path=None):
         linewidth=1.5,
     )
     ax.legend(bbox_to_anchor=(1, 0.5), loc="center left")
-    kf.plotting.add_recession_bars(
-        ax, freq="M", startdate=df.index[0], enddate=df.index[-1]
-    )
+    add_recession_bars(ax, freq="M", startdate=df.index[0], enddate=df.index[-1])
 
     # Sparsity
     ax = axes[1]
@@ -745,9 +950,7 @@ def plot_regularisation_summary(df, save_path=None):
     )
     ax.set_ylim([0, 1])
     ax.legend(bbox_to_anchor=(1, 0.5), loc="center left")
-    kf.plotting.add_recession_bars(
-        ax, freq="M", startdate=df.index[0], enddate=df.index[-1]
-    )
+    add_recession_bars(ax, freq="M", startdate=df.index[0], enddate=df.index[-1])
 
     # Shrinkage
     ax = axes[2]
@@ -760,62 +963,179 @@ def plot_regularisation_summary(df, save_path=None):
         ),
     )
     ax.plot(
-        df["covar_nonzero_shrinkage"],
+        df["precision_nonzero_shrinkage"],
         linestyle="--",
+        label="Precision matrix shrinkage, mean={}".format(
+            (df["precision_nonzero_shrinkage"]).mean().round(2)
+        ),
+    )
+    # ax.plot(
+    #     df["mean_shrinkage"],
+    #     linestyle=":",
+    #     label="Overall estimate shrinkage, mean={}".format(
+    #         (df["mean_shrinkage"]).mean().round(2)
+    #     ),
+    # )
+    ax.plot(
+        df["covar_nonzero_shrinkage"],
+        linestyle="-.",
         label="Covariance matrix shrinkage, mean={}".format(
             (df["covar_nonzero_shrinkage"]).mean().round(2)
         ),
     )
-    ax.plot(
-        df["mean_shrinkage"],
-        linestyle="-.",
-        label="Overall estimate shrinkage, mean={}".format(
-            (df["mean_shrinkage"]).mean().round(2)
-        ),
-    )
     ax.set_ylim([0, 1])
     ax.legend(bbox_to_anchor=(1, 0.5), loc="center left")
-    kf.plotting.add_recession_bars(
-        ax, freq="M", startdate=df.index[0], enddate=df.index[-1]
-    )
+    add_recession_bars(ax, freq="M", startdate=df.index[0], enddate=df.index[-1])
 
     if save_path:
         fig.savefig(save_path, format="pdf", dpi=200, bbox_inches="tight")
 
 
 def plot_network_summary(df, save_path=None):
+    # set up plot
     fig, axes = plt.subplots(1, 1, figsize=(20, 6))
     colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
 
-    # Network stats
+    # connectedness
     ax1 = axes  # [0]
-    ax2 = ax1.twinx()
-    ax1.set_title("FEV Network statistics")
     l1 = ax1.plot(
-        df["fev_avg_connectedness_normalised"],
+        df["fevd_avg_connectedness"],
         label="Average connectedness $c^{avg}$, mean="
-        + str((df["fev_avg_connectedness_normalised"]).mean().round(2)),
+        + str((df["fevd_avg_connectedness"]).mean().round(2)),
         c=colors[0],
     )
+    ax1.set_ylabel("Connectedness", color=colors[0])
+    ax1.tick_params(axis="y", labelcolor=colors[0])
+    ax1.set_ylim([0, 0.3])
+    # ax1.set_yscale("log")
+
+    # concentration
+    ax2 = ax1.twinx()
     l2 = ax2.plot(
-        df["fev_asymmetry"],
-        label="Network asymmetry, mean={}".format(
-            (df["fev_asymmetry"]).mean().round(2)
+        df["fevd_concentration_out_connectedness"].rolling(1).mean(),
+        label="Network concentration, mean={}".format(
+            (df["fevd_concentration_out_connectedness"]).mean().round(2)
         ),
         linestyle="--",
         c=colors[1],
     )
     ax2.grid(None)
-    ax1.set_ylabel("Connectedness", color=colors[0])
-    ax1.tick_params(axis="y", labelcolor=colors[0])
-    ax2.set_ylabel("Asymmetry", color=colors[1])
+    ax2.set_ylabel("Concentration", color=colors[1])
     ax2.tick_params(axis="y", labelcolor=colors[1])
+    ax2.set_ylim([0.2, 0.8])
+    # ax3.set_yscale("log")
+
+    # asymmetry
+    ax3 = ax1.twinx()
+    l3 = ax3.plot(
+        df["fevd_asymmetry"],
+        label="Network directedness, mean={}".format(
+            (df["fevd_asymmetry"]).mean().round(2)
+        ),
+        linestyle="-.",
+        c=colors[2],
+    )
+    ax3.grid(None)
+    ax3.set_ylabel("Directedness", color=colors[2])
+    ax3.tick_params(axis="y", labelcolor=colors[2])
+    ax3.yaxis.set_label_coords(1.07, 0.5)
+    ax3.tick_params(direction="out", pad=50)
+    ax3.set_ylim([0, 0.12])
+    # ax2.set_yscale("log")
+
+    # figure formatting
+    ax1.set_title("FEVD Network statistics")
+    lines = l1 + l2 + l3
+    labels = [l.get_label() for l in lines]
+    ax1.legend(lines, labels, loc="upper left")
+    add_recession_bars(ax1, freq="M", startdate=df.index[0], enddate=df.index[-1])
+
+    if save_path:
+        fig.savefig(save_path, format="pdf", dpi=200, bbox_inches="tight")
+
+
+def plot_partial_r2(df, save_path=None):
+    fig, ax = plt.subplots(1, 1, figsize=(20, 6))
+    colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+
+    # Network stats
+    ax.set_title("VAR Partial $R^2$")
+    ax.plot(
+        df["var_partial_r2_factors"],
+        label="Partial $R^2$ factors, mean="
+        + str((df["var_partial_r2_factors"]).mean().round(2)),
+        c=colors[0],
+    )
+    ax.plot(
+        df["var_partial_r2_var"],
+        label="Partial $R^2$ spillovers, mean="
+        + str((df["var_partial_r2_var"]).mean().round(2)),
+        c=colors[1],
+        linestyle="--",
+    )
+    ax.set_ylabel("Partial $R^2$")
+    ax.legend()
+    add_recession_bars(ax, freq="M", startdate=df.index[0], enddate=df.index[-1])
+
+    if save_path:
+        fig.savefig(save_path, format="pdf", dpi=200, bbox_inches="tight")
+
+
+def plot_ledoitwolf_test(df: pd.DataFrame, save_path=None):
+    """"""
+    fig, ax = plt.subplots(1, 1, figsize=(20, 6))
+    colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+
+    #
+    ax1 = ax
+    l1 = ax1.plot(
+        df["innovation_diagonality_test_stat"],
+        label="test statistic, mean="
+        + str((df["innovation_diagonality_test_stat"]).mean().round(2)),
+        c=colors[0],
+    )
+    ax1.set_ylabel("test statistic", color=colors[0])
+    ax1.tick_params(axis="y", labelcolor=colors[0])
+
+    #
+    ax2 = ax1.twinx()
+    l2 = ax2.plot(
+        df["innovation_diagonality_p_value"],
+        label="p-value, mean="
+        + str((df["innovation_diagonality_test_stat"]).mean().round(2)),
+        c=colors[1],
+        linestyle="--",
+    )
+    ax2.grid(False)
+    ax2.set_ylabel("p-value", color=colors[1])
+    ax2.tick_params(axis="y", labelcolor=colors[1])
+
+    #
     lines = l1 + l2
     labels = [l.get_label() for l in lines]
-    ax1.legend(lines, labels)
-    kf.plotting.add_recession_bars(
-        ax1, freq="M", startdate=df.index[0], enddate=df.index[-1]
-    )
+    ax1.legend(lines, labels, loc="center left")
+    add_recession_bars(ax, freq="M", startdate=df.index[0], enddate=df.index[-1])
+
+    if save_path:
+        fig.savefig(save_path, format="pdf", dpi=200, bbox_inches="tight")
+
+
+def plot_pca_elbow(df: pd.DataFrame, n_pcs: int = 10, save_path=None):
+    # create pca
+    pca = PCA(n_components=n_pcs).fit(df)
+
+    # plot data
+    fig, ax = plt.subplots(1, 1)
+    ax.plot(pca.explained_variance_ratio_, marker="o")
+
+    # xticks
+    ax.set_xticks(np.arange(n_pcs))
+    ax.set_xticklabels(np.arange(n_pcs) + 1)
+
+    # labels
+    ax.set_title("Principal Components: Explained Variance")
+    ax.set_xlabel("Principal component")
+    ax.set_ylabel("Explained variance ratio")
 
     if save_path:
         fig.savefig(save_path, format="pdf", dpi=200, bbox_inches="tight")
