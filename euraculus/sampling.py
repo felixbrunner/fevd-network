@@ -7,6 +7,7 @@ CRSP data at the end of each month.
 import datetime as dt
 from string import ascii_uppercase as ALPHABET
 
+import numpy as np
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 
@@ -185,6 +186,52 @@ class LargeCapSampler:
         return mean_size
 
     @staticmethod
+    def _get_mean_valuation_volatility(df: pd.DataFrame) -> pd.Series:
+        """Get average firm sizes from dataset.
+
+        Return a series of average market capitalisations for contained permnos.
+
+        Args:
+            df : CRSP data with column 'mcap'.
+
+        Returns:
+            mean_size: Permno, size pairs with average observed sizes.
+
+        """
+        valuation_volatility = df["mcap"] * np.sqrt(df["var"].fillna(df["noisevar"]))
+        mean_valuation_volatility = (
+            valuation_volatility.unstack()
+            .mean()
+            .squeeze()
+            .rename("mean_valuation_volatility")
+        )
+        return mean_valuation_volatility
+
+    @staticmethod
+    def _get_last_valuation_volatility(df: pd.DataFrame) -> pd.Series:
+        """Get average firm sizes from dataset.
+
+        Return a series of average market capitalisations for contained permnos.
+
+        Args:
+            df : CRSP data with column 'mcap'.
+
+        Returns:
+            mean_size: Permno, size pairs with average observed sizes.
+
+        """
+        valuation_volatility = df["mcap"] * np.sqrt(df["var"].fillna(df["noisevar"]))
+        last_valuation_volatility = (
+            valuation_volatility.unstack()
+            .sort_index()
+            .fillna(method="ffill", limit=1)
+            .tail(1)
+            .squeeze()
+            .rename("last_valuation_volatility")
+        )
+        return last_valuation_volatility
+
+    @staticmethod
     def _get_tickers(df: pd.DataFrame) -> pd.Series:
         """Get tickers for the data contained in dataframe.
 
@@ -253,6 +300,8 @@ class LargeCapSampler:
             .join(self._has_obs(df_back, df_forward).rename("has_next_obs"))
             .join(self._get_last_sizes(df_back))
             .join(self._get_mean_sizes(df_back))
+            .join(self._get_last_valuation_volatility(df_back))
+            .join(self._get_mean_valuation_volatility(df_back))
         )
 
         # set next obs to TRUE if there are no subsequent observations at all
@@ -272,10 +321,27 @@ class LargeCapSampler:
             .where(df_summary["has_next_obs"])
             .rank(ascending=False)
         )
+        df_summary["last_valuation_volatility_rank"] = (
+            df_summary["mean_valuation_volatility"]
+            .where(df_summary["has_all_days"])
+            .where(df_summary["has_next_obs"])
+            .rank(ascending=False)
+        )
+        df_summary["mean_valuation_volatility_rank"] = (
+            df_summary["mean_valuation_volatility"]
+            .where(df_summary["has_all_days"])
+            .where(df_summary["has_next_obs"])
+            .rank(ascending=False)
+        )
 
         return df_summary
 
-    def _select_largest(self, df_summary: pd.DataFrame, method: str = "mean") -> list:
+    def _select_largest(
+        self,
+        df_summary: pd.DataFrame,
+        method: str = "mean",
+        characteristic: str = "valuation_volatility",
+    ) -> list:
         """Pick N lagest companies.
 
         Return a list of permnos of the n companies
@@ -285,6 +351,7 @@ class LargeCapSampler:
             df_summary: Summary data to determine selection.
             method: Selection criterion, can be 'last' or 'mean' to select largest
                 companies based on last or mean size.
+            characteristic: Variable to perform ranking and selection on.
 
         Returns:
             permnos: Permnos of the N largest companies.
@@ -297,7 +364,7 @@ class LargeCapSampler:
                 )
             )
         permnos = (
-            df_summary.sort_values("{}_size_rank".format(method))
+            df_summary.sort_values(f"{method}_{characteristic}_rank")
             .head(self.n_assets)
             .index.get_level_values("permno")
             .tolist()
