@@ -12,6 +12,8 @@ from collections import defaultdict
 import numpy as np
 import pandas as pd
 
+from euraculus.settings import DATA_DIR
+
 
 class DataMap:
     """Serves to store and read data during the course of the project.
@@ -24,7 +26,7 @@ class DataMap:
 
     """
 
-    def __init__(self, datapath: str = None):
+    def __init__(self, datapath: Path = DATA_DIR):
         """Set up the datamap of local filesystem.
 
         Args:
@@ -32,16 +34,9 @@ class DataMap:
 
         """
         # path
-        if not datapath:
-            self.datapath = Path().cwd() / "data"
-            warnings.warn(
-                "no datapath input, setting datapath to '{}'".format(self.datapath)
-            )
-        else:
-            datapath = Path(datapath)
-            if datapath.name != "data":
-                raise ValueError("datapath must have name 'data'")
-            self.datapath = Path(datapath)
+        if datapath != DATA_DIR:
+            warnings.warn(f"Initializing DataMap at non-standard datapath '{datapath}'")
+        self.datapath = Path(datapath)
 
         # files
         self.files = []
@@ -823,9 +818,13 @@ class DataMap:
         )
         historic_indices["ew"] = df_historic.mean(axis=1)
         historic_indices["vw"] = (df_historic * historic_weights).sum(axis=1)
-        historic_indices["spy"] = (
-            df_spy.loc[df_historic.index].values - df_rf.loc[df_historic.index].values
-        )
+        try:
+            historic_indices["spy"] = (
+                df_spy.loc[df_historic.index].values
+                - df_rf.loc[df_historic.index].values
+            )
+        except KeyError:
+            pass
 
         # future outputs
         if future:
@@ -835,9 +834,13 @@ class DataMap:
             )
             future_indices["ew"] = df_future.mean(axis=1)
             future_indices["vw"] = (df_future * future_weights).sum(axis=1)
-            future_indices["spy"] = (
-                df_spy.loc[df_future.index].values - df_rf.loc[df_future.index].values
-            )
+            try:
+                future_indices["spy"] = (
+                    df_spy.loc[df_future.index].values
+                    - df_rf.loc[df_future.index].values
+                )
+            except KeyError:
+                pass
         else:
             future_indices = None
 
