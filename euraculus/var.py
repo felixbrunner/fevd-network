@@ -1,6 +1,4 @@
-"""
-
-"""
+"""This module provides VAR and FactorVAR classes for estimation."""
 
 import copy
 
@@ -29,7 +27,6 @@ class VAR:
         var_matrices_: The VAR coefficient matrices.
         var_1_matrix_: The VAR matrix corresponding to the first lag.
         intercepts_: The model intercepts.
-
     """
 
     def __init__(
@@ -87,7 +84,6 @@ class VAR:
 
         The df_used_ is defined as all nonzero estimates in the intercepts and
         in all VAR coefficient matrices together.
-
         """
         df_used = np.count_nonzero(self.intercepts_) + np.count_nonzero(
             self.var_matrices_
@@ -100,7 +96,6 @@ class VAR:
 
         The df_full_ is defined as the number of all parameters the model can
         potentially use.
-
         """
         df_full = np.size(self.intercepts_) + np.size(self.var_matrices_)
         return df_full
@@ -110,7 +105,6 @@ class VAR:
         """The estimate density of a trained model.
 
         Density is defined as the share of nonzero coefficients.
-
         """
         density = self.df_used_ / self.df_full_
         return density
@@ -120,7 +114,6 @@ class VAR:
         """The estimate sparsity of a trained model.
 
         Sparsity is defined as the share of zero coefficients.
-
         """
         sparsity = 1 - self.coef_density_
         return sparsity
@@ -130,7 +123,6 @@ class VAR:
         """The VAR coefficient estimate density of a trained model.
 
         Density is defined as the share of nonzero coefficients.
-
         """
         density = np.count_nonzero(self.var_matrices_) / np.size(self.var_matrices_)
         return density
@@ -140,7 +132,6 @@ class VAR:
         """The VAR coefficient estimate sparsity of a trained model.
 
         Sparsity is defined as the share of zero coefficients.
-
         """
         sparsity = 1 - self.var_density_
         return sparsity
@@ -153,7 +144,6 @@ class VAR:
 
         Returns:
             y: (t_periods*n_series,) array reshaped for regression form.
-
         """
         y = var_data.values[self.p_lags :].reshape(-1, 1, order="F")
         return y
@@ -175,7 +165,6 @@ class VAR:
 
         Returns:
             X_block: (t_periods, m_features) array for the construction of X.
-
         """
         # setup
         t_periods = var_data.shape[0] - self.p_lags
@@ -209,7 +198,6 @@ class VAR:
         Returns:
             X: (t_periods*n_series, m_features*n_series) array reshaped
                 for regression form.
-
         """
         # size
         n_series = var_data.shape[1]
@@ -237,7 +225,6 @@ class VAR:
             y: (t_periods*n_series,) array reshaped for regression form.
             X: (t_periods*n_series, m_features*n_series) array reshaped
                 for regression form.
-
         """
         X = self._build_X(
             var_data=var_data,
@@ -259,7 +246,6 @@ class VAR:
 
         Returns:
             intercepts: (n_series, 1) vector of constant terms.
-
         """
         m_features = self.has_intercepts + n_series * self.p_lags
         indices = list(
@@ -287,7 +273,6 @@ class VAR:
         Returns:
             var_matrices: List of p_lags (n_series, n_series) matrices with
                 VAR coefficient estimates.
-
         """
         var_matrices = []
         m_features = self.has_intercepts + n_series * self.p_lags
@@ -320,7 +305,6 @@ class VAR:
 
         Returns:
             model (optional): The LinearRegression object fitted to the data.
-
         """
         # build inputs
         X, y = self._build_X_y(var_data=var_data, add_intercepts=self.has_intercepts)
@@ -354,7 +338,6 @@ class VAR:
 
         Returns:
             scaled_data: The standardized data array.
-
         """
         # fit
         levels = data.mean().values
@@ -381,7 +364,6 @@ class VAR:
         Returns:
             scaled_coef: The rescaled model coefficent vector.
                 Includes intercepts if the original model has intercepts.
-
         """
         # dimensions
         n_series = var_data.shape[1]
@@ -423,7 +405,6 @@ class VAR:
         Returns:
             penalty_weights: Array to indicate which coefficients are to be
                 excluded from penalization during estimation.
-
         """
         penalty_weights = np.ones(shape=(n_series**2 * self.p_lags))
         if not penalize_diagonals:
@@ -459,7 +440,6 @@ class VAR:
             y: (t_periods*n_series,) array reshaped for regression form.
             penalty_weights: Array of ones and zeros to indicate which
                 coefficients should be penalized.
-
         """
         # dimensions
         n_series = var_data.shape[1]
@@ -493,7 +473,6 @@ class VAR:
             var_data: (t_periods, n_series) array with observations.
             n_series: The number of dependent variables when fitting.
             model: The fitted model which hold a 'coef_' vector.
-
         """
         # self._coef_ = self._scale_coefs(
         #     model=model,
@@ -532,7 +511,6 @@ class VAR:
 
         Returns:
             model (optional): The LinearRegression object fitted to the data.
-
         """
         # build inputs
         n_series = var_data.shape[1]
@@ -588,7 +566,6 @@ class VAR:
 
         Returns:
             model (optional): The LinearRegression object fitted to the data.
-
         """
         # build inputs
         n_series = var_data.shape[1]
@@ -638,7 +615,6 @@ class VAR:
 
         Returns:
             splitter: Cross-validation sample splits.
-
         """
         # shapes
         t_periods = var_data.shape[0] - self.p_lags
@@ -678,7 +654,6 @@ class VAR:
 
         Returns:
             cv (optional): The GridSearchCV object fitted to the data.
-
         """
         # build inputs
         n_series = var_data.shape[1]
@@ -741,7 +716,6 @@ class VAR:
 
         Returns:
             cv (optional): The GridSearchCV object fitted to the data.
-
         """
         # build inputs
         n_series = var_data.shape[1]
@@ -806,7 +780,6 @@ class VAR:
 
         Args:
             method: Indicates the fitting method to use.
-
         """
         if method == "OLS":
             self.fit_ols(**kwargs)
@@ -829,7 +802,6 @@ class VAR:
 
         Returns:
             y_pred: (t_periods-p_lags, n_series) dataframe with fitted values.
-
         """
         # setup
         t_periods = var_data.shape[0] - self.p_lags
@@ -854,7 +826,6 @@ class VAR:
 
         Returns:
             residuals: (t_periods-p_lags, n_series) dataframe with residuals.
-
         """
         y_pred = self.predict(var_data=var_data, **kwargs)
         residuals = var_data[self.p_lags :] - y_pred
@@ -875,7 +846,6 @@ class VAR:
 
         Returns:
             r2: The goodness of fit statistic for the input data and the model.
-
         """
         levels = var_data[self.p_lags :].mean().values
         tss = np.nansum((var_data[self.p_lags :] - levels) ** 2, axis=0)
@@ -914,7 +884,6 @@ class FactorVAR(VAR):
         intercepts_: The model intercepts.
         factor_loadings_: The model factor loadings.
         k_factors_: The number of factors in the model.
-
     """
 
     def __init__(
@@ -956,7 +925,6 @@ class FactorVAR(VAR):
 
         The df_used_ is defined as all nonzero estimates in the intercepts,
         factor loadings and all VAR coefficient matrices together.
-
         """
         df_used = (
             np.count_nonzero(self.intercepts_)
@@ -971,7 +939,6 @@ class FactorVAR(VAR):
 
         The df_full_ is defined as the number of all parameters the model can
         potentially use.
-
         """
         df_full = (
             np.size(self.intercepts_)
@@ -985,7 +952,6 @@ class FactorVAR(VAR):
         """The factor loading estimate density of a trained model.
 
         Density is defined as the share of nonzero coefficients.
-
         """
         density = np.count_nonzero(self.factor_loadings_) / np.size(
             self.factor_loadings_
@@ -997,7 +963,6 @@ class FactorVAR(VAR):
         """The factor loading estimate sparsity of a trained model.
 
         Sparsity is defined as the share of zero coefficients.
-
         """
         sparsity = 1 - self.factor_loading_density_
         return sparsity
@@ -1022,7 +987,6 @@ class FactorVAR(VAR):
 
         Returns:
             X_block: (t_periods, m_features) array for the construction of X.
-
         """
         # setup
         t_periods = var_data.shape[0] - self.p_lags
@@ -1064,7 +1028,6 @@ class FactorVAR(VAR):
         Returns:
             X: (t_periods*n_series, m_features*n_series) array reshaped
                 for regression form.
-
         """
         # size
         n_series = var_data.shape[1]
@@ -1095,7 +1058,6 @@ class FactorVAR(VAR):
             y: (t_periods*n_series,) array reshaped for regression form.
             X: (t_periods*n_series, m_features*n_series) array reshaped
                 for regression form.
-
         """
         X = self._build_X(
             var_data=var_data,
@@ -1120,7 +1082,6 @@ class FactorVAR(VAR):
 
         Returns:
             intercepts: (n_series, 1) vector of constant terms.
-
         """
         m_features = self.has_intercepts + k_factors + n_series * self.p_lags
         indices = list(
@@ -1149,7 +1110,6 @@ class FactorVAR(VAR):
 
         Returns:
             factor_loadings: (n_series, k_factors) matrix of factor loadings.
-
         """
         m_features = self.has_intercepts + k_factors + n_series * self.p_lags
         indices = list(
@@ -1183,7 +1143,6 @@ class FactorVAR(VAR):
         Returns:
             var_matrices: List of p_lags (n_series, n_series) matrices with
                 VAR coefficient estimates.
-
         """
         var_matrices = []
         m_features = self.has_intercepts + k_factors + n_series * self.p_lags
@@ -1221,7 +1180,6 @@ class FactorVAR(VAR):
 
         Returns:
             model (optional): The LinearRegression object fitted to the data.
-
         """
         # build inputs
         n_series = var_data.shape[1]
@@ -1273,7 +1231,6 @@ class FactorVAR(VAR):
         Returns:
             scaled_coef: The rescaled model coefficent vector.
                 Includes intercepts if the original model has intercepts.
-
         """
         # dimensions
         n_series = var_data.shape[1]
@@ -1324,7 +1281,6 @@ class FactorVAR(VAR):
         Returns:
             penalty_weights: Array of ones and zeros to indicate which
                 coefficients should be penalized.
-
         """
         penalty_weights = np.ones(shape=((k_factors + n_series) * n_series))
         if not penalize_diagonals:
@@ -1377,7 +1333,6 @@ class FactorVAR(VAR):
             y: (t_periods*n_series,) array reshaped for regression form.
             penalty_weights: Array of ones and zeros to indicate which
                 coefficients should be penalized.
-
         """
         # dimensions
         n_series = var_data.shape[1]
@@ -1423,7 +1378,6 @@ class FactorVAR(VAR):
             n_series: The number of dependent variables when fitting.
             k_factors: The number of factors when fitting.
             model: The fitted model which hold a 'coef_' vector.
-
         """
         coef_ = self._scale_coefs(
             model=model,
@@ -1464,7 +1418,6 @@ class FactorVAR(VAR):
 
         Returns:
             model (optional): The LinearRegression object fitted to the data.
-
         """
         # build inputs
         n_series = var_data.shape[1]
@@ -1527,7 +1480,6 @@ class FactorVAR(VAR):
 
         Returns:
             model (optional): The LinearRegression object fitted to the data.
-
         """
         # build inputs
         n_series = var_data.shape[1]
@@ -1587,7 +1539,6 @@ class FactorVAR(VAR):
 
         Returns:
             cv (optional): The GridSearchCV object fitted to the data.
-
         """
         # build inputs
         n_series = var_data.shape[1]
@@ -1653,7 +1604,6 @@ class FactorVAR(VAR):
 
         Returns:
             cv (optional): The GridSearchCV object fitted to the data.
-
         """
         # build inputs
         n_series = var_data.shape[1]
@@ -1712,7 +1662,6 @@ class FactorVAR(VAR):
 
         Returns:
             factor_predictions: (t_periods, n_series) dataframe with fitted values.
-
         """
         factor_predictions = factor_data[self.p_lags :] @ self.factor_loadings_.T
         if self.has_intercepts:
@@ -1732,7 +1681,6 @@ class FactorVAR(VAR):
 
         Returns:
             residuals: (t_periods, n_series) dataframe with factor residuals.
-
         """
         factor_predictions = self.factor_predict(factor_data=factor_data)
         if type(var_data) == pd.DataFrame:
@@ -1759,7 +1707,6 @@ class FactorVAR(VAR):
 
         Returns:
             factor_r2: The goodness of fit statistic for the factor loadings.
-
         """
         levels = var_data[self.p_lags :].mean().values
         tss = np.nansum(
@@ -1783,6 +1730,21 @@ class FactorVAR(VAR):
             raise ValueError("weighting method '{}' not available".format(weighting))
         return factor_r2
 
+    def systematic_variances(
+        self,
+        factor_data: np.ndarray = None,
+    ):
+        """Calculate systematic variances from the fitted factor loadings and factor data.
+
+        Args:
+            factor_data: (t_periods, k_factors) array with factor observations.
+
+        Returns:
+            systematic_variances: The systematic variances of each series.
+        """
+        systematic_variances = self.factor_loadings_**2 @ factor_data.cov().values
+        return systematic_variances
+
     def partial_r2s(
         self,
         var_data: np.ndarray,
@@ -1799,7 +1761,6 @@ class FactorVAR(VAR):
 
         Returns:
             partial_r2s: The partial goodness of fit statistics.
-
         """
 
         # full model
@@ -1876,7 +1837,6 @@ class FactorVAR(VAR):
 
         Returns:
             partial_r2s: The partial goodness of fit statistics.
-
         """
 
         # total variation
