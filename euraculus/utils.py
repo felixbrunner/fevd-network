@@ -8,10 +8,10 @@ import pandas as pd
 def matrix_asymmetry(M: np.ndarray, drop_diag: bool = False) -> float:
     """Return a (self-built) measure of matrix asymmetry.
 
-    The measure is calculated as asymmetry = |M_a| / |M_s|, where
-        |.|: Frobenius norm of .
+    The measure is calculated as asymmetry = |M_a| / |M|, where
+        |.|: The entry-wise L1 norm of the matrix, |M| = |vec(M)|.
         M_a: the asymmetric part of M = (M - M') / 2
-        M_s: the symmetric part of M = (M + M') / 2
+             (the symmetric part of M = (M + M') / 2)
     The matrix diagonal can be excluded by setting drop_diag=True.
 
     Args:
@@ -19,16 +19,15 @@ def matrix_asymmetry(M: np.ndarray, drop_diag: bool = False) -> float:
         drop_diag: Indicates if the diagonal should be excluded from the calculations.
 
     Returns:
-        asymmetry: The calculated symmetry measure.
-
+        asymmetry: The calculated asymmetry measure.
     """
     M_ = M.copy()
     if drop_diag:
         M_diag = np.diag(np.diag(M))
         M_ -= M_diag
-    M_s = (M_ + M_.T) / 2  # symmetric_part
+    # M_s = (M_ + M_.T) / 2  # symmetric_part
     M_a = (M_ - M_.T) / 2  # asymmetric_part
-    asymmetry = np.linalg.norm(M_a) / np.linalg.norm(M_s)
+    asymmetry = abs(M_a).sum() / abs(M_).sum()
     return asymmetry
 
 
@@ -49,7 +48,6 @@ def shrinkage_factor(
 
     Returns:
         mean_scaling: The average scaling factor of the non-zero elements.
-
     """
     if drop_zeros:
         benchmark_array = benchmark_array[array != 0]
@@ -68,7 +66,6 @@ def cov_to_corr(cov: np.ndarray) -> np.ndarray:
 
     Returns:
         corr: Correlation matrix corresponding to the input covariance matrix.
-
     """
     stds = np.sqrt(np.diag(cov)).reshape(-1, 1)
     std_prod = stds @ stds.T
@@ -107,7 +104,6 @@ def average_correlation(data: pd.DataFrame) -> float:
 
     Returns:
         mean_corr: The calculated average correaltion.
-
     """
     n = data.shape[1]
     corr = data.corr().values
@@ -139,7 +135,6 @@ def months_difference(start_date: dt.datetime, end_date: dt.datetime) -> int:
 
     Returns:
         delta: Difference of dates in full months.
-
     """
     delta = 12 * (end_date.year - start_date.year) + (end_date.month - start_date.month)
     return delta
@@ -154,7 +149,6 @@ def herfindahl_index(values: np.ndarray, axis: int = 0) -> float:
 
     Returns:
         hhi: The Herfindahl-Hirschman index of concentration.
-
     """
     weights = values / values.sum(axis=axis, keepdims=True)
     hhi = (weights**2).sum(axis=axis)
@@ -177,7 +171,6 @@ def power_law_exponent(
 
     Returns:
         alpha: The exponent of the power law distribution.
-
     """
     # keep only positive values
     sample[sample <= 0] = np.nan
