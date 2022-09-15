@@ -25,6 +25,11 @@
 
 from euraculus.data import DataMap
 from euraculus.download import WRDSDownloader, download_yahoo_data
+from euraculus.settings import (
+    DATA_DIR, 
+    FIRST_SAMPLING_DATE,
+    LAST_SAMPLING_DATE,
+)
 
 # %% [markdown]
 # ## Set up
@@ -37,14 +42,15 @@ db = WRDSDownloader()
 db._create_pgpass_file()
 
 # %%
-data = DataMap("../data")
+data = DataMap(DATA_DIR)
 
 # %% [markdown]
 # ### Timeframe
 
 # %%
-first_year = 1993
-last_year = 2021
+# first_year = 1925
+first_year = FIRST_SAMPLING_DATE.year - 2
+last_year = LAST_SAMPLING_DATE.year + 1
 
 # %% [markdown]
 # #### Explore database
@@ -78,9 +84,9 @@ table_description = db.describe_table(library="crsp", table="dsf")
 # %%time
 for year in range(first_year, last_year + 1):
     df = db.download_crsp_year(year=year)
-    data.dump(df, "raw/crsp_{}.pkl".format(year))
+    data.dump(df, f"raw/crsp_{year}.pkl")
     if year % 5 == 0:
-        print("    Year {} done.".format(year))
+        print(f"    Year {year} done.")
 
 # %% [markdown]
 # ### Delisting Returns

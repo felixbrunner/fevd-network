@@ -30,13 +30,19 @@ from euraculus.factor import (
 from euraculus.estimate import prepare_log_data
 from euraculus.factor import estimate_models
 from euraculus.utils import months_difference
+from euraculus.settings import (
+    DATA_DIR,
+    FIRST_SAMPLING_DATE,
+    LAST_SAMPLING_DATE,
+    TIME_STEP,
+)
 
 # %% [markdown]
 # ## Set up
 # ### Data
 
 # %%
-data = DataMap("../data")
+data = DataMap(DATA_DIR)
 df_rf = data.load_rf()
 
 # %% [markdown]
@@ -44,7 +50,7 @@ df_rf = data.load_rf()
 
 # %%
 ret_models = {
-    "spy_capm": SPY1FactorModel(data),
+    # "spy_capm": SPY1FactorModel(data),
     "capm": CAPM(data),
     "ff3": FamaFrench3FactorModel(data),
     "c4": Carhart4FactorModel(data),
@@ -52,15 +58,8 @@ ret_models = {
 
 # %%
 var_models = {
-    "logvar_capm": SPYVariance1FactorModel(data),
+    # "logvar_capm": SPYVariance1FactorModel(data),
 }
-
-# %% [markdown]
-# ### Dates
-
-# %%
-first_sampling_date = dt.datetime(year=1994, month=1, day=31)
-last_sampling_date = dt.datetime(year=2021, month=12, day=31)
 
 # %% [markdown]
 # ## Standard Factor Models
@@ -70,8 +69,8 @@ last_sampling_date = dt.datetime(year=2021, month=12, day=31)
 
 # %%
 # %%time
-sampling_date = first_sampling_date
-while sampling_date <= last_sampling_date:
+sampling_date = FIRST_SAMPLING_DATE
+while sampling_date <= LAST_SAMPLING_DATE:
     # get excess return samples
     df_historic = data.load_historic(sampling_date=sampling_date, column="retadj")
     df_historic -= df_rf.loc[df_historic.index].values
@@ -81,29 +80,25 @@ while sampling_date <= last_sampling_date:
 
     # store
     data.store(
-        data=df_residuals,
-        path="samples/{:%Y-%m-%d}/historic_daily.csv".format(sampling_date),
+        data=df_residuals, path=f"samples/{sampling_date:%Y-%m-%d}/historic_daily.csv"
     )
     data.store(
-        data=df_estimates,
-        path="samples/{:%Y-%m-%d}/asset_estimates.csv".format(sampling_date),
+        data=df_estimates, path=f"samples/{sampling_date:%Y-%m-%d}/asset_estimates.csv"
     )
 
     # increment monthly end of month
     print(
-        "Completed historic return factor model estimation at {:%Y-%m-%d}".format(
-            sampling_date
-        )
+        f"Completed historic return factor model estimation at {sampling_date:%Y-%m-%d}"
     )
-    sampling_date += relativedelta(months=1, day=31)
+    sampling_date += TIME_STEP
 
 # %% [markdown]
 # ### Forward part as expanding window
 
 # %%
 # %%time
-sampling_date = first_sampling_date
-while sampling_date < last_sampling_date:
+sampling_date = FIRST_SAMPLING_DATE
+while sampling_date < LAST_SAMPLING_DATE:
     # get excess return samples
     df_future = data.load_future(sampling_date=sampling_date, column="retadj")
     df_future -= df_rf.loc[df_future.index].values
@@ -112,7 +107,7 @@ while sampling_date < last_sampling_date:
     df_expanding_estimates = pd.DataFrame(index=df_future.columns)
     for window_length in range(1, 13):
         if (
-            months_difference(end_date=last_sampling_date, start_date=sampling_date)
+            months_difference(end_date=LAST_SAMPLING_DATE, start_date=sampling_date)
             >= window_length
         ):
             end_date = sampling_date + relativedelta(months=window_length, day=31)
@@ -122,26 +117,24 @@ while sampling_date < last_sampling_date:
             df_estimates, df_residuals = estimate_models(ret_models, df_window)
 
             # collect
-            df_estimates = df_estimates.add_suffix("_next{}M".format(window_length))
+            df_estimates = df_estimates.add_suffix(f"_next{window_length}M")
             df_expanding_estimates = df_expanding_estimates.join(df_estimates)
 
     # store
     data.store(
         data=df_expanding_estimates,
-        path="samples/{:%Y-%m-%d}/asset_estimates.csv".format(sampling_date),
+        path=f"samples/{sampling_date:%Y-%m-%d}/asset_estimates.csv",
     )
     data.store(
         data=df_residuals,
-        path="samples/{:%Y-%m-%d}/future_daily.csv".format(sampling_date),
+        path=f"samples/{sampling_date:%Y-%m-%d}/future_daily.csv",
     )
 
     # increment monthly end of month
     print(
-        "Completed future return factor model estimation at {:%Y-%m-%d}".format(
-            sampling_date
-        )
+        f"Completed future return factor model estimation at {sampling_date:%Y-%m-%d}"
     )
-    sampling_date += relativedelta(months=1, day=31)
+    sampling_date += TIME_STEP
 
 # %% [markdown]
 # ## Variance Factor Models
@@ -151,8 +144,8 @@ while sampling_date < last_sampling_date:
 
 # %%
 # %%time
-sampling_date = first_sampling_date
-while sampling_date <= last_sampling_date:
+sampling_date = FIRST_SAMPLING_DATE
+while sampling_date <= LAST_SAMPLING_DATE:
     # get excess return samples
     df_var = data.load_historic(sampling_date=sampling_date, column="var")
     df_noisevar = data.load_historic(sampling_date=sampling_date, column="noisevar")
@@ -164,28 +157,26 @@ while sampling_date <= last_sampling_date:
     # store
     data.store(
         data=df_residuals,
-        path="samples/{:%Y-%m-%d}/historic_daily.csv".format(sampling_date),
+        path=f"samples/{sampling_date:%Y-%m-%d}/historic_daily.csv",
     )
     data.store(
         data=df_estimates,
-        path="samples/{:%Y-%m-%d}/asset_estimates.csv".format(sampling_date),
+        path=f"samples/{sampling_date:%Y-%m-%d}/asset_estimates.csv",
     )
 
     # increment monthly end of month
     print(
-        "Completed historic variance factor model estimation at {:%Y-%m-%d}".format(
-            sampling_date
-        )
+        f"Completed historic variance factor model estimation at {sampling_date:%Y-%m-%d}"
     )
-    sampling_date += relativedelta(months=1, day=31)
+    sampling_date += TIME_STEP
 
 # %% [markdown]
 # ### Forward part as expanding window
 
 # %%
 # %%time
-sampling_date = first_sampling_date
-while sampling_date < last_sampling_date:
+sampling_date = FIRST_SAMPLING_DATE
+while sampling_date < LAST_SAMPLING_DATE:
     # get excess return samples
     df_var = data.load_future(sampling_date=sampling_date, column="var")
     df_noisevar = data.load_future(sampling_date=sampling_date, column="noisevar")
@@ -195,7 +186,7 @@ while sampling_date < last_sampling_date:
     df_expanding_estimates = pd.DataFrame(index=df_future.columns)
     for window_length in range(1, 13):
         if (
-            months_difference(end_date=last_sampling_date, start_date=sampling_date)
+            months_difference(end_date=LAST_SAMPLING_DATE, start_date=sampling_date)
             >= window_length
         ):
             end_date = sampling_date + relativedelta(months=window_length, day=31)
@@ -205,23 +196,21 @@ while sampling_date < last_sampling_date:
             df_estimates, df_residuals = estimate_models(var_models, df_window)
 
             # collect
-            df_estimates = df_estimates.add_suffix("_next{}M".format(window_length))
+            df_estimates = df_estimates.add_suffix(f"_next{window_length}M")
             df_expanding_estimates = df_expanding_estimates.join(df_estimates)
 
     # store
     data.store(
         data=df_expanding_estimates,
-        path="samples/{:%Y-%m-%d}/asset_estimates.csv".format(sampling_date),
+        path=f"samples/{sampling_date:%Y-%m-%d}/asset_estimates.csv",
     )
     data.store(
         data=df_residuals,
-        path="samples/{:%Y-%m-%d}/future_daily.csv".format(sampling_date),
+        path=f"samples/{sampling_date:%Y-%m-%d}/future_daily.csv",
     )
 
     # increment monthly end of month
     print(
-        "Completed future variance factor model estimation at {:%Y-%m-%d}".format(
-            sampling_date
-        )
+        f"Completed future variance factor model estimation at {sampling_date:%Y-%m-%d}"
     )
-    sampling_date += relativedelta(months=1, day=31)
+    sampling_date += TIME_STEP
