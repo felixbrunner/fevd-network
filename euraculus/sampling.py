@@ -1,7 +1,6 @@
 """
 This module provides functionality to sample the largest companies from
 CRSP data at the end of each month.
-
 """
 
 import datetime as dt
@@ -31,7 +30,6 @@ class LargeCapSampler:
             data: DataMap to access local file system with raw data.
             back_offset: Length of period to consider before sampling date in months.
             forward_offset: Length of period to consider after sampling date in months.
-
         """
         self._data = datamap
         self.n_assets = n_assets
@@ -59,7 +57,6 @@ class LargeCapSampler:
 
         Returns:
             date: Transformed input as datetime object.
-
         """
         try:
             date = pd.to_datetime(dateinput)
@@ -81,7 +78,6 @@ class LargeCapSampler:
         Returns:
             df_back: Sampled data of the period prior to the sampling date.
             df_forward: Sampled data of the period after the sampling date.
-
         """
         # format sampling date
         sampling_date = self._prepare_date(sampling_date)  # should come in right format
@@ -116,7 +112,6 @@ class LargeCapSampler:
 
         Returns:
             has_all_days: Permno, bool pairs indicating completeness.
-
         """
         t_periods = df.index.get_level_values("date").nunique()
         has_all_days = df["retadj"].groupby("permno").count() > t_periods * required_pct
@@ -136,7 +131,6 @@ class LargeCapSampler:
 
         Returns:
             has_obs: Permno, bool pairs indicating subsequent observations.
-
         """
         permnos_back = df_back.index.get_level_values("permno").unique()
         permnos_forward = df_forward.index.get_level_values("permno").unique()
@@ -156,7 +150,6 @@ class LargeCapSampler:
 
         Returns:
             last_size: Permno, size pairs with last observed sizes.
-
         """
         last_size = (
             df["mcap"]
@@ -180,7 +173,6 @@ class LargeCapSampler:
 
         Returns:
             mean_size: Permno, size pairs with average observed sizes.
-
         """
         mean_size = df["mcap"].unstack().mean().squeeze().rename("mean_size")
         return mean_size
@@ -196,7 +188,6 @@ class LargeCapSampler:
 
         Returns:
             mean_size: Permno, size pairs with average observed sizes.
-
         """
         valuation_volatility = df["mcap"] * np.sqrt(df["var"].fillna(df["noisevar"]))
         mean_valuation_volatility = (
@@ -218,7 +209,6 @@ class LargeCapSampler:
 
         Returns:
             mean_size: Permno, size pairs with average observed sizes.
-
         """
         valuation_volatility = df["mcap"] * np.sqrt(df["var"].fillna(df["noisevar"]))
         last_valuation_volatility = (
@@ -242,7 +232,6 @@ class LargeCapSampler:
 
         Returns:
             tickers: Permno, ticker pairs from dataframe.
-
         """
         tickers = df["ticker"].unstack().tail(1).squeeze().rename("ticker")
         return tickers
@@ -257,7 +246,6 @@ class LargeCapSampler:
 
         Returns:
             comnams: Permno, company name pairs from dataframe.
-
         """
         # set up
         permnos = df.index.get_level_values("permno").unique().tolist()
@@ -289,7 +277,6 @@ class LargeCapSampler:
 
         Returns:
             df_summary: Summarizing information in tabular form.
-
         """
         # assemble statistics
         df_summary = (
@@ -355,7 +342,6 @@ class LargeCapSampler:
 
         Returns:
             permnos: Permnos of the N largest companies.
-
         """
         if not method in ["last", "mean"]:
             raise ValueError(
@@ -382,7 +368,6 @@ class LargeCapSampler:
 
         Returns:
             df_: Transformed dataframe with unique 'tickers'.
-
         """
         df_ = df.copy()
         if isinstance(df_.index, pd.MultiIndex):
@@ -416,7 +401,6 @@ class LargeCapSampler:
             df_historic: Sampled data of the period prior to the sampling date.
             df_future: Sampled data of the period after the sampling date.
             df_summary: Summary data used to determine selection.
-
         """
         # set up data
         sampling_date = self._prepare_date(sampling_date)
