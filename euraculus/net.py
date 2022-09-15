@@ -1,3 +1,5 @@
+"""This module defines the adaptive elastic net based on the glmnet routine."""
+
 import copy
 
 import glmnet_python
@@ -36,7 +38,6 @@ class ElasticNet(BaseEstimator):
                     intercept=False,
                     threshold=1e-4,
                     max_iter=1e5)
-
     """
 
     def __init__(
@@ -71,7 +72,6 @@ class ElasticNet(BaseEstimator):
 
         Returns:
             data_: The formatted data array.
-
         """
         data_ = data.astype("float64")
         if sp.sparse.issparse(data):
@@ -101,7 +101,6 @@ class ElasticNet(BaseEstimator):
         Returns:
             self : The fitted ElasticNet object.
             fit (dict): The glmnet results as obtained from the glmnet routine.
-
         """
         # dimensions
         if X.shape[0] != y.shape[0]:
@@ -149,7 +148,6 @@ class ElasticNet(BaseEstimator):
 
         Returns:
             y: Predicted values for the inputs X of shape (n_samples,).
-
         """
         X = check_array(X, accept_sparse=True)
         check_is_fitted(self, "is_fitted_")
@@ -176,7 +174,6 @@ class ElasticNet(BaseEstimator):
 
         Returns:
             score: The calculated score for the model predictions.
-
         """
         predictions = self.predict(X)
         if scorer is None:
@@ -188,71 +185,6 @@ class ElasticNet(BaseEstimator):
     def copy(self):
         """Returns a copy of the ElasticNet BaseEstimator."""
         return copy.deepcopy(self)
-
-
-#     def find_lambda_path(self, X, y, alpha=None, penalty_weights=None, nlambda=10, **kwargs):
-#         '''Uses glmnet API to find a plausible path for lambda.
-#         '''
-#         # dimensions
-#         assert X.shape[0] == y.shape[0], \
-#             'data dimension mismatch'
-#
-#         n_obs = y.shape[0]
-#         n_feat = X.shape[1]
-#
-#         # set penalty weights
-#         if penalty_weights is None:
-#             penalty_weights = np.ones([n_feat])
-#
-#         # set alpha
-#         if alpha is None:
-#             alpha = self.alpha
-#
-#         # transform inputs for glmnet
-#         X = self._fix_data(X)
-#         y = self._fix_data(y)
-#
-#         # estimate
-#         fit = glmnet(x=X,
-#                      y=y,
-#                      alpha=alpha,                    # corresponds to kappa hyperparameter
-#                      nlambda=nlambda,                # maximum size of lambda search grid
-#                      standardize=self.standardize,   # standardise data before optimisation
-#                      penalty_factor=penalty_weights, # coefficient penalty weight
-#                      intr=self.intercept,            # intercept
-#                      thresh=self.threshold,          # convergence threshold
-#                      maxit=self.max_iter,            # maximum number of iterations
-#                     )
-#         lambda_path = fit['lambdau']
-#         return lambda_path
-
-
-#     def find_lambda(self, X, y, lambda_grid=[1], alpha=None, penalty_weights=None, split=None, **kwargs):
-#         '''Finds the best lambda among a list of alternatives.
-#         Uses 2-fold cross-validation with alternating sampling by default.
-#         '''
-#         # set up net
-#         elnet = self.copy()
-#         if alpha:
-#             elnet.alpha = alpha
-#
-#         # set grid
-#         if type(lambda_grid) == np.ndarray:
-#             lambda_grid = lambda_grid.tolist()
-#         grid = {'lambdau': lambda_grid}
-#
-#         # set split
-#         if split is None:
-#             split = PredefinedSplit([0, 1]*(len(y)//2))
-#         cv = GridSearchCV(elnet, grid, cv=split, **kwargs)
-#
-#         # fit
-#         cv.fit(X, y, penalty_weights=penalty_weights, refit=False)
-#
-#         # extract
-#         lambdau = grid['lambdau'][cv.best_index_]
-#
-#         return lambdau
 
 
 class AdaptiveElasticNet(ElasticNet):
@@ -273,7 +205,6 @@ class AdaptiveElasticNet(ElasticNet):
         intercept: Indicates whether to include an intercept, default=False.
         threshold: Optimisation convergence threshold, defaut=1e-4.
         max_iter: Maximum number of iterations, default=1e5.
-
     """
 
     def __init__(
@@ -333,7 +264,6 @@ class AdaptiveElasticNet(ElasticNet):
         Returns:
             grid: Dictionary with candidate hyperparameter values for alpha
                 and lambdau.
-
         """
         # limits
         lower = y.std() / X.shape[1]
@@ -378,7 +308,6 @@ class AdaptiveElasticNet(ElasticNet):
             grid: Dictionary with candidate hyperparameter values for alpha
                 and lambdau.
             split: Number of splits to use for cross-validation.
-
         """
         if penalty_weights is not None:
             penalise = penalty_weights != 0
@@ -447,7 +376,6 @@ class AdaptiveElasticNet(ElasticNet):
             self : The fitted AdaptiveElasticNet object.
             fit (dict): The glmnet results as obtained from the glmnet routine
                 of the second estiamtion step.
-
         """
         # update penalty weights if not available or user forced
         if self.penalty_weights is None or force_update:
