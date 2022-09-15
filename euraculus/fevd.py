@@ -17,7 +17,6 @@ class FEVD:
         n_series: The number of series.
         p_lags: The order of the VAR(p).
         generalized_error_cov: The generalized innovation covariance matrix.
-
     """
 
     def __init__(
@@ -30,7 +29,6 @@ class FEVD:
         Args:
             var_matrices: The vector auto-regression coefficient matrices.
             error_cov: The innovation covariance matrix.
-
         """
         self.var_matrices = var_matrices
         self.error_cov = error_cov
@@ -52,7 +50,6 @@ class FEVD:
 
         Args:
             var_matrices: The vector auto-regression coefficient matrices.
-
         """
         for var_matrix in var_matrices:
             assert type(var_matrix) == np.ndarray, "VAR matrices must be numpy arrays"
@@ -96,7 +93,6 @@ class FEVD:
 
         Returns:
             phi_h: h-step VMA matrix (n_series * n_series).
-
         """
         assert (
             type(horizon) == int and horizon >= 0
@@ -136,7 +132,6 @@ class FEVD:
 
         Returns:
             psi_h: h-step impulse response matrix (n_series * n_series).
-
         """
         assert (
             type(horizon) == int and horizon >= 0
@@ -165,7 +160,6 @@ class FEVD:
 
         Returns:
             irv_h: h-step innovation response variances (n_series * n_series).
-
         """
         assert (
             type(horizon) == int and horizon >= 0
@@ -189,7 +183,6 @@ class FEVD:
 
         Returns:
             fev_h: h-step forecast error variance matrix (n_series * n_series).
-
         """
         assert (
             type(horizon) == int and horizon >= 0
@@ -215,7 +208,6 @@ class FEVD:
 
         Returns:
             mse_h: h-step mean squared error vector (n_series * 1).
-
         """
         assert (
             type(horizon) == int and horizon >= 0
@@ -248,7 +240,6 @@ class FEVD:
 
         Returns:
             fevd: Forecast error variance decomposition (n_series * n_series).
-
         """
         assert (
             type(horizon) == int and horizon >= 0
@@ -274,7 +265,6 @@ class FEVD:
 
         Returns:
             fu_h: h-step forecast uncertainty matrix (n_series * n_series).
-
         """
         fu_h = self.forecast_error_variances(horizon) ** 0.5
         return fu_h
@@ -290,7 +280,6 @@ class FEVD:
 
         Returns:
             mae_h: h-step mean absolute forecast error vector (n_series * 1).
-
         """
         mae_h = self.mean_squared_errors(horizon) ** 0.5
         return mae_h
@@ -310,7 +299,6 @@ class FEVD:
 
         Returns:
             fud: Forecast uncertainty decomposition (n_series * n_series).
-
         """
         assert (
             type(horizon) == int and horizon >= 0
@@ -338,7 +326,6 @@ class FEVD:
 
         Returns:
             table: The requested (n_series * n_series) connectedness table.
-
         """
         # verify inputs
         assert (
@@ -392,7 +379,6 @@ class FEVD:
 
         Returns:
             in_connectedness: A (n_series * 1) vector with connectedness values.
-
         """
         table = self._get_table(
             name=table_name,
@@ -423,7 +409,6 @@ class FEVD:
 
         Returns:
             out_connectedness: A (n_series * 1) vector with connectedness values.
-
         """
         table = self._get_table(
             name=table_name,
@@ -442,6 +427,7 @@ class FEVD:
         horizon: int,
         table_name: str = "fevd",
         normalize: bool = False,
+        **kwargs,
     ) -> np.ndarray:
         """Get the links of each node with itself.
 
@@ -453,7 +439,6 @@ class FEVD:
 
         Returns:
             self_connectedness: A (n_series * 1) vector with connectedness values.
-
         """
         table = self._get_table(
             name=table_name,
@@ -481,7 +466,6 @@ class FEVD:
 
         Returns:
             total_connectedness: A (n_series * 1) vector with connectedness values.
-
         """
         # collect arguments to pass
         kwargs = locals()
@@ -495,6 +479,72 @@ class FEVD:
             kwargs.pop("others_only")
             total_connectedness -= self.self_connectedness(**kwargs)
         return total_connectedness
+
+    def amplification_factor(
+        self,
+        horizon: int,
+        table_name: str = "fevd",
+        others_only: bool = False,
+        normalize: bool = False,
+    ) -> np.ndarray:
+        """Get the amplification factors of each node.
+
+        amplification factor = (out_connectedness + self_connectedness)
+            / (in_connectedness + self_connectedness)
+
+        The inclusion of self_connectedness can be turned off with others_only=True.
+
+        Args:
+            table_name: Abbreviated name of the table.
+            horizon: Number of periods to compute the table.
+            others_only: Indicates wheter to include self-linkages.
+            normalize: Indicates if table should be row-normalized.
+
+        Returns:
+            amplification_factor: A (n_series * 1) vector with amplifier values.
+        """
+        # collect arguments to pass
+        kwargs = locals()
+        kwargs.pop("self")
+
+        # calculate
+        amplification_factor = self.out_connectedness(**kwargs) / self.in_connectedness(
+            **kwargs
+        )
+        return amplification_factor
+
+    def absorption_rate(
+        self,
+        horizon: int,
+        table_name: str = "fevd",
+        others_only: bool = False,
+        normalize: bool = False,
+    ) -> np.ndarray:
+        """Get the absorption rates of each node.
+
+        absorption rate = self_connectedness / (in_connectedness + self_connectedness)
+
+        The inclusion of self_connectedness in the denominator can be turned
+        off with others_only=True.
+
+        Args:
+            table_name: Abbreviated name of the table.
+            horizon: Number of periods to compute the table.
+            others_only: Indicates wheter to include self-linkages in denominator.
+            normalize: Indicates if table should be row-normalized.
+
+        Returns:
+            absorption_rate: A (n_series * 1) vector with absorption rates.
+        """
+        # collect arguments to pass
+        kwargs = locals()
+        kwargs.pop("self")
+
+        # calculate
+        absorption_rate = self.self_connectedness(**kwargs) / self.in_connectedness(
+            **kwargs
+        )
+        return absorption_rate
 
     def average_connectedness(
         self,
@@ -513,7 +563,6 @@ class FEVD:
 
         Returns:
             average_connectedness: Average connectedness value in the table.
-
         """
         # collect arguments to pass
         kwargs = locals()
@@ -543,7 +592,6 @@ class FEVD:
 
         Returns:
             in_concentration: A (n_series * 1) vector with concentration values.
-
         """
         if measure not in ["power_law_exponent", "herfindahl_index", "entropy"]:
             raise ValueError(
@@ -597,7 +645,6 @@ class FEVD:
 
         Returns:
             out_concentration: A (n_series * 1) vector with concentration values.
-
         """
         if measure not in ["power_law_exponent", "herfindahl_index", "entropy"]:
             raise ValueError(
@@ -647,7 +694,6 @@ class FEVD:
 
         Returns:
             graph: The connectedness table as a networkx DiGraph object.
-
         """
         table = self._get_table(
             name=table_name,
@@ -655,7 +701,7 @@ class FEVD:
             normalize=normalize,
         )
         graph = nx.convert_matrix.from_numpy_array(table, create_using=nx.DiGraph)
-        return graph
+        return graph.reverse()
 
     def in_eigenvector_centrality(
         self,
@@ -672,22 +718,21 @@ class FEVD:
 
         Returns:
             in_centrality: A (n_series * 1) vector with centrality values.
-
         """
-        graph = self.to_graph(
-            table_name=table_name,
+        # retrieve inputs
+        table = self._get_table(
+            name=table_name,
             horizon=horizon,
             normalize=normalize,
         )
-        try:
-            in_centrality = nx.centrality.eigenvector_centrality_numpy(
-                graph, weight="weight", max_iter=500
-            )
-        except PowerIterationFailedConvergence:
-            warnings.warn("in-eigenvector-centrality calculation did not converge")
-            in_centrality = {node: np.nan for node in list(graph.nodes)}
-        in_centrality = np.fromiter(in_centrality.values(), dtype=float).reshape(-1, 1)
-        return in_centrality
+
+        # compute the largest right eigenvector
+        eigenvalues, eigenvectors = np.linalg.eig(table)
+        idx = np.argmax(eigenvalues)
+        in_page_rank = eigenvectors[:, idx].flatten().real
+        in_page_rank *= np.sign(in_page_rank.sum())
+
+        return in_page_rank.reshape(-1, 1)
 
     def out_eigenvector_centrality(
         self,
@@ -704,30 +749,29 @@ class FEVD:
 
         Returns:
             out_centrality: A (n_series * 1) vector with centrality values.
-
         """
-        graph = self.to_graph(
-            table_name=table_name,
+        # retrieve inputs
+        table = self._get_table(
+            name=table_name,
             horizon=horizon,
             normalize=normalize,
-        ).reverse()
-        try:
-            out_centrality = nx.centrality.eigenvector_centrality_numpy(
-                graph, weight="weight", max_iter=500
-            )
-        except PowerIterationFailedConvergence:
-            warnings.warn("out-eigenvector-centrality calculation did not converge")
-            out_centrality = {node: np.nan for node in list(graph.nodes)}
-        out_centrality = np.fromiter(out_centrality.values(), dtype=float).reshape(
-            -1, 1
         )
-        return out_centrality
+
+        # compute the largest left eigenvector
+        eigenvalues, eigenvectors = np.linalg.eig(table.T)
+        idx = np.argmax(eigenvalues)
+        out_page_rank = eigenvectors[:, idx].flatten().real
+        out_page_rank *= np.sign(out_page_rank.sum())
+
+        return out_page_rank.reshape(-1, 1)
 
     def in_page_rank(
         self,
         horizon: int,
         table_name: str = "fevd",
         normalize: bool = False,
+        alpha: float = 0.85,
+        weights: np.ndarray = None,
     ) -> np.ndarray:
         """Calculate the page rank of incoming links per node (row-wise).
 
@@ -735,54 +779,94 @@ class FEVD:
             table_name: Abbreviated name of the table.
             horizon: Number of periods to compute the table.
             normalize: Indicates if table should be row-normalized.
+            alpha: Damping parameter for PageRank, default=0.85.
+            weights: Probabilities of starting in a node (personalization).
 
         Returns:
             in_rank: A (n_series * 1) vector with centrality values.
-
         """
-        graph = self.to_graph(
-            table_name=table_name,
+        # retrieve inputs
+        table = self._get_table(
+            name=table_name,
             horizon=horizon,
             normalize=normalize,
         )
-        try:
-            in_rank = nx.pagerank_numpy(graph, weight="weight", alpha=0.85)
-        except PowerIterationFailedConvergence:
-            warnings.warn("in-page-rank calculation did not converge")
-            in_rank = {node: np.nan for node in list(graph.nodes)}
-        in_rank = np.fromiter(in_rank.values(), dtype=float).reshape(-1, 1)
-        return in_rank
+        out_connectedness = self.out_connectedness(
+            table_name=table_name,
+            horizon=horizon,
+            normalize=normalize,
+            others_only=False,
+        )
+
+        # normalize weights
+        if weights is None:
+            weights = np.ones([self.n_series, 1])
+        weights /= weights.sum()
+
+        # calculate google matrix
+        google_matrix = alpha * table @ np.linalg.inv(
+            np.diag(out_connectedness.squeeze())
+        ) + (1 - alpha) * weights @ np.ones([1, self.n_series])
+
+        # compute the largest right eigenvector
+        eigenvalues, eigenvectors = np.linalg.eig(google_matrix)
+        idx = np.argmax(eigenvalues)
+        in_page_rank = eigenvectors[:, idx].flatten().real
+        in_page_rank *= np.sign(in_page_rank.sum())
+
+        return in_page_rank.reshape(-1, 1)
 
     def out_page_rank(
         self,
         horizon: int,
         table_name: str = "fevd",
         normalize: bool = False,
+        alpha: float = 0.85,
+        weights: np.ndarray = None,
     ) -> np.ndarray:
-        """Calculate the page rank of outgoing links per node (column-wise).
+        """Calculate the page rank of incoming links per node (row-wise).
 
         Args:
             table_name: Abbreviated name of the table.
             horizon: Number of periods to compute the table.
-            others_only: Indicates wheter to include self-linkages.
             normalize: Indicates if table should be row-normalized.
+            alpha: Damping parameter for PageRank, default=0.85.
+            weights: Probabilities of starting in a node (personalization).
 
         Returns:
-            out_rank: A (n_series * 1) vector with centrality values.
-
+            in_rank: A (n_series * 1) vector with centrality values.
         """
-        graph = self.to_graph(
+        # retrieve inputs
+        table = self._get_table(
+            name=table_name,
+            horizon=horizon,
+            normalize=normalize,
+        )
+        in_connectedness = self.in_connectedness(
             table_name=table_name,
             horizon=horizon,
             normalize=normalize,
-        ).reverse()
-        try:
-            out_rank = nx.pagerank_numpy(graph, weight="weight", alpha=0.85)
-        except PowerIterationFailedConvergence:
-            warnings.warn("out-page-rank calculation did not converge")
-            out_rank = {node: np.nan for node in list(graph.nodes)}
-        out_rank = np.fromiter(out_rank.values(), dtype=float).reshape(-1, 1)
-        return out_rank
+            others_only=False,
+        )
+
+        # normalize weights
+        if weights is None:
+            weights = np.ones([self.n_series, 1])
+        weights /= weights.sum()
+
+        # calculate google matrix
+        google_matrix = (
+            alpha * np.linalg.inv(np.diag(in_connectedness.squeeze())) @ table
+            + (1 - alpha) * np.ones([self.n_series, 1]) @ weights.T
+        )
+
+        # compute the largest left eigenvector
+        eigenvalues, eigenvectors = np.linalg.eig(google_matrix.T)
+        idx = np.argmax(eigenvalues)
+        out_page_rank = eigenvectors[:, idx].flatten().real
+        out_page_rank *= np.sign(out_page_rank.sum())
+
+        return out_page_rank.reshape(-1, 1)
 
     @property
     def generalized_error_cov(self) -> np.ndarray:
@@ -792,7 +876,6 @@ class FEVD:
 
         Returns:
             omega: The generalized error covariance.
-
         """
         omega = (
             np.diag(np.diag(self.error_cov)) ** 0.5
@@ -821,7 +904,6 @@ class FEVD:
         Returns:
             test_statistic (float): The calculated test statistic.
             p_value (float): The corresponding p-value of the test.
-
         """
         assert method in [
             "ledoit-wolf",
