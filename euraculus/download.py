@@ -147,6 +147,7 @@ class WRDSDownloader:
             SELECT
             dsf.date,
             dsf.permno,
+            dsf.permco,
             mn.ticker,
             mn.siccd AS crsp_sic,
             COALESCE(cn1.sic, cn2.sic) AS comp_sic,
