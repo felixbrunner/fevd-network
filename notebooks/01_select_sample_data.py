@@ -21,6 +21,7 @@ from euraculus.settings import (
     FIRST_SAMPLING_DATE,
     LAST_SAMPLING_DATE,
     TIME_STEP,
+    SAMPLING_VARIABLE,
 )
 
 # %% [markdown]
@@ -44,7 +45,7 @@ sampling_date = dt.datetime(year=2021, month=12, day=31)
 
 # %%
 # %%time
-df_historic, df_future, df_summary = sampler.sample(sampling_date)
+df_historic, df_future, df_summary = sampler.sample(sampling_date=sampling_date, sampling_variable=SAMPLING_VARIABLE)
 df_estimates = df_summary.loc[df_historic.index.get_level_values("permno").unique()]
 df_estimates["ticker"] = df_historic["ticker"].unstack().iloc[-1, :].values
 df_estimates["sic"] = (

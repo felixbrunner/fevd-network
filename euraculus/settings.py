@@ -13,7 +13,10 @@ FIRST_SAMPLING_DATE = dt.datetime(year=1990, month=1, day=31)
 LAST_SAMPLING_DATE = dt.datetime(year=2021, month=12, day=31)
 TIME_STEP = relativedelta(months=1, day=31)
 
-# parameters
+# sampling
+SAMPLING_VARIABLE = "mcap"
+
+# estimation
 FACTORS = ["crsp"]
 VAR_GRID = {
     "alpha": np.geomspace(1e-4, 1e0, 13),

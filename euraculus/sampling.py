@@ -100,6 +100,47 @@ class LargeCapSampler:
         return (df_back, df_forward)
 
     @staticmethod
+    def _aggregate_permco(
+        df: pd.DataFrame, selected_permnos: list = None
+    ) -> pd.DataFrame:
+        """Aggregate CRSP data to permco level.
+
+        The selected data will be the security (permno) with the highest median variance per
+        company (permco). A column 'permco_mcap' will be added with the aggregated market capitalization.
+
+        Args:
+            df: Dataframe with CRSP data.
+            selected_permnos: Optional list of permnos to select.
+
+        Returns:
+            df_aggregated: Transformed dataframe.
+        """
+
+        # select permnos with largest median variance
+        if selected_permnos is None:
+            median_variances = df.groupby(["permco", "permno"])["var"].median()
+            selected_permnos = median_variances.index.get_level_values("permno")[
+                median_variances.groupby("permco").transform(max) == median_variances
+            ].tolist()
+
+        # aggregate
+        df_aggregated = (
+            df[df.index.get_level_values("permno").isin(selected_permnos)]
+            .rename(columns={"mcap": "permno_mcap"})
+            .reset_index()
+        )
+        aggregated_mcap = df.groupby(["date", "permco"])["mcap"].sum()
+        df_aggregated = df_aggregated.merge(
+            aggregated_mcap,
+            how="left",
+            on=["date", "permco"],
+            # right_on=["date", "permco"],
+            # left_index=True,
+        ).set_index(["date", "permno"])
+
+        return df_aggregated, selected_permnos
+
+    @staticmethod
     def _has_all_days(df: pd.DataFrame, required_pct: float = 0.99) -> pd.Series:
         """Check data completeness.
 
@@ -139,7 +180,7 @@ class LargeCapSampler:
         return has_obs
 
     @staticmethod
-    def _get_last_sizes(df: pd.DataFrame) -> pd.Series:
+    def _get_last_mcaps(df: pd.DataFrame) -> pd.Series:
         """Get last firm sizes from dataset.
 
         Create a series of last observed market capitalisation for
@@ -149,21 +190,21 @@ class LargeCapSampler:
             df: CRSP data with column 'mcap'.
 
         Returns:
-            last_size: Permno, size pairs with last observed sizes.
+            last_mcap: Permno, mcap pairs with last observed sizes.
         """
-        last_size = (
+        last_mcap = (
             df["mcap"]
             .unstack()
             .sort_index()
             .fillna(method="ffill", limit=1)
             .tail(1)
             .squeeze()
-            .rename("last_size")
+            .rename("last_mcap")
         )
-        return last_size
+        return last_mcap
 
     @staticmethod
-    def _get_mean_sizes(df: pd.DataFrame) -> pd.Series:
+    def _get_mean_mcaps(df: pd.DataFrame) -> pd.Series:
         """Get average firm sizes from dataset.
 
         Return a series of average market capitalisations for contained permnos.
@@ -172,14 +213,14 @@ class LargeCapSampler:
             df : CRSP data with column 'mcap'.
 
         Returns:
-            mean_size: Permno, size pairs with average observed sizes.
+            mean_mcap: Permno, mcap pairs with average observed sizes.
         """
-        mean_size = df["mcap"].unstack().mean().squeeze().rename("mean_size")
-        return mean_size
+        mean_mcap = df["mcap"].unstack().mean().squeeze().rename("mean_mcap")
+        return mean_mcap
 
     @staticmethod
     def _get_mean_valuation_volatility(df: pd.DataFrame) -> pd.Series:
-        """Get average firm sizes from dataset.
+        """Get average firm valuation volatilities from dataset.
 
         Return a series of average market capitalisations for contained permnos.
 
@@ -187,7 +228,7 @@ class LargeCapSampler:
             df : CRSP data with column 'mcap'.
 
         Returns:
-            mean_size: Permno, size pairs with average observed sizes.
+            mean_valuation_volatility: Permno, valuation_volatility pairs with average observed vv.
         """
         valuation_volatility = df["mcap"] * np.sqrt(df["var"].fillna(df["noisevar"]))
         mean_valuation_volatility = (
@@ -200,7 +241,7 @@ class LargeCapSampler:
 
     @staticmethod
     def _get_last_valuation_volatility(df: pd.DataFrame) -> pd.Series:
-        """Get average firm sizes from dataset.
+        """Get average firm valuation volatilities from dataset.
 
         Return a series of average market capitalisations for contained permnos.
 
@@ -208,7 +249,7 @@ class LargeCapSampler:
             df : CRSP data with column 'mcap'.
 
         Returns:
-            mean_size: Permno, size pairs with average observed sizes.
+            mean_valuation_volatility: Permno, valuation volatilities pairs with average observed vv.
         """
         valuation_volatility = df["mcap"] * np.sqrt(df["var"].fillna(df["noisevar"]))
         last_valuation_volatility = (
@@ -257,19 +298,15 @@ class LargeCapSampler:
         return company_names
 
     def _describe_sampling_data(
-        self, df_back: pd.DataFrame, df_forward: pd.DataFrame
+        self,
+        df_back: pd.DataFrame,
+        df_forward: pd.DataFrame,
+        characteristic: str = "mcap",
     ) -> pd.DataFrame:
         """Create summary statistics for the financial data provided.
 
         Return a summaring dataframe where the index consists
         of the permnos present in the dataframe.
-        Columns are:
-            ticker
-            has_all_days
-            has_obs
-            last_size
-            mean_size
-            size_rank
 
         Args:
             df_back: CRSP data of the period prior to the sampling date.
@@ -285,8 +322,8 @@ class LargeCapSampler:
             .join(self._get_company_names(df_back))
             .join(self._has_all_days(df_back))
             .join(self._has_obs(df_back, df_forward).rename("has_next_obs"))
-            .join(self._get_last_sizes(df_back))
-            .join(self._get_mean_sizes(df_back))
+            .join(self._get_last_mcaps(df_back))
+            .join(self._get_mean_mcaps(df_back))
             .join(self._get_last_valuation_volatility(df_back))
             .join(self._get_mean_valuation_volatility(df_back))
         )
@@ -295,15 +332,15 @@ class LargeCapSampler:
         if not any(df_summary["has_next_obs"]):
             df_summary["has_next_obs"] = True
 
-        # cross-sectional size rank
-        df_summary["last_size_rank"] = (
-            df_summary["last_size"]
+        # cross-sectional ranks
+        df_summary["last_mcap_rank"] = (
+            df_summary["last_mcap"]
             .where(df_summary["has_all_days"])
             .where(df_summary["has_next_obs"])
             .rank(ascending=False)
         )
-        df_summary["mean_size_rank"] = (
-            df_summary["mean_size"]
+        df_summary["mean_mcap_rank"] = (
+            df_summary["mean_mcap"]
             .where(df_summary["has_all_days"])
             .where(df_summary["has_next_obs"])
             .rank(ascending=False)
@@ -327,7 +364,7 @@ class LargeCapSampler:
         self,
         df_summary: pd.DataFrame,
         method: str = "mean",
-        characteristic: str = "valuation_volatility",
+        characteristic: str = "mcap",
     ) -> list:
         """Pick N lagest companies.
 
@@ -389,13 +426,16 @@ class LargeCapSampler:
 
         return df_
 
-    def sample(self, sampling_date: str) -> tuple:
+    def sample(
+        self, sampling_date: str, method: str = "mean", sampling_variable: str = "mcap"
+    ) -> tuple:
         """Preprocess CRSP data to provide sample of large caps.
 
         Prepare asset return and variance datasets for a specified sampling date.
 
         Args:
            sampling_date: Sampling date as dt.datetime or string, e.g. format 'YYYY-MM-DD'.
+           sampling_variable: The variable to use for sample selection.
 
         Returns:
             df_historic: Sampled data of the period prior to the sampling date.
@@ -405,10 +445,16 @@ class LargeCapSampler:
         # set up data
         sampling_date = self._prepare_date(sampling_date)
         df_historic, df_future = self._load_sampling_data(sampling_date)
+        df_historic, selected_permnos = self._aggregate_permco(df_historic)
+        df_future, _ = self._aggregate_permco(
+            df_future, selected_permnos=selected_permnos
+        )
 
         # select assets
         df_summary = self._describe_sampling_data(df_historic, df_future)
-        permnos = self._select_largest(df_summary, method="mean")
+        permnos = self._select_largest(
+            df_summary, method=method, characteristic=sampling_variable
+        )
 
         # slice
         df_historic = (
