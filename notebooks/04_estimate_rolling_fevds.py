@@ -57,14 +57,14 @@ sampling_date = dt.datetime(year=2021, month=12, day=31)
 # %%
 # %%time
 # load data
-df_info, df_log_mcap_vola, df_factors = load_estimation_data(
+df_info, df_log_vola, df_factors = load_estimation_data(
     data=data, sampling_date=sampling_date
 )
-df_pca = construct_pca_factors(df=df_log_mcap_vola, n_factors=1)
+df_pca = construct_pca_factors(df=df_log_vola, n_factors=1)
 df_factors = df_factors.join(df_pca)
 
 # estimate
-var_data = df_log_mcap_vola
+var_data = df_log_vola
 factor_data = df_factors[FACTORS]
 var_cv, var, cov_cv, cov, fevd = estimate_fevd(
     var_data=var_data,
@@ -87,14 +87,14 @@ residuals = var.residuals(var_data=var_data, factor_data=factor_data)
 sampling_date = FIRST_SAMPLING_DATE
 while sampling_date <= LAST_SAMPLING_DATE:
     # load data
-    df_info, df_log_mcap_vola, df_factors = load_estimation_data(
+    df_info, df_log_vola, df_factors = load_estimation_data(
         data=data, sampling_date=sampling_date
     )
-    df_pca = construct_pca_factors(df=df_log_mcap_vola, n_factors=1)
+    df_pca = construct_pca_factors(df=df_log_vola, n_factors=1)
     df_factors = df_factors.join(df_pca)
 
     # estimate
-    var_data = df_log_mcap_vola
+    var_data = df_log_vola
     factor_data = df_factors[FACTORS]
     var_cv, var, cov_cv, cov, fevd = estimate_fevd(
         var_data=var_data,
@@ -138,6 +138,9 @@ cov_cv = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/cov_cv.pkl")
 cov = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/cov.pkl")
 fevd = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/fevd.pkl")
 residuals = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/residuals.pkl")
+weights = data.load_asset_estimates(
+    sampling_date=sampling_date, columns=["mean_mcap"]
+).values.reshape(-1, 1)
 
 # collect estimation statistics
 stats = describe_data(var_data)
@@ -145,16 +148,14 @@ stats.update(
     describe_var(var=var, var_cv=var_cv, var_data=var_data, factor_data=factor_data)
 )
 stats.update(describe_cov(cov=cov, cov_cv=cov_cv, data=residuals))
-stats.update(describe_fevd(fevd=fevd, horizon=HORIZON, data=var_data))
-# stats = {key + '_factor': value for key, value in stats.items()}
+stats.update(describe_fevd(fevd=fevd, horizon=HORIZON, data=var_data, weights=weights))
 
 # collect estimates
 estimates = collect_var_estimates(var=var, var_data=var_data, factor_data=factor_data)
 estimates = estimates.join(collect_cov_estimates(cov=cov, data=residuals))
 estimates = estimates.join(
-    collect_fevd_estimates(fevd=fevd, horizon=HORIZON, data=var_data)
+    collect_fevd_estimates(fevd=fevd, horizon=HORIZON, data=var_data, weights=weights)
 )
-# estimates = estimates.add_suffix("_factor")
 
 # %% [markdown]
 # ### Rolling Window
@@ -178,6 +179,9 @@ while sampling_date <= LAST_SAMPLING_DATE:
     cov = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/cov.pkl")
     fevd = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/fevd.pkl")
     residuals = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/residuals.pkl")
+    weights = data.load_asset_estimates(
+        sampling_date=sampling_date, columns=["mean_mcap"]
+    ).values.reshape(-1, 1)
 
     # collect estimation statistics
     stats = describe_data(var_data)
@@ -185,7 +189,9 @@ while sampling_date <= LAST_SAMPLING_DATE:
         describe_var(var=var, var_cv=var_cv, var_data=var_data, factor_data=factor_data)
     )
     stats.update(describe_cov(cov=cov, cov_cv=cov_cv, data=residuals))
-    stats.update(describe_fevd(fevd=fevd, horizon=HORIZON, data=var_data))
+    stats.update(
+        describe_fevd(fevd=fevd, horizon=HORIZON, data=var_data, weights=weights)
+    )
 
     # collect estimates
     estimates = collect_var_estimates(
@@ -193,7 +199,9 @@ while sampling_date <= LAST_SAMPLING_DATE:
     )
     estimates = estimates.join(collect_cov_estimates(cov=cov, data=residuals))
     estimates = estimates.join(
-        collect_fevd_estimates(fevd=fevd, horizon=HORIZON, data=var_data)
+        collect_fevd_estimates(
+            fevd=fevd, horizon=HORIZON, data=var_data, weights=weights
+        )
     )
 
     # store
