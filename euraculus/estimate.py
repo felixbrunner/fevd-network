@@ -1,6 +1,5 @@
 import warnings
 from dateutil.relativedelta import relativedelta
-from string import ascii_uppercase as ALPHABET
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -11,36 +10,15 @@ from euraculus.data import DataMap
 from euraculus.var import FactorVAR
 from euraculus.covar import GLASSO
 from euraculus.fevd import FEVD
-from euraculus.utils import matrix_asymmetry, shrinkage_factor, herfindahl_index
+from euraculus.utils import (
+    matrix_asymmetry,
+    shrinkage_factor,
+    herfindahl_index,
+    power_law_exponent,
+)
 import datetime as dt
 
 import euraculus
-
-
-def make_tickers_unique(tickers: pd.Series) -> pd.Series:
-    """Adds alphabetic suffixes to duplicate tickers.
-
-    If tickers are not unique, add .<ALPHA> to duplicate tickers.
-
-    Args:
-        tickers: Series with tickers as values.
-
-    Args:
-        tickers: Series of unique tickers.
-
-    """
-    # find indices for each unique ticker
-    for ticker in set(tickers):
-        ticker_indices = [
-            col for (col, value) in tickers.iteritems() if value == ticker
-        ]
-
-        # append if duplicate
-        if len(ticker_indices) > 1:
-            for occurence, ticker_index in enumerate(ticker_indices):
-                tickers.at[ticker_index] += "." + ALPHABET[occurence]
-
-    return tickers
 
 
 def map_columns(
@@ -60,7 +38,7 @@ def map_columns(
 
     """
     df_ = df.rename(columns=dict(mapping))
-    df_.columns.name = "ticker"
+    df_.columns.name = mapping_name
 
     return df_
 
@@ -137,7 +115,7 @@ def log_replace(df: pd.DataFrame, method: str = "min") -> pd.DataFrame:
 
 
 def construct_crsp_index(sampling_date: dt.datetime, data: DataMap) -> pd.Series:
-    """Constructs an equally weighted log wealth volatility index across the CRSP universe.
+    """Constructs an equally weighted log valuation volatility index across the CRSP universe.
 
     Args:
         data: DataMap to load data from.
@@ -201,9 +179,19 @@ def load_estimation_data(data: DataMap, sampling_date: dt.datetime) -> dict:
     df_mcap = data.load_historic(sampling_date=sampling_date, column="mcap")
     df_info = data.load_asset_estimates(
         sampling_date=sampling_date,
-        columns=["ticker", "comnam", "last_size", "mean_size"],
+        columns=[
+            "ticker",
+            "comnam",
+            "last_mcap",
+            "mean_mcap",
+            "last_valuation_volatility",
+            "mean_valuation_volatility",
+            "sic_division",
+            "ff_sector",
+            "ff_sector_ticker",
+            "gics_sector",
+        ],
     )
-    df_info["ticker"] = make_tickers_unique(df_info["ticker"])
 
     # prepare asset data
     df_vola = np.sqrt(df_var)
@@ -239,7 +227,7 @@ def load_estimation_data(data: DataMap, sampling_date: dt.datetime) -> dict:
     spy_factor = prepare_spy_factor(df_spy)
     df_factors = df_factors.join(spy_factor)
 
-    ew_factor = prepare_ew_factor(df_log_mcap_vola)
+    ew_factor = prepare_ew_factor(df_log_vola)  ##
     df_factors = df_factors.join(ew_factor)
 
     crsp_factor = construct_crsp_index(sampling_date=sampling_date, data=data)
@@ -250,7 +238,7 @@ def load_estimation_data(data: DataMap, sampling_date: dt.datetime) -> dict:
         factor = prepare_yahoo_factor(df_yahoo).rename(ticker)
         df_factors = df_factors.join(factor)
 
-    return (df_info, df_log_mcap_vola, df_factors)
+    return (df_info, df_log_vola, df_factors)  ##
 
 
 def construct_pca_factors(df: pd.DataFrame, n_factors: int) -> pd.DataFrame:
@@ -309,17 +297,17 @@ def estimate_fevd(
     """Perform all estimation steps necessary to construct FEVD.
 
     Args:
-        var_data:
-        factor_data:
-        var_grid:
-        cov_grid:
+        var_data: Dataframe with the data panel for the VAR.
+        factor_data: Dataframe with the control factor data.
+        var_grid: Grid with VAR hyperparameters.
+        cov_grid: Grid with covariance hyperparameters.
 
     Returns:
-        var_cv:
-        var:
-        cov_cv:
-        cov:
-        fevd:
+        var_cv: Cross-validation object for VAR.
+        var: The estimated VAR object.
+        cov_cv: Cross-validation object for the covariance.
+        cov: The estimated covariance object.
+        fevd: The constructed FEVD from the estimates.
 
     """
 
@@ -545,40 +533,18 @@ def describe_fevd(
     fevd: euraculus.fevd.FEVD,
     horizon: int,
     data: pd.DataFrame,
+    weights: np.ndarray,
 ) -> dict:
-    """Creates descriptive statistics of a GLASSO Covariance estimation.
+    """Creates descriptive statistics of a FEVD.
 
-    Calculates the following statistics:
-        fevd_avg_connectedness: Average connectedness of FEVD table.
-        fevd_avg_connectedness_normalized: Average connectedness of row-normalized FEVD table.
-        fev_avg_connectedness: Average connectedness of FEV table.
-        irv_avg_connectedness: Average connectedness of IRV table.
-        fevd_asymmetry: Asymmetry of FEVD table.
-        fevd_asymmetry_normalized: Asymmetry of row-normalized FEVD table.
-        fev_asymmetry: Asymmetry of FEV table.
-        irv_asymmetry: Asymmetry of IRV table.
-        fevd_asymmetry_offdiag: Off-diagonal asymmetry of FEVD table.
-        fevd_asymmetry_normalized_offdiag: Off-diagonal asymmetry of row-normalized FEVD table.
-        fev_asymmetry_offdiag: Off-diagonal asymmetry of FEV table.
-        irv_asymmetry_offdiag: Off-diagonal asymmetry of IRV table.
-        fevd_concentration_in_connectedness:
-        fev_concentration_in_connectedness:
-        irv_concentration_in_connectedness:
-        fevd_concentration_out_connectedness:
-        fev_concentration_out_connectedness:
-        irv_concentration_out_connectedness:
-        fevd_concentration_in_eigenvector_centrality:
-        fev_concentration_in_eigenvector_centrality:
-        irv_concentration_in_eigenvector_centrality:
-        fevd_concentration_out_eigenvector_centrality:
-        fev_concentration_out_eigenvector_centrality:
-        irv_concentration_out_eigenvector_centrality:
-        fevd_concentration_in_page_rank:
-        fev_concentration_in_page_rank:
-        irv_concentration_in_page_rank:
-        fevd_concentration_out_page_rank:
-        fev_concentration_out_page_rank:
-        irv_concentration_out_page_rank:
+    Calculates the following statistics for all tables and weights:
+        avg_connectedness: Average connectedness of the network table.
+        asymmetry: Asymmetry of network table.
+        asymmetry_offdiag: Off-diagonal asymmetry of network table.
+        concentration_out_connectedness:
+        concentration_out_eigenvector_centrality:
+        concentration_out_page_rank:
+        amplification:
         innovation_diagonality_test_stat': Ledoit-Wolf test statistic for diagonality of innovations.
         innovation_diagonality_p_value': P-value for Ledoit-Wolf test statistic.
 
@@ -586,119 +552,80 @@ def describe_fevd(
         fevd: Forecast Error Variance Decomposition to be described.
         horizon: Horizon to calculate the descriptive statistics with.
         data: Data the estimation is performed on.
+        weights: A vector indicating the weights of each node in the aggregate.
 
     Returns:
         stats: Key, value pairs of the calculated statistics.
 
     """
-    stats = {
-        "fevd_avg_connectedness": fevd.average_connectedness(
-            horizon=horizon, table_name="fevd", normalize=False
-        ),
-        "fevd_avg_connectedness_normalized": fevd.average_connectedness(
-            horizon=horizon, table_name="fevd", normalize=True
-        ),
-        "fev_avg_connectedness": fevd.average_connectedness(
-            horizon=horizon, table_name="fev", normalize=False
-        ),
-        "irv_avg_connectedness": fevd.average_connectedness(
-            horizon=horizon, table_name="irv", normalize=False
-        ),
-        "fevd_asymmetry": matrix_asymmetry(
-            fevd.forecast_error_variance_decomposition(horizon=horizon, normalize=False)
-        ),
-        "fevd_asymmetry_normalized": matrix_asymmetry(
-            fevd.forecast_error_variance_decomposition(horizon=horizon, normalize=True)
-        ),
-        "fev_asymmetry": matrix_asymmetry(
-            fevd.forecast_error_variances(horizon=horizon)
-        ),
-        "irv_asymmetry": matrix_asymmetry(
-            fevd.innovation_response_variances(horizon=horizon)
-        ),
-        "fevd_asymmetry_offdiag": matrix_asymmetry(
-            fevd.forecast_error_variance_decomposition(
-                horizon=horizon, normalize=False
-            ),
-            drop_diag=True,
-        ),
-        "fevd_asymmetry_normalized_offdiag": matrix_asymmetry(
-            fevd.forecast_error_variance_decomposition(horizon=horizon, normalize=True),
-            drop_diag=True,
-        ),
-        "fev_asymmetry_offdiag": matrix_asymmetry(
-            fevd.forecast_error_variances(horizon=horizon), drop_diag=True
-        ),
-        "irv_asymmetry_offdiag": matrix_asymmetry(
-            fevd.innovation_response_variances(horizon=horizon), drop_diag=True
-        ),
-        "fevd_concentration_in_connectedness": herfindahl_index(
-            fevd.in_connectedness(horizon=horizon, table_name="fevd", normalize=False),
-        ),
-        "fev_concentration_in_connectedness": herfindahl_index(
-            fevd.in_connectedness(horizon=horizon, table_name="fev", normalize=False),
-        ),
-        "irv_concentration_in_connectedness": herfindahl_index(
-            fevd.in_connectedness(horizon=horizon, table_name="irv", normalize=False),
-        ),
-        "fevd_concentration_out_connectedness": herfindahl_index(
-            fevd.out_connectedness(horizon=horizon, table_name="fevd", normalize=False),
-        ),
-        "fev_concentration_out_connectedness": herfindahl_index(
-            fevd.out_connectedness(horizon=horizon, table_name="fev", normalize=False),
-        ),
-        "irv_concentration_out_connectedness": herfindahl_index(
-            fevd.out_connectedness(horizon=horizon, table_name="irv", normalize=False),
-        ),
-        "fevd_concentration_in_eigenvector_centrality": herfindahl_index(
-            fevd.in_eigenvector_centrality(
-                horizon=horizon, table_name="fevd", normalize=False
-            ),
-        ),
-        "fev_concentration_in_eigenvector_centrality": herfindahl_index(
-            fevd.in_eigenvector_centrality(
-                horizon=horizon, table_name="fev", normalize=False
-            ),
-        ),
-        "irv_concentration_in_eigenvector_centrality": herfindahl_index(
-            fevd.in_eigenvector_centrality(
-                horizon=horizon, table_name="irv", normalize=False
-            ),
-        ),
-        "fevd_concentration_out_eigenvector_centrality": herfindahl_index(
-            fevd.out_eigenvector_centrality(
-                horizon=horizon, table_name="fevd", normalize=False
-            ),
-        ),
-        "fev_concentration_out_eigenvector_centrality": herfindahl_index(
-            fevd.out_eigenvector_centrality(
-                horizon=horizon, table_name="fev", normalize=False
-            ),
-        ),
-        "irv_concentration_out_eigenvector_centrality": herfindahl_index(
-            fevd.out_eigenvector_centrality(
-                horizon=horizon, table_name="irv", normalize=False
-            ),
-        ),
-        "fevd_concentration_in_page_rank": herfindahl_index(
-            fevd.in_page_rank(horizon=horizon, table_name="fevd", normalize=False),
-        ),
-        "fev_concentration_in_page_rank": herfindahl_index(
-            fevd.in_page_rank(horizon=horizon, table_name="fev", normalize=False),
-        ),
-        "irv_concentration_in_page_rank": herfindahl_index(
-            fevd.in_page_rank(horizon=horizon, table_name="irv", normalize=False),
-        ),
-        "fevd_concentration_out_page_rank": herfindahl_index(
-            fevd.out_page_rank(horizon=horizon, table_name="fevd", normalize=False),
-        ),
-        "fev_concentration_out_page_rank": herfindahl_index(
-            fevd.out_page_rank(horizon=horizon, table_name="fev", normalize=False),
-        ),
-        "irv_concentration_out_page_rank": herfindahl_index(
-            fevd.out_page_rank(horizon=horizon, table_name="irv", normalize=False),
-        ),
-    }
+    stats = {}
+    for table in ["fev", "fevd", "irv"]:
+        for w in [weights, None]:
+            suffix = "_weighted" if w is not None else ""
+            stats[f"{table}_avg_connectedness" + suffix] = fevd.average_connectedness(
+                horizon=horizon,
+                table_name=table,
+                normalize=False,
+                weights=w,
+            )
+            stats[f"{table}_asymmetry" + suffix] = matrix_asymmetry(
+                fevd._get_table(
+                    name=table,
+                    horizon=horizon,
+                    normalize=False,
+                    weights=w,
+                )
+            )
+            stats[f"{table}_asymmetry_offdiag" + suffix] = matrix_asymmetry(
+                fevd._get_table(
+                    name=table,
+                    horizon=horizon,
+                    normalize=False,
+                    weights=w,
+                ),
+                drop_diag=True,
+            )
+            stats[
+                f"{table}_concentration_out_connectedness" + suffix
+            ] = power_law_exponent(
+                fevd.out_connectedness(
+                    horizon=horizon,
+                    table_name=table,
+                    normalize=False,
+                    weights=w,
+                ),
+                invert=True,
+            )
+            stats[
+                f"{table}_concentration_out_eigenvector_centrality" + suffix
+            ] = power_law_exponent(
+                fevd.out_eigenvector_centrality(
+                    horizon=horizon,
+                    table_name=table,
+                    normalize=False,
+                    weights=w,
+                ),
+                invert=True,
+            )
+            stats[f"{table}_concentration_out_page_rank" + suffix] = power_law_exponent(
+                fevd.out_page_rank(
+                    horizon=horizon,
+                    table_name=table,
+                    normalize=False,
+                    weights=w,
+                ),
+                invert=True,
+            )
+            stats[f"{table}_amplification" + suffix] = (
+                fevd.amplification_factor(
+                    horizon=horizon,
+                    table_name="fev",
+                    normalize=False,
+                    weights=w,
+                ).squeeze()
+                * (weights / weights.sum()).squeeze()
+            ).sum()
+
     (
         stats["innovation_diagonality_test_stat"],
         stats["innovation_diagonality_p_value"],
@@ -744,6 +671,9 @@ def collect_var_estimates(
     estimates["var_factor_residual_variance"] = np.diag(factor_residuals.cov())
     residuals = var.residuals(var_data=var_data, factor_data=factor_data)
     estimates["var_residual_variance"] = np.diag(residuals.cov())
+    estimates["var_systematic_variance"] = var.systematic_variances(
+        factor_data=factor_data
+    )
     return estimates
 
 
@@ -777,43 +707,33 @@ def collect_fevd_estimates(
     fevd: euraculus.fevd.FEVD,
     horizon: int,
     data: pd.DataFrame,
-    # sizes: pd.Series,
+    weights: np.ndarray,
 ) -> pd.DataFrame:
     """Extract estimates from a Forecast Error Variance Decomposition network.
 
-    Extracts the following estimates on asset level:
-        fev_total:
-        fev_others:
-        fev_self:
-        fevd_in_connectedness:
-        fevd_out_connectedness:
-        fevd_eigenvector_centrality:
-        fevd_closeness_centrality:
-        fevd_in_concentration:
-        fevd_in_connectedness_normalized:
-        fevd_out_connectedness_normalized:
-        fevd_eigenvector_centrality_normalized:
-        fevd_closeness_centrality_normalized:
-        fu_total:
-        fu_others:
-        fu_self:
-        fud_in_connectedness:
-        fud_out_connectedness:
-        fud_eigenvector_centrality:
-        fud_closeness_centrality:
-        fud_in_concentration:
-        fud_in_connectedness_normalized:
-        fud_out_connectedness_normalized:
-        fud_eigenvector_centrality_normalized:
-        fud_closeness_centrality_normalized:
-        # irv_index_decomposition_absolute:
-        # irv_index_decomposition_shares:
+    Extracts the following estimates on node level for each table and weighting:
+        in_connectedness: Sum of incoming links.
+        out_connectedness: Sum of outgoing links.
+        self_connectedness: Link with itself.
+        total_connectedness: Total links of each node (incoming and outgoing).
+        in_concentration: Concentration of incoming links.
+        out_concentration: Concentration of outgoing links.
+        in_eigenvector_centrality: Eigenvector centrality of incoming links.
+        out_eigenvector_centrality: Eigenvector centrality of outgoing links.
+        in_page_rank_equal: Page rank of incoming links without personalisation.
+        out_page_rank_equal: Page rank of outgoing links without personalisation.
+        in_page_rank_85: Page rank of incoming links with alpha 0.85.
+        out_page_rank_85: Page rank of outgoing links with alpha 0.85.
+        in_page_rank_95: Page rank of incoming links with alpha 0.95.
+        out_page_rank_95: Page rank of outgoing links with alpha 0.95.
+        amplification_factor:
+        absorption_rate
 
     Args:
         fevd: Forecast Error Variance Decomposition to be described.
         horizon: Horizon to calculate some estimates with.
-        # data: Data the estimation is performed on.
-        # sizes: Firm sizes to define weights.
+        data: Data the estimation is performed on.
+        weights: A vector indicating the weights of each node in the aggregate.
 
     Returns:
         estimates: Extracted estimates in a DataFrame.
@@ -822,42 +742,118 @@ def collect_fevd_estimates(
 
     estimates = pd.DataFrame(index=data.columns)
 
-    tables = [("fevd", False), ("fevd", True), ("fev", False), ("irv", False)]
-
-    for (table, normalize) in tables:
-        estimates[f"{table}_in_connectedness"] = fevd.in_connectedness(
-            horizon=horizon, table_name=table, normalize=normalize
-        )
-        estimates[f"{table}_out_connectedness"] = fevd.out_connectedness(
-            horizon=horizon, table_name=table, normalize=normalize
-        )
-        estimates[f"{table}_self_connectedness"] = fevd.self_connectedness(
-            horizon=horizon, table_name=table, normalize=normalize
-        )
-        estimates[f"{table}_total_connectedness"] = fevd.total_connectedness(
-            horizon=horizon, table_name=table, normalize=normalize
-        )
-        estimates[f"{table}_in_concentration"] = fevd.in_concentration(
-            horizon=horizon, table_name=table, normalize=normalize
-        )
-        estimates[f"{table}_out_concentration"] = fevd.out_concentration(
-            horizon=horizon, table_name=table, normalize=normalize
-        )
-        estimates[
-            f"{table}_in_eigenvector_centrality"
-        ] = fevd.in_eigenvector_centrality(
-            horizon=horizon, table_name=table, normalize=normalize
-        )
-        estimates[
-            f"{table}_out_eigenvector_centrality"
-        ] = fevd.out_eigenvector_centrality(
-            horizon=horizon, table_name=table, normalize=normalize
-        )
-        estimates[f"{table}_in_page_rank"] = fevd.in_page_rank(
-            horizon=horizon, table_name=table, normalize=normalize
-        )
-        estimates[f"{table}_out_page_rank"] = fevd.out_page_rank(
-            horizon=horizon, table_name=table, normalize=normalize
-        )
+    for table in ["fev", "fevd", "irv"]:
+        for w in [weights, None]:
+            suffix = "_weighted" if w is not None else ""
+            estimates[f"{table}_in_connectedness" + suffix] = fevd.in_connectedness(
+                horizon=horizon,
+                table_name=table,
+                normalize=False,
+                weights=w,
+            )
+            estimates[f"{table}_out_connectedness" + suffix] = fevd.out_connectedness(
+                horizon=horizon,
+                table_name=table,
+                normalize=False,
+                weights=w,
+            )
+            estimates[f"{table}_self_connectedness" + suffix] = fevd.self_connectedness(
+                horizon=horizon,
+                table_name=table,
+                normalize=False,
+                weights=w,
+            )
+            estimates[
+                f"{table}_total_connectedness" + suffix
+            ] = fevd.total_connectedness(
+                horizon=horizon,
+                table_name=table,
+                normalize=False,
+                weights=w,
+            )
+            estimates[f"{table}_in_concentration" + suffix] = fevd.in_concentration(
+                horizon=horizon,
+                table_name=table,
+                normalize=False,
+                weights=w,
+            )
+            estimates[f"{table}_out_concentration" + suffix] = fevd.out_concentration(
+                horizon=horizon,
+                table_name=table,
+                normalize=False,
+                weights=w,
+            )
+            estimates[
+                f"{table}_in_eigenvector_centrality" + suffix
+            ] = fevd.in_eigenvector_centrality(
+                horizon=horizon,
+                table_name=table,
+                normalize=False,
+                weights=w,
+            )
+            estimates[
+                f"{table}_out_eigenvector_centrality" + suffix
+            ] = fevd.out_eigenvector_centrality(
+                horizon=horizon,
+                table_name=table,
+                normalize=False,
+                weights=w,
+            )
+            estimates[f"{table}_in_page_rank_equal" + suffix] = fevd.in_page_rank(
+                horizon=horizon,
+                table_name=table,
+                normalize=False,
+                weights=None,
+                alpha=0.85,
+            )
+            estimates[f"{table}_out_page_rank_equal" + suffix] = fevd.out_page_rank(
+                horizon=horizon,
+                table_name=table,
+                normalize=False,
+                weights=None,
+                alpha=0.85,
+            )
+            estimates[f"{table}_in_page_rank_85" + suffix] = fevd.in_page_rank(
+                horizon=horizon,
+                table_name=table,
+                normalize=False,
+                weights=w,
+                alpha=0.85,
+            )
+            estimates[f"{table}_out_page_rank_85" + suffix] = fevd.out_page_rank(
+                horizon=horizon,
+                table_name=table,
+                normalize=False,
+                weights=w,
+                alpha=0.85,
+            )
+            estimates[f"{table}_in_page_rank_95" + suffix] = fevd.in_page_rank(
+                horizon=horizon,
+                table_name=table,
+                normalize=False,
+                weights=w,
+                alpha=0.95,
+            )
+            estimates[f"{table}_out_page_rank_95" + suffix] = fevd.out_page_rank(
+                horizon=horizon,
+                table_name=table,
+                normalize=False,
+                weights=w,
+                alpha=0.95,
+            )
+            estimates[
+                f"{table}_amplification_factor" + suffix
+            ] = fevd.amplification_factor(
+                horizon=horizon,
+                table_name=table,
+                normalize=False,
+                weights=w,
+            )
+            estimates[f"{table}_absorption_rate" + suffix] = fevd.absorption_rate(
+                horizon=horizon,
+                table_name=table,
+                normalize=False,
+                weights=w,
+            )
 
     return estimates
