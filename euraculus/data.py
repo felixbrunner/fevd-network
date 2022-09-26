@@ -1,6 +1,4 @@
-"""This module provides convenient access to the local filesystem for data.
-
-"""
+"""This module provides convenient access to the local filesystem for data."""
 
 import json
 import math

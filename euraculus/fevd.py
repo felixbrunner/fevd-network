@@ -316,6 +316,7 @@ class FEVD:
         name: str,
         horizon: int,
         normalize: bool = False,
+        weights: np.ndarray = None,
     ) -> np.ndarray:
         """Retrieve a connectedness table from FEVD object.
 
@@ -323,6 +324,7 @@ class FEVD:
             name: Abbreviated name of the table.
             horizon: Number of periods to compute the table.
             normalize: Indicates if table should be row-normalized.
+            weights: A vector indicating the weights of each node in the aggregate.
 
         Returns:
             table: The requested (n_series * n_series) connectedness table.
@@ -360,6 +362,9 @@ class FEVD:
         if name == "vma":
             table = self.vma_matrix(horizon=horizon)
 
+        if weights is not None:
+            table = np.diag(weights.flatten()) @ table
+
         return table
 
     def in_connectedness(
@@ -368,6 +373,7 @@ class FEVD:
         table_name: str = "fevd",
         others_only: bool = True,
         normalize: bool = False,
+        weights: np.ndarray = None,
     ) -> np.ndarray:
         """Calculate the sum of incoming links per node (row-wise).
 
@@ -376,6 +382,7 @@ class FEVD:
             horizon: Number of periods to compute the table.
             others_only: Indicates wheter to include self-linkages.
             normalize: Indicates if table should be row-normalized.
+            weights: A vector indicating the weights of each node in the aggregate.
 
         Returns:
             in_connectedness: A (n_series * 1) vector with connectedness values.
@@ -384,6 +391,7 @@ class FEVD:
             name=table_name,
             horizon=horizon,
             normalize=normalize,
+            weights=weights,
         )
 
         in_connectedness = table.sum(axis=1)
@@ -398,6 +406,7 @@ class FEVD:
         table_name: str = "fevd",
         others_only: bool = True,
         normalize: bool = False,
+        weights: np.ndarray = None,
     ) -> np.ndarray:
         """Calculate the sum of outgoing links per node (column-wise).
 
@@ -406,6 +415,7 @@ class FEVD:
             horizon: Number of periods to compute the table.
             others_only: Indicates wheter to include self-linkages.
             normalize: Indicates if table should be row-normalized.
+            weights: A vector indicating the weights of each node in the aggregate.
 
         Returns:
             out_connectedness: A (n_series * 1) vector with connectedness values.
@@ -414,6 +424,7 @@ class FEVD:
             name=table_name,
             horizon=horizon,
             normalize=normalize,
+            weights=weights,
         )
 
         out_connectedness = table.sum(axis=0)
@@ -427,6 +438,7 @@ class FEVD:
         horizon: int,
         table_name: str = "fevd",
         normalize: bool = False,
+        weights: np.ndarray = None,
         **kwargs,
     ) -> np.ndarray:
         """Get the links of each node with itself.
@@ -436,6 +448,7 @@ class FEVD:
             horizon: Number of periods to compute the table.
             others_only: Indicates wheter to include self-linkages.
             normalize: Indicates if table should be row-normalized.
+            weights: A vector indicating the weights of each node in the aggregate.
 
         Returns:
             self_connectedness: A (n_series * 1) vector with connectedness values.
@@ -444,6 +457,7 @@ class FEVD:
             name=table_name,
             horizon=horizon,
             normalize=normalize,
+            weights=weights,
         )
 
         self_connectedness = np.diag(table).reshape(-1, 1)
@@ -455,6 +469,7 @@ class FEVD:
         table_name: str = "fevd",
         others_only: bool = True,
         normalize: bool = False,
+        weights: np.ndarray = None,
     ) -> np.ndarray:
         """Get the total links of each node (incoming and outgoing).
 
@@ -463,6 +478,7 @@ class FEVD:
             horizon: Number of periods to compute the table.
             others_only: Indicates wheter to include self-linkages.
             normalize: Indicates if table should be row-normalized.
+            weights: A vector indicating the weights of each node in the aggregate.
 
         Returns:
             total_connectedness: A (n_series * 1) vector with connectedness values.
@@ -486,6 +502,7 @@ class FEVD:
         table_name: str = "fevd",
         others_only: bool = False,
         normalize: bool = False,
+        weights: np.ndarray = None,
     ) -> np.ndarray:
         """Get the amplification factors of each node.
 
@@ -499,6 +516,7 @@ class FEVD:
             horizon: Number of periods to compute the table.
             others_only: Indicates wheter to include self-linkages.
             normalize: Indicates if table should be row-normalized.
+            weights: A vector indicating the weights of each node in the aggregate.
 
         Returns:
             amplification_factor: A (n_series * 1) vector with amplifier values.
@@ -519,6 +537,7 @@ class FEVD:
         table_name: str = "fevd",
         others_only: bool = False,
         normalize: bool = False,
+        weights: np.ndarray = None,
     ) -> np.ndarray:
         """Get the absorption rates of each node.
 
@@ -532,6 +551,7 @@ class FEVD:
             horizon: Number of periods to compute the table.
             others_only: Indicates wheter to include self-linkages in denominator.
             normalize: Indicates if table should be row-normalized.
+            weights: A vector indicating the weights of each node in the aggregate.
 
         Returns:
             absorption_rate: A (n_series * 1) vector with absorption rates.
@@ -552,6 +572,7 @@ class FEVD:
         table_name: str = "fevd",
         others_only: bool = True,
         normalize: bool = False,
+        weights: np.ndarray = None,
     ) -> float:
         """Get the total links of each node (incoming and outgoing).
 
@@ -560,6 +581,7 @@ class FEVD:
             horizon: Number of periods to compute the table.
             others_only: Indicates wheter to include self-linkages.
             normalize: Indicates if table should be row-normalized.
+            weights: A vector indicating the weights of each node in the aggregate.
 
         Returns:
             average_connectedness: Average connectedness value in the table.
@@ -579,6 +601,7 @@ class FEVD:
         table_name: str = "fevd",
         others_only: bool = True,
         normalize: bool = False,
+        weights: np.ndarray = None,
         measure: str = "power_law_exponent",
     ) -> np.ndarray:
         """Calculate the concentration of incoming links per node (row-wise).
@@ -588,6 +611,7 @@ class FEVD:
             horizon: Number of periods to compute the table.
             others_only: Indicates wheter to include self-linkages.
             normalize: Indicates if table should be row-normalized.
+            weights: A vector indicating the weights of each node in the aggregate.
             measure: One of 'power_law_exponent', 'herfindahl_index', 'entropy'.
 
         Returns:
@@ -601,6 +625,7 @@ class FEVD:
             name=table_name,
             horizon=horizon,
             normalize=normalize,
+            weights=weights,
         )
         n = self.n_series
 
@@ -632,6 +657,7 @@ class FEVD:
         table_name: str = "fevd",
         others_only: bool = True,
         normalize: bool = False,
+        weights: np.ndarray = None,
         measure: str = "power_law_exponent",
     ) -> np.ndarray:
         """Calculate the concentration of outgoing links per node (column-wise).
@@ -641,6 +667,7 @@ class FEVD:
             horizon: Number of periods to compute the table.
             others_only: Indicates wheter to include self-linkages.
             normalize: Indicates if table should be row-normalized.
+            weights: A vector indicating the weights of each node in the aggregate.
             measure: One of 'power_law_exponent', 'herfindahl_index', 'entropy'.
 
         Returns:
@@ -654,6 +681,7 @@ class FEVD:
             name=table_name,
             horizon=horizon,
             normalize=normalize,
+            weights=weights,
         )
         n = self.n_series
 
@@ -684,6 +712,7 @@ class FEVD:
         horizon: int,
         table_name: str = "fevd",
         normalize: bool = False,
+        weights: np.ndarray = None,
     ) -> nx.classes.digraph.DiGraph:
         """Create a networkx Graph object from a connectedness table.
 
@@ -691,6 +720,7 @@ class FEVD:
             table_name: Abbreviated name of the table.
             horizon: Number of periods to compute the table.
             normalize: Indicates if table should be row-normalized.
+            weights: A vector indicating the weights of each node in the aggregate.
 
         Returns:
             graph: The connectedness table as a networkx DiGraph object.
@@ -699,6 +729,7 @@ class FEVD:
             name=table_name,
             horizon=horizon,
             normalize=normalize,
+            weights=weights,
         )
         graph = nx.convert_matrix.from_numpy_array(table, create_using=nx.DiGraph)
         return graph.reverse()
@@ -708,6 +739,7 @@ class FEVD:
         horizon: int,
         table_name: str = "fevd",
         normalize: bool = False,
+        weights: np.ndarray = None,
     ) -> np.ndarray:
         """Calculate the eigenvector centrality of incoming links per node (row-wise).
 
@@ -715,6 +747,7 @@ class FEVD:
             table_name: Abbreviated name of the table.
             horizon: Number of periods to compute the table.
             normalize: Indicates if table should be row-normalized.
+            weights: A vector indicating the weights of each node in the aggregate.
 
         Returns:
             in_centrality: A (n_series * 1) vector with centrality values.
@@ -724,6 +757,7 @@ class FEVD:
             name=table_name,
             horizon=horizon,
             normalize=normalize,
+            weights=weights,
         )
 
         # compute the largest right eigenvector
@@ -739,6 +773,7 @@ class FEVD:
         horizon: int,
         table_name: str = "fevd",
         normalize: bool = False,
+        weights: np.ndarray = None,
     ) -> np.ndarray:
         """Calculate the eigenvector centrality of outgoing links per node (column-wise).
 
@@ -746,6 +781,7 @@ class FEVD:
             table_name: Abbreviated name of the table.
             horizon: Number of periods to compute the table.
             normalize: Indicates if table should be row-normalized.
+            weights: A vector indicating the weights of each node in the aggregate.
 
         Returns:
             out_centrality: A (n_series * 1) vector with centrality values.
@@ -755,6 +791,7 @@ class FEVD:
             name=table_name,
             horizon=horizon,
             normalize=normalize,
+            weights=weights,
         )
 
         # compute the largest left eigenvector
@@ -790,12 +827,14 @@ class FEVD:
             name=table_name,
             horizon=horizon,
             normalize=normalize,
+            weights=None,  ##
         )
         out_connectedness = self.out_connectedness(
             table_name=table_name,
             horizon=horizon,
             normalize=normalize,
             others_only=False,
+            weights=None,  ##
         )
 
         # normalize weights
@@ -841,12 +880,14 @@ class FEVD:
             name=table_name,
             horizon=horizon,
             normalize=normalize,
+            weights=None,  ##
         )
         in_connectedness = self.in_connectedness(
             table_name=table_name,
             horizon=horizon,
             normalize=normalize,
             others_only=False,
+            weights=None,  ##
         )
 
         # normalize weights
