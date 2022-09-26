@@ -535,8 +535,15 @@ def draw_fevd_as_network(
     ff_sector_codes = {tick: i for i, tick in enumerate(ff_sector_tickers)}
 
     # calculations to highlight nodes/edges
-    out_cent = fevd.out_page_rank(horizon=horizon, table_name=table_name)
-    in_cent = fevd.in_page_rank(horizon=horizon, table_name=table_name)
+    out_eigenvector_centrality = fevd.out_eigenvector_centrality(
+        horizon=horizon,
+        table_name=table_name,
+    )
+    out_page_rank = fevd.out_page_rank(
+        horizon=horizon,
+        table_name=table_name,
+        weights=df_info["mean_valuation_volatility"].values.reshape(-1, 1),
+    )
     include_edges = table > np.percentile(table, q=90, axis=None, keepdims=True)
 
     # plot
@@ -546,26 +553,32 @@ def draw_fevd_as_network(
 
     # draw nodes
     node_options = {
-        "node_size": 500
-        + (df_info["mean_size"] / df_info["mean_size"].mean()).values * 200,
+        "node_size": 750
+        + (
+            df_info["mean_valuation_volatility"]
+            / df_info["mean_valuation_volatility"].mean()
+        ).values
+        * 250,
         "node_color": [
             sector_colors[ff_sector_codes[i]]
             for i in df_info["ff_sector_ticker"].values
         ],
         "linewidths": [
             4
-            if o > np.percentile(out_cent, 80) or i > np.percentile(in_cent, 80)
+            if e > np.percentile(out_eigenvector_centrality, 80)
+            else 4
+            if p > np.percentile(out_page_rank, 80)
             else 0
-            for (o, i) in zip(out_cent, in_cent)
+            for (e, p) in zip(out_eigenvector_centrality, out_page_rank)
         ],
         "alpha": 0.9,
         "edgecolors": [
             "w"
-            if o > np.percentile(out_cent, 80)
+            if e > np.percentile(out_eigenvector_centrality, 80)
             else "grey"
-            if i > np.percentile(in_cent, 80)
+            if p > np.percentile(out_page_rank, 80)
             else "r"
-            for (o, i) in zip(out_cent, in_cent)
+            for (e, p) in zip(out_eigenvector_centrality, out_page_rank)
         ],
         "node_shape": "o",
     }
@@ -604,6 +617,8 @@ def draw_fevd_as_network(
             for ticker, i in ff_sector_codes.items()
         ],
         title="Sectors",
+        edgecolor="k",
+        facecolor="lightgray",
     )
     influence_legend = ax.legend(
         handles=[
@@ -614,7 +629,7 @@ def draw_fevd_as_network(
                 markerfacecolor="none",
                 markeredgewidth=2,
                 markeredgecolor="w",
-                label="Highest outgoing",
+                label="Eigenvector centrality",
                 markersize=10,
                 linewidth=0,
             ),
@@ -625,13 +640,14 @@ def draw_fevd_as_network(
                 markerfacecolor="none",
                 markeredgewidth=2,
                 markeredgecolor="grey",
-                label="Highest incoming",
+                label="Page rank",
                 markersize=10,
                 linewidth=0,
             ),
         ],
-        title="Page rank",
+        title="Most influential assets",
         loc="lower right",
+        edgecolor="k",
     )
     ax.add_artist(sector_legend)
     ax.add_artist(influence_legend)
@@ -993,28 +1009,28 @@ def plot_regularisation_summary(df, save_path=None):
 
 def plot_network_summary(df, save_path=None):
     # set up plot
-    fig, axes = plt.subplots(1, 1, figsize=(20, 6))
+    fig, axes = plt.subplots(1, 1, figsize=(20, 8))
     colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
 
     # connectedness
     ax1 = axes  # [0]
     l1 = ax1.plot(
-        df["fevd_avg_connectedness"],
+        df["fev_avg_connectedness"],
         label="Average connectedness $c^{avg}$, mean="
-        + str((df["fevd_avg_connectedness"]).mean().round(2)),
+        + str((df["fev_avg_connectedness"]).mean().round(2)),
         c=colors[0],
     )
     ax1.set_ylabel("Connectedness", color=colors[0])
     ax1.tick_params(axis="y", labelcolor=colors[0])
-    ax1.set_ylim([0, 0.3])
+    ax1.set_ylim([0, 0.35])
     # ax1.set_yscale("log")
 
     # concentration
     ax2 = ax1.twinx()
     l2 = ax2.plot(
-        df["fevd_concentration_out_connectedness"].rolling(1).mean(),
+        df["fev_concentration_out_page_rank"].rolling(1).mean(),
         label="Network concentration, mean={}".format(
-            (df["fevd_concentration_out_connectedness"]).mean().round(2)
+            (df["fev_concentration_out_page_rank"]).mean().round(2)
         ),
         linestyle="--",
         c=colors[1],
@@ -1022,15 +1038,15 @@ def plot_network_summary(df, save_path=None):
     ax2.grid(None)
     ax2.set_ylabel("Concentration", color=colors[1])
     ax2.tick_params(axis="y", labelcolor=colors[1])
-    ax2.set_ylim([0.2, 0.8])
+    ax2.set_ylim([0, 0.7])
     # ax3.set_yscale("log")
 
     # asymmetry
     ax3 = ax1.twinx()
     l3 = ax3.plot(
-        df["fevd_asymmetry"],
+        df["fev_asymmetry"],
         label="Network directedness, mean={}".format(
-            (df["fevd_asymmetry"]).mean().round(2)
+            (df["fev_asymmetry"]).mean().round(2)
         ),
         linestyle="-.",
         c=colors[2],
@@ -1040,12 +1056,30 @@ def plot_network_summary(df, save_path=None):
     ax3.tick_params(axis="y", labelcolor=colors[2])
     ax3.yaxis.set_label_coords(1.07, 0.5)
     ax3.tick_params(direction="out", pad=50)
-    ax3.set_ylim([0, 0.12])
+    ax3.set_ylim([0, 0.35])
+    # ax2.set_yscale("log")
+
+    # asymmetry
+    ax4 = ax1.twinx()
+    l4 = ax4.plot(
+        df["fev_amplification"],
+        label="Network amplification, mean={}".format(
+            (df["fev_amplification"]).mean().round(2)
+        ),
+        linestyle=(0, (5, 1)),
+        c=colors[3],
+    )
+    ax4.grid(None)
+    ax4.set_ylabel("Amplification", color=colors[3])
+    ax4.tick_params(axis="y", labelcolor=colors[3])
+    ax4.yaxis.set_label_coords(1.115, 0.5)
+    ax4.tick_params(direction="out", pad=100)
+    ax4.set_ylim([0.8, 1.15])
     # ax2.set_yscale("log")
 
     # figure formatting
     ax1.set_title("FEVD Network statistics")
-    lines = l1 + l2 + l3
+    lines = l1 + l2 + l3 + l4
     labels = [l.get_label() for l in lines]
     ax1.legend(lines, labels, loc="upper left")
     add_recession_bars(ax1, freq="M", startdate=df.index[0], enddate=df.index[-1])
@@ -1136,6 +1170,156 @@ def plot_pca_elbow(df: pd.DataFrame, n_pcs: int = 10, save_path=None):
     ax.set_title("Principal Components: Explained Variance")
     ax.set_xlabel("Principal component")
     ax.set_ylabel("Explained variance ratio")
+
+    if save_path:
+        fig.savefig(save_path, format="pdf", dpi=200, bbox_inches="tight")
+
+
+def plot_sampling_fractions(df_summary, save_path=None):
+
+    # calculate data
+    df_sampling = pd.DataFrame()
+    df_sampling["n_assets"] = df_summary.groupby("sampling_date").size()
+    df_sampling["total_mean_mcap"] = df_summary.groupby("sampling_date")[
+        "mean_size"
+    ].sum()
+    df_sampling["100_mean_mcap"] = df_summary.groupby("sampling_date").apply(
+        lambda x: x.sort_values("mean_valuation_volatility", ascending=False)[
+            "mean_size"
+        ]
+        .iloc[:100]
+        .sum()
+    )
+    df_sampling["total_mean_vv"] = df_summary.groupby("sampling_date")[
+        "mean_valuation_volatility"
+    ].sum()
+    df_sampling["100_mean_vv"] = df_summary.groupby("sampling_date").apply(
+        lambda x: x.sort_values("mean_valuation_volatility", ascending=False)[
+            "mean_valuation_volatility"
+        ]
+        .iloc[:100]
+        .sum()
+    )
+
+    # set up plot
+    fig, ax = plt.subplots(figsize=(16, 6))
+    ax2 = ax.twinx()
+    ax.set_title("Proportion of our sample compared to the entire CRSP universe")
+    colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+
+    # plot lines
+    l1 = ax.plot(
+        df_sampling["100_mean_vv"] / df_sampling["total_mean_vv"],
+        label="Valuation volatility",
+    )
+    l2 = ax.plot(
+        df_sampling["100_mean_mcap"] / df_sampling["total_mean_mcap"],
+        label="Market capitalization",
+        linestyle="--",
+    )
+    l3 = ax2.plot(
+        100 / df_sampling["n_assets"],
+        label="Number of assets (right axis)",
+        linestyle="-.",
+        color=colors[2],
+    )
+
+    # format
+    ax.set_ylim([0, 1])
+    ax.set_yticks([i / 10 for i in range(11)])
+    ax.set_yticklabels([f"{int(tick*100)}%" for tick in ax.get_yticks()])
+    ax.set_ylabel("Valuation volatility & market capitalization")
+
+    ax2.set_ylim([0, 0.1])
+    ax2.set_yticks([i / 100 for i in range(11)])
+    ax2.set_yticklabels([f"{int(tick*10)}%" for tick in ax.get_yticks()])
+    ax2.grid(False)
+    ax2.set_ylabel("Number of assets", color=colors[2])
+    ax2.tick_params(axis="y", labelcolor=colors[2])
+
+    add_recession_bars(
+        ax, freq="M", startdate=df_sampling.index[0], enddate=df_sampling.index[-1]
+    )
+
+    # legend
+    lines = l1 + l2 + l3
+    labels = [l.get_label() for l in lines]
+    ax.legend(lines, labels)  # , loc="center left")
+
+    # save
+    if save_path:
+        fig.savefig(save_path, format="pdf", dpi=200, bbox_inches="tight")
+
+
+def plot_mcap_concentration(df_summary, sampling_date, save_path):
+    """"""
+    # create plot
+    fig, ax = plt.subplots(1, 1, figsize=(18, 6))
+    ax2 = ax.twinx()
+    colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    ax.set_title(f"Firm Size Distribution ({sampling_date.date()})")
+
+    # prepare data
+    mcaps = df_summary["last_mcap"] * 1e3
+    mcaps = mcaps.loc[mcaps > 0].sort_values(ascending=False).reset_index(drop=True)
+    cumulative = pd.Series([0]).append(mcaps.cumsum()) / mcaps.sum()
+
+    # firm sizes
+    area = ax.fill_between(
+        x=mcaps.index + 1,
+        y1=mcaps,
+        # y2=1e0,
+        label="Asset market capitalization",
+        alpha=0.7,
+        # linewidth=1,
+        # edgecolor="k",
+        # hatch="|",
+    )
+    ax.scatter(
+        mcaps.index + 1,
+        mcaps,
+        marker=".",
+        color=colors[0],
+        s=5,
+    )
+    scat = ax.scatter(
+        mcaps.index[:100] + 1,
+        mcaps[:100],
+        label="100 largest assets",
+        marker="x",
+        color=colors[1],
+    )
+
+    ax.set_ylabel("Market capitalization")  # ('000 USD)")
+    ax.set_xlabel("Size Rank")
+    # ax.set_ylim([0, mcaps.max()*1.05])
+    ax.set_xlim([-10, len(mcaps) + 10])
+    ax.set_yscale("log")
+    ax.grid(True, which="both", linestyle="-")
+
+    # cumulative
+    line = ax2.plot(cumulative, label="Cumulative share (right axis)", color=colors[2])
+    ax2.set_yticks([0, 0.1, 0.25, 0.5, 0.75, 0.9, 1])
+    ax2.set_yticklabels([f"{int(tick*100)}%" for tick in ax2.get_yticks()])
+    ax2.grid(True, color="gray")
+    ax2.set_ylabel("Cumulative share")
+    ax2.set_ylim([0, 1.01])
+
+    # cutoffs
+    for pct in ax2.get_yticks()[1:-1]:
+        x = cumulative[cumulative.gt(pct)].index[0]
+        ax2.scatter(x=x, y=cumulative[x], marker="o", color=colors[2])
+        ax2.text(
+            x=x + 10,
+            y=cumulative[x] - 0.04,
+            s=f"{x} assets: {cumulative[x]*100:.2f}% of total market capitalization",
+            color=colors[2],
+        )
+
+    # legend
+    elements = [area, scat, line[0]]
+    labels = [e.get_label() for e in elements]
+    ax.legend(elements, labels)  # , bbox_to_anchor=(1.05, 0.5), loc="center left")
 
     if save_path:
         fig.savefig(save_path, format="pdf", dpi=200, bbox_inches="tight")
