@@ -544,6 +544,9 @@ def describe_fevd(
         concentration_out_connectedness:
         concentration_out_eigenvector_centrality:
         concentration_out_page_rank:
+        concentration_out_connectedness_herfindahl:
+        concentration_out_eigenvector_centrality_herfindahl:
+        concentration_out_page_rank_herfindahl:
         amplification:
         innovation_diagonality_test_stat': Ledoit-Wolf test statistic for diagonality of innovations.
         innovation_diagonality_p_value': P-value for Ledoit-Wolf test statistic.
@@ -615,6 +618,36 @@ def describe_fevd(
                     weights=w,
                 ),
                 invert=True,
+            )
+            stats[
+                f"{table}_concentration_out_connectedness_herfindahl" + suffix
+            ] = herfindahl_index(
+                fevd.out_connectedness(
+                    horizon=horizon,
+                    table_name=table,
+                    normalize=False,
+                    weights=w,
+                ),
+            )
+            stats[
+                f"{table}_concentration_out_eigenvector_centrality_herfindahl" + suffix
+            ] = herfindahl_index(
+                fevd.out_eigenvector_centrality(
+                    horizon=horizon,
+                    table_name=table,
+                    normalize=False,
+                    weights=w,
+                ),
+            )
+            stats[
+                f"{table}_concentration_out_page_rank_herfindahl" + suffix
+            ] = herfindahl_index(
+                fevd.out_page_rank(
+                    horizon=horizon,
+                    table_name=table,
+                    normalize=False,
+                    weights=w,
+                ),
             )
             stats[f"{table}_amplification" + suffix] = (
                 fevd.amplification_factor(
@@ -727,7 +760,7 @@ def collect_fevd_estimates(
         in_page_rank_95: Page rank of incoming links with alpha 0.95.
         out_page_rank_95: Page rank of outgoing links with alpha 0.95.
         amplification_factor:
-        absorption_rate
+        absorption_rate:
 
     Args:
         fevd: Forecast Error Variance Decomposition to be described.
