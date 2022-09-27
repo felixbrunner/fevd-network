@@ -564,101 +564,58 @@ def describe_fevd(
     stats = {}
     for table in ["fev", "fevd", "irv"]:
         for w in [weights, None]:
+            # set up inputs
             suffix = "_weighted" if w is not None else ""
-            stats[f"{table}_avg_connectedness" + suffix] = fevd.average_connectedness(
+            network = fevd.to_network(
                 horizon=horizon,
                 table_name=table,
                 normalize=False,
                 weights=w,
             )
-            stats[f"{table}_asymmetry" + suffix] = matrix_asymmetry(
-                fevd._get_table(
-                    name=table,
-                    horizon=horizon,
-                    normalize=False,
-                    weights=w,
-                )
-            )
+
+            # calculate statistics
+            stats[
+                f"{table}_avg_connectedness" + suffix
+            ] = network.average_connectedness()
+            stats[f"{table}_asymmetry" + suffix] = matrix_asymmetry(network.adjacency)
             stats[f"{table}_asymmetry_offdiag" + suffix] = matrix_asymmetry(
-                fevd._get_table(
-                    name=table,
-                    horizon=horizon,
-                    normalize=False,
-                    weights=w,
-                ),
-                drop_diag=True,
+                network.adjacency, drop_diag=True
             )
             stats[
                 f"{table}_concentration_out_connectedness" + suffix
             ] = power_law_exponent(
-                fevd.out_connectedness(
-                    horizon=horizon,
-                    table_name=table,
-                    normalize=False,
-                    weights=w,
-                ),
+                network.out_connectedness(),
                 invert=True,
             )
             stats[
                 f"{table}_concentration_out_eigenvector_centrality" + suffix
             ] = power_law_exponent(
-                fevd.out_eigenvector_centrality(
-                    horizon=horizon,
-                    table_name=table,
-                    normalize=False,
-                    weights=w,
-                ),
+                network.out_eigenvector_centrality(),
                 invert=True,
             )
             stats[f"{table}_concentration_out_page_rank" + suffix] = power_law_exponent(
-                fevd.out_page_rank(
-                    horizon=horizon,
-                    table_name=table,
-                    normalize=False,
-                    weights=w,
-                ),
+                network.out_page_rank(),
                 invert=True,
             )
             stats[
                 f"{table}_concentration_out_connectedness_herfindahl" + suffix
             ] = herfindahl_index(
-                fevd.out_connectedness(
-                    horizon=horizon,
-                    table_name=table,
-                    normalize=False,
-                    weights=w,
-                ),
+                network.out_connectedness(),
             )
             stats[
                 f"{table}_concentration_out_eigenvector_centrality_herfindahl" + suffix
             ] = herfindahl_index(
-                fevd.out_eigenvector_centrality(
-                    horizon=horizon,
-                    table_name=table,
-                    normalize=False,
-                    weights=w,
-                ),
+                network.out_eigenvector_centrality(),
             )
             stats[
                 f"{table}_concentration_out_page_rank_herfindahl" + suffix
             ] = herfindahl_index(
-                fevd.out_page_rank(
-                    horizon=horizon,
-                    table_name=table,
-                    normalize=False,
-                    weights=w,
-                ),
+                network.out_page_rank(),
             )
             stats[f"{table}_amplification" + suffix] = (
-                fevd.amplification_factor(
-                    horizon=horizon,
-                    table_name="fev",
-                    normalize=False,
-                    weights=w,
-                ).squeeze()
+                network.amplification_factor().squeeze()
                 * (weights / weights.sum()).squeeze()
             ).sum()
-
     (
         stats["innovation_diagonality_test_stat"],
         stats["innovation_diagonality_p_value"],
@@ -776,117 +733,57 @@ def collect_fevd_estimates(
     estimates = pd.DataFrame(index=data.columns)
 
     for table in ["fev", "fevd", "irv"]:
-        for w in [weights, None]:
+        for w in [weights, None]:  # set up inputs
             suffix = "_weighted" if w is not None else ""
-            estimates[f"{table}_in_connectedness" + suffix] = fevd.in_connectedness(
+            network = fevd.to_network(
                 horizon=horizon,
                 table_name=table,
                 normalize=False,
                 weights=w,
             )
-            estimates[f"{table}_out_connectedness" + suffix] = fevd.out_connectedness(
-                horizon=horizon,
-                table_name=table,
-                normalize=False,
-                weights=w,
-            )
-            estimates[f"{table}_self_connectedness" + suffix] = fevd.self_connectedness(
-                horizon=horizon,
-                table_name=table,
-                normalize=False,
-                weights=w,
-            )
+
+            # calculate statistics
+            estimates[f"{table}_in_connectedness" + suffix] = network.in_connectedness()
+            estimates[
+                f"{table}_out_connectedness" + suffix
+            ] = network.out_connectedness()
+            estimates[
+                f"{table}_self_connectedness" + suffix
+            ] = network.self_connectedness()
             estimates[
                 f"{table}_total_connectedness" + suffix
-            ] = fevd.total_connectedness(
-                horizon=horizon,
-                table_name=table,
-                normalize=False,
-                weights=w,
-            )
-            estimates[f"{table}_in_concentration" + suffix] = fevd.in_concentration(
-                horizon=horizon,
-                table_name=table,
-                normalize=False,
-                weights=w,
-            )
-            estimates[f"{table}_out_concentration" + suffix] = fevd.out_concentration(
-                horizon=horizon,
-                table_name=table,
-                normalize=False,
-                weights=w,
-            )
+            ] = network.total_connectedness()
+            estimates[f"{table}_in_concentration" + suffix] = network.in_concentration()
+            estimates[
+                f"{table}_out_concentration" + suffix
+            ] = network.out_concentration()
             estimates[
                 f"{table}_in_eigenvector_centrality" + suffix
-            ] = fevd.in_eigenvector_centrality(
-                horizon=horizon,
-                table_name=table,
-                normalize=False,
-                weights=w,
-            )
+            ] = network.in_eigenvector_centrality()
             estimates[
                 f"{table}_out_eigenvector_centrality" + suffix
-            ] = fevd.out_eigenvector_centrality(
-                horizon=horizon,
-                table_name=table,
-                normalize=False,
-                weights=w,
+            ] = network.out_eigenvector_centrality()
+            estimates[f"{table}_in_page_rank_equal" + suffix] = network.in_page_rank(
+                weights=None, alpha=0.85
             )
-            estimates[f"{table}_in_page_rank_equal" + suffix] = fevd.in_page_rank(
-                horizon=horizon,
-                table_name=table,
-                normalize=False,
-                weights=None,
-                alpha=0.85,
+            estimates[f"{table}_out_page_rank_equal" + suffix] = network.out_page_rank(
+                weights=None, alpha=0.85
             )
-            estimates[f"{table}_out_page_rank_equal" + suffix] = fevd.out_page_rank(
-                horizon=horizon,
-                table_name=table,
-                normalize=False,
-                weights=None,
-                alpha=0.85,
+            estimates[f"{table}_in_page_rank_85" + suffix] = network.in_page_rank(
+                weights=w, alpha=0.85
             )
-            estimates[f"{table}_in_page_rank_85" + suffix] = fevd.in_page_rank(
-                horizon=horizon,
-                table_name=table,
-                normalize=False,
-                weights=w,
-                alpha=0.85,
+            estimates[f"{table}_out_page_rank_85" + suffix] = network.out_page_rank(
+                weights=w, alpha=0.85
             )
-            estimates[f"{table}_out_page_rank_85" + suffix] = fevd.out_page_rank(
-                horizon=horizon,
-                table_name=table,
-                normalize=False,
-                weights=w,
-                alpha=0.85,
+            estimates[f"{table}_in_page_rank_95" + suffix] = network.in_page_rank(
+                weights=w, alpha=0.95
             )
-            estimates[f"{table}_in_page_rank_95" + suffix] = fevd.in_page_rank(
-                horizon=horizon,
-                table_name=table,
-                normalize=False,
-                weights=w,
-                alpha=0.95,
-            )
-            estimates[f"{table}_out_page_rank_95" + suffix] = fevd.out_page_rank(
-                horizon=horizon,
-                table_name=table,
-                normalize=False,
-                weights=w,
-                alpha=0.95,
+            estimates[f"{table}_out_page_rank_95" + suffix] = network.out_page_rank(
+                weights=w, alpha=0.95
             )
             estimates[
                 f"{table}_amplification_factor" + suffix
-            ] = fevd.amplification_factor(
-                horizon=horizon,
-                table_name=table,
-                normalize=False,
-                weights=w,
-            )
-            estimates[f"{table}_absorption_rate" + suffix] = fevd.absorption_rate(
-                horizon=horizon,
-                table_name=table,
-                normalize=False,
-                weights=w,
-            )
+            ] = network.amplification_factor()
+            estimates[f"{table}_absorption_rate" + suffix] = network.absorption_rate()
 
     return estimates
