@@ -6,11 +6,11 @@ import pickle
 import warnings
 from pathlib import Path
 from collections import defaultdict
+from dateutil.relativedelta import relativedelta
 
-import numpy as np
 import pandas as pd
 
-from euraculus.settings import DATA_DIR
+from euraculus.settings import DATA_DIR, TIME_STEP
 
 
 class DataMap:
@@ -1221,3 +1221,55 @@ class DataMap:
         else:
             sectors = [ff_names[code] for code in codes]
         return sectors
+
+    def load_nonoverlapping_historic(self, columns: list = None):
+        """Load a dataframe with non-overlapping historic daily observations.
+
+        Args:
+            column: Name of the columns to load (optional).
+
+        Returns:
+            df_historic: Dataframe with historic observations.
+        """
+        df_historic = pd.DataFrame()
+
+        for sample_path in (self.datapath / "samples").iterdir():
+            sampling_date = self._prepare_date(sample_path.name)
+            df_sample = self.load_historic(sampling_date=sampling_date)
+            df_sample = self._slice_daterange(
+                df=df_sample,
+                start_date=sampling_date - TIME_STEP + relativedelta(days=1),
+                end_date=sampling_date,
+            )
+
+            if columns is not None:
+                df_sample = df_sample[columns]
+            df_historic = df_historic.append(df_sample)
+
+        return df_historic
+
+    def load_nonoverlapping_future(self, columns: list = None):
+        """Load a dataframe with non-overlapping future daily observations.
+
+        Args:
+            column: Name of the columns to load (optional).
+
+        Returns:
+            df_future: Dataframe with historic observations.
+        """
+        df_future = pd.DataFrame()
+
+        for sample_path in (self.datapath / "samples").iterdir():
+            sampling_date = self._prepare_date(sample_path.name)
+            df_sample = self.load_future(sampling_date=sampling_date)
+            df_sample = self._slice_daterange(
+                df=df_sample,
+                start_date=sampling_date + relativedelta(days=1),
+                end_date=sampling_date + TIME_STEP,
+            )
+
+            if columns is not None:
+                df_sample = df_sample[columns]
+            df_future = df_future.append(df_sample)
+
+        return df_future
