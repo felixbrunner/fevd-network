@@ -414,9 +414,12 @@ class FEVD:
             in_rank: A (n_series * 1) vector with centrality values.
         """
         table = self._get_table(
-            name=table_name, horizon=horizon, normalize=normalize, weights=weights
+            name=table_name,
+            horizon=horizon,
+            normalize=normalize,
+            weights=weights,
         )
-        network = Network(table)
+        network = Network(adjacency_matrix=table)
         return network
 
     @property

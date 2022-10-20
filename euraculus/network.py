@@ -7,24 +7,24 @@ from euraculus.utils import herfindahl_index, power_law_exponent
 
 
 class Network:
-    """A Network object describes the relation of a collation of nodes."""
+    """A Network object describes the relation of a collection of nodes."""
 
-    def __init__(self, adjacency: np.ndarray):
+    def __init__(self, adjacency_matrix: np.ndarray):
         """Set up the adjacency matrix.
 
         Args:
             adjacency: The square matrix containing connection strength values.
 
         """
-        if adjacency.shape[0] != adjacency.shape[1]:
+        if adjacency_matrix.shape[0] != adjacency_matrix.shape[1]:
             raise ValueError("adjacency matrix needs to be square")
 
-        self.adjacency = adjacency
+        self.adjacency_matrix = adjacency_matrix
 
     @property
     def n_nodes(self) -> int:
         """The number of nodes in the network."""
-        return self.adjacency.shape[0]
+        return self.adjacency_matrix.shape[0]
 
     def in_connectedness(
         self,
@@ -38,9 +38,9 @@ class Network:
         Returns:
             in_connectedness: A (n_nodes * 1) vector with connectedness values.
         """
-        in_connectedness = self.adjacency.sum(axis=1)
+        in_connectedness = self.adjacency_matrix.sum(axis=1)
         if others_only:
-            in_connectedness -= np.diag(self.adjacency)
+            in_connectedness -= np.diag(self.adjacency_matrix)
         in_connectedness = in_connectedness.reshape(-1, 1)
         return in_connectedness
 
@@ -56,9 +56,9 @@ class Network:
         Returns:
             out_connectedness: A (n_nodes * 1) vector with connectedness values.
         """
-        out_connectedness = self.adjacency.sum(axis=0)
+        out_connectedness = self.adjacency_matrix.sum(axis=0)
         if others_only:
-            out_connectedness -= np.diag(self.adjacency)
+            out_connectedness -= np.diag(self.adjacency_matrix)
         out_connectedness = out_connectedness.reshape(-1, 1)
         return out_connectedness
 
@@ -74,7 +74,7 @@ class Network:
         Returns:
             self_connectedness: A (n_nodes * 1) vector with connectedness values.
         """
-        self_connectedness = np.diag(self.adjacency).reshape(-1, 1)
+        self_connectedness = np.diag(self.adjacency_matrix).reshape(-1, 1)
         return self_connectedness
 
     def total_connectedness(
@@ -174,7 +174,7 @@ class Network:
             raise ValueError(
                 "measure neets to be one of 'power_law_exponent', 'herfindahl_index', 'entropy'"
             )
-        table = self.adjacency.copy()
+        table = self.adjacency_matrix.copy()
         n = self.n_nodes
 
         # remove diagonal values
@@ -217,7 +217,7 @@ class Network:
             raise ValueError(
                 "measure neets to be one of 'power_law_exponent', 'herfindahl_index', 'entropy'"
             )
-        table = self.adjacency
+        table = self.adjacency_matrix
         n = self.n_nodes
 
         # remove diagonal values
@@ -251,7 +251,7 @@ class Network:
             graph: The connectedness table as a networkx DiGraph object.
         """
         graph = nx.convert_matrix.from_numpy_array(
-            self.adjacency, create_using=nx.DiGraph
+            self.adjacency_matrix, create_using=nx.DiGraph
         )
         return graph.reverse()
 
@@ -264,7 +264,7 @@ class Network:
             in_centrality: A (n_nodes * 1) vector with centrality values.
         """
         # compute the largest right eigenvector
-        eigenvalues, eigenvectors = np.linalg.eig(self.adjacency)
+        eigenvalues, eigenvectors = np.linalg.eig(self.adjacency_matrix)
         idx = np.argmax(eigenvalues)
         in_page_rank = eigenvectors[:, idx].flatten().real
         in_page_rank *= np.sign(in_page_rank.sum())
@@ -278,7 +278,7 @@ class Network:
             out_centrality: A (n_nodes * 1) vector with centrality values.
         """
         # compute the largest left eigenvector
-        eigenvalues, eigenvectors = np.linalg.eig(self.adjacency.T)
+        eigenvalues, eigenvectors = np.linalg.eig(self.adjacency_matrix.T)
         idx = np.argmax(eigenvalues)
         out_page_rank = eigenvectors[:, idx].flatten().real
         out_page_rank *= np.sign(out_page_rank.sum())
@@ -300,7 +300,7 @@ class Network:
             in_rank: A (n_nodes * 1) vector with centrality values.
         """
         # retrieve inputs
-        table = self.adjacency
+        table = self.adjacency_matrix
         out_connectedness = self.out_connectedness(others_only=False)
 
         # normalize weights
@@ -336,7 +336,7 @@ class Network:
             in_rank: A (n_nodes * 1) vector with centrality values.
         """
         # retrieve inputs
-        table = self.adjacency
+        table = self.adjacency_matrix
         in_connectedness = self.in_connectedness(others_only=False)
 
         # normalize weights
