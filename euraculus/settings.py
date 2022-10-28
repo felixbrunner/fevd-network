@@ -9,12 +9,14 @@ ROOT_DIR = Path(__file__).parents[1]
 DATA_DIR = ROOT_DIR / "data"
 
 # rolling window
-FIRST_SAMPLING_DATE = dt.datetime(year=1990, month=1, day=31)
-LAST_SAMPLING_DATE = dt.datetime(year=2021, month=12, day=31)
+FIRST_SAMPLING_DATE = dt.datetime(year=1989, month=12, day=31)
+LAST_SAMPLING_DATE = dt.datetime(year=2022, month=3, day=31)
 TIME_STEP = relativedelta(months=1, day=31)
 
 # sampling
-SAMPLING_VARIABLE = "mcap"
+SAMPLING_VARIABLE = "valuation_volatility"  # "mcap"
+ESTIMATION_WINDOW = 12
+FORECAST_WINDOW = 60
 
 # estimation
 FACTORS = ["crsp"]

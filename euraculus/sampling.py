@@ -88,7 +88,7 @@ class LargeCapSampler:
             start_date += relativedelta(day=31)
 
         # infer end date
-        end_date = sampling_date + relativedelta(months=self.back_offset)
+        end_date = sampling_date + relativedelta(months=self.forward_offset)
         if end_date.month == 2 and end_date.day == 28:
             end_date += relativedelta(day=31)
 
@@ -419,7 +419,7 @@ class LargeCapSampler:
             ]
 
             # append letter if duplicate
-            if len(ticker_keys) > 1:
+            if len(ticker_keys) > 1 and ticker is not None:
                 for occurence, ticker_key in enumerate(ticker_keys):
                     rows = df_.index.get_level_values("permno") == ticker_key
                     df_.loc[rows, "ticker"] = ticker + "." + ALPHABET[occurence]
