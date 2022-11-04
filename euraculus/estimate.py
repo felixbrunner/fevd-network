@@ -15,6 +15,7 @@ from euraculus.utils import (
     shrinkage_factor,
     herfindahl_index,
     power_law_exponent,
+    months_difference,
 )
 import datetime as dt
 
@@ -529,15 +530,13 @@ def describe_cov(
     return stats
 
 
-def describe_fevd(
-    fevd: euraculus.fevd.FEVD,
-    horizon: int,
-    data: pd.DataFrame,
-    weights: np.ndarray,
+def describe_network(
+    network: euraculus.network.Network,
+    # weights: np.ndarray,
 ) -> dict:
-    """Creates descriptive statistics of a FEVD.
+    """Creates descriptive statistics of a Network.
 
-    Calculates the following statistics for all tables and weights:
+    Calculates the following statistics for the network:
         avg_connectedness: Average connectedness of the network table.
         asymmetry: Asymmetry of network table.
         asymmetry_offdiag: Off-diagonal asymmetry of network table.
@@ -548,6 +547,56 @@ def describe_fevd(
         concentration_out_eigenvector_centrality_herfindahl:
         concentration_out_page_rank_herfindahl:
         amplification:
+
+    Args:
+        network: Network object to be described.
+     #   weights: A vector indicating the weights of each node in the aggregate.
+
+    Returns:
+        stats: Key, value pairs of the calculated statistics.
+    """
+    stats = {}
+    stats[f"avg_connectedness"] = network.average_connectedness()
+    stats[f"asymmetry"] = matrix_asymmetry(network.adjacency_matrix)
+    stats[f"asymmetry_offdiag"] = matrix_asymmetry(
+        network.adjacency_matrix, drop_diag=True
+    )
+    stats[f"concentration_out_connectedness"] = power_law_exponent(
+        network.out_connectedness(),
+        invert=True,
+    )
+    stats[f"concentration_out_eigenvector_centrality"] = power_law_exponent(
+        network.out_eigenvector_centrality(),
+        invert=True,
+    )
+    stats[f"concentration_out_page_rank"] = power_law_exponent(
+        network.out_page_rank(),
+        invert=True,
+    )
+    stats[f"concentration_out_connectedness_herfindahl"] = herfindahl_index(
+        network.out_connectedness(),
+    )
+    stats[f"concentration_out_eigenvector_centrality_herfindahl"] = herfindahl_index(
+        network.out_eigenvector_centrality(),
+    )
+    stats[f"concentration_out_page_rank_herfindahl"] = herfindahl_index(
+        network.out_page_rank(),
+    )
+    # stats[f"amplification"] = (
+    #     network.amplification_factor().squeeze() * (weights / weights.sum()).squeeze()
+    # ).sum()
+    return stats
+
+
+def describe_fevd(
+    fevd: euraculus.fevd.FEVD,
+    horizon: int,
+    data: pd.DataFrame,
+    weights: np.ndarray,
+) -> dict:
+    """Creates descriptive statistics of a FEVD.
+
+    Calculates the following statistics for the FEVD, then describes some FEVD network tables:
         innovation_diagonality_test_stat': Ledoit-Wolf test statistic for diagonality of innovations.
         innovation_diagonality_p_value': P-value for Ledoit-Wolf test statistic.
 
@@ -561,66 +610,81 @@ def describe_fevd(
         stats: Key, value pairs of the calculated statistics.
 
     """
+    # direct analysis of fevd
     stats = {}
-    for table in ["fev", "fevd", "irv"]:
-        for w in [weights, None]:
-            # set up inputs
-            suffix = "_weighted" if w is not None else ""
-            network = fevd.to_network(
-                horizon=horizon,
-                table_name=table,
-                normalize=False,
-                weights=w,
-            )
-
-            # calculate statistics
-            stats[
-                f"{table}_avg_connectedness" + suffix
-            ] = network.average_connectedness()
-            stats[f"{table}_asymmetry" + suffix] = matrix_asymmetry(network.adjacency)
-            stats[f"{table}_asymmetry_offdiag" + suffix] = matrix_asymmetry(
-                network.adjacency, drop_diag=True
-            )
-            stats[
-                f"{table}_concentration_out_connectedness" + suffix
-            ] = power_law_exponent(
-                network.out_connectedness(),
-                invert=True,
-            )
-            stats[
-                f"{table}_concentration_out_eigenvector_centrality" + suffix
-            ] = power_law_exponent(
-                network.out_eigenvector_centrality(),
-                invert=True,
-            )
-            stats[f"{table}_concentration_out_page_rank" + suffix] = power_law_exponent(
-                network.out_page_rank(),
-                invert=True,
-            )
-            stats[
-                f"{table}_concentration_out_connectedness_herfindahl" + suffix
-            ] = herfindahl_index(
-                network.out_connectedness(),
-            )
-            stats[
-                f"{table}_concentration_out_eigenvector_centrality_herfindahl" + suffix
-            ] = herfindahl_index(
-                network.out_eigenvector_centrality(),
-            )
-            stats[
-                f"{table}_concentration_out_page_rank_herfindahl" + suffix
-            ] = herfindahl_index(
-                network.out_page_rank(),
-            )
-            stats[f"{table}_amplification" + suffix] = (
-                network.amplification_factor().squeeze()
-                * (weights / weights.sum()).squeeze()
-            ).sum()
     (
         stats["innovation_diagonality_test_stat"],
         stats["innovation_diagonality_p_value"],
     ) = fevd.test_diagonal_generalized_innovations(t_observations=data.shape[0])
+
+    # analyse networks derived from fevd
+    tables = [
+        ("fevd", None),
+        ("fev", None),
+        ("fevd", weights),
+        ("fev", weights),
+    ]
+    for (table_name, weights) in tables:
+        network = fevd.to_network(
+            horizon=horizon,
+            table_name=table_name,
+            normalize=False,
+            weights=weights,
+        )
+        network_stats = describe_network(network)
+        weighted = "" if weights is None else "w"
+        network_stats = {
+            f"{weighted}{table_name}_{k}": v for k, v in network_stats.items()
+        }
+        stats.update(network_stats)
     return stats
+
+
+def collect_data_estimates(
+    df_historic: pd.DataFrame,
+    df_future: pd.DataFrame,
+    df_rf: pd.DataFrame,
+    analysis_windows: list,
+) -> pd.DataFrame:
+    """Calculate return and variance estimates for various horizons.
+
+    Args:
+        df_historic: Dataframe with past returns.
+        df_future: Dataframe with subsequent returns.
+        df_rf: Dataframe with risk-free returns.
+        analysis_windows: List of forecast horizons in months.
+
+    Returns:
+        estimates: Extracted estimates in a DataFrame.
+    """
+    estimates = pd.DataFrame(index=df_historic.columns)
+
+    # historic
+    df_historic -= df_rf.loc[df_historic.index].values
+    estimates["ret_excess"] = (1 + df_historic).prod() - 1
+    estimates["var_annual"] = df_historic.var() * 252
+
+    # forecasts
+    if df_future is not None:
+        df_future -= df_rf.loc[df_future.index].values
+        for window_length in analysis_windows:
+            if (
+                months_difference(
+                    end_date=df_future.index.max(),
+                    start_date=df_historic.index.max(),
+                )
+                >= window_length
+            ):
+                end_date = df_historic.index.max() + relativedelta(
+                    months=window_length, day=31
+                )
+                df_window = df_future[df_future.index <= end_date]
+                estimates[f"ret_excess_next{window_length}M"] = (
+                    1 + df_window
+                ).prod() - 1
+                estimates[f"var_annual_next{window_length}M"] = df_window.var() * 252
+
+    return estimates
 
 
 def collect_var_estimates(
@@ -693,13 +757,12 @@ def collect_cov_estimates(
     return estimates
 
 
-def collect_fevd_estimates(
-    fevd: euraculus.fevd.FEVD,
-    horizon: int,
+def collect_network_estimates(
+    network: euraculus.network.Network,
     data: pd.DataFrame,
     weights: np.ndarray,
 ) -> pd.DataFrame:
-    """Extract estimates from a Forecast Error Variance Decomposition network.
+    """Extract estimates from a Network.
 
     Extracts the following estimates on node level for each table and weighting:
         in_connectedness: Sum of incoming links.
@@ -721,69 +784,73 @@ def collect_fevd_estimates(
 
     Args:
         fevd: Forecast Error Variance Decomposition to be described.
+        data: Data the estimation is performed on.
+        weights: A vector indicating the weights of each node in the aggregate.
+
+    Returns:
+        estimates: Extracted estimates in a DataFrame.
+    """
+    estimates = pd.DataFrame(index=data.columns)
+    estimates[f"in_connectedness"] = network.in_connectedness()
+    estimates[f"out_connectedness"] = network.out_connectedness()
+    estimates[f"full_in_connectedness"] = network.in_connectedness(others_only=False)
+    estimates[f"full_out_connectedness"] = network.out_connectedness(others_only=False)
+    estimates[f"self_connectedness"] = network.self_connectedness()
+    estimates[f"total_connectedness"] = network.total_connectedness()
+    estimates[f"in_concentration"] = network.in_concentration()
+    estimates[f"out_concentration"] = network.out_concentration()
+    estimates[f"full_in_concentration"] = network.in_concentration(others_only=False)
+    estimates[f"full_out_concentration"] = network.out_concentration(others_only=False)
+    estimates[f"in_eigenvector_centrality"] = network.in_eigenvector_centrality()
+    estimates[f"out_eigenvector_centrality"] = network.out_eigenvector_centrality()
+    estimates[f"in_page_rank_equal"] = network.in_page_rank(weights=None, alpha=0.85)
+    estimates[f"out_page_rank_equal"] = network.out_page_rank(weights=None, alpha=0.85)
+    estimates[f"in_page_rank_85"] = network.in_page_rank(weights=weights, alpha=0.85)
+    estimates[f"out_page_rank_85"] = network.out_page_rank(weights=weights, alpha=0.85)
+    estimates[f"in_page_rank_95"] = network.in_page_rank(weights=weights, alpha=0.95)
+    estimates[f"out_page_rank_95"] = network.out_page_rank(weights=weights, alpha=0.95)
+    estimates[f"amplification_factor"] = network.amplification_factor()
+    estimates[f"absorption_rate"] = network.absorption_rate()
+    return estimates
+
+
+def collect_fevd_estimates(
+    fevd: euraculus.fevd.FEVD,
+    horizon: int,
+    data: pd.DataFrame,
+    weights: np.ndarray,
+) -> pd.DataFrame:
+    """Extract estimates from a Forecast Error Variance Decomposition network.
+
+    Extracts estimates on node level from a set of FEVD tables.
+
+    Args:
+        fevd: Forecast Error Variance Decomposition to be described.
         horizon: Horizon to calculate some estimates with.
         data: Data the estimation is performed on.
         weights: A vector indicating the weights of each node in the aggregate.
 
     Returns:
         estimates: Extracted estimates in a DataFrame.
-
     """
-
     estimates = pd.DataFrame(index=data.columns)
-
-    for table in ["fev", "fevd", "irv"]:
-        for w in [weights, None]:  # set up inputs
-            suffix = "_weighted" if w is not None else ""
-            network = fevd.to_network(
-                horizon=horizon,
-                table_name=table,
-                normalize=False,
-                weights=w,
-            )
-
-            # calculate statistics
-            estimates[f"{table}_in_connectedness" + suffix] = network.in_connectedness()
-            estimates[
-                f"{table}_out_connectedness" + suffix
-            ] = network.out_connectedness()
-            estimates[
-                f"{table}_self_connectedness" + suffix
-            ] = network.self_connectedness()
-            estimates[
-                f"{table}_total_connectedness" + suffix
-            ] = network.total_connectedness()
-            estimates[f"{table}_in_concentration" + suffix] = network.in_concentration()
-            estimates[
-                f"{table}_out_concentration" + suffix
-            ] = network.out_concentration()
-            estimates[
-                f"{table}_in_eigenvector_centrality" + suffix
-            ] = network.in_eigenvector_centrality()
-            estimates[
-                f"{table}_out_eigenvector_centrality" + suffix
-            ] = network.out_eigenvector_centrality()
-            estimates[f"{table}_in_page_rank_equal" + suffix] = network.in_page_rank(
-                weights=None, alpha=0.85
-            )
-            estimates[f"{table}_out_page_rank_equal" + suffix] = network.out_page_rank(
-                weights=None, alpha=0.85
-            )
-            estimates[f"{table}_in_page_rank_85" + suffix] = network.in_page_rank(
-                weights=w, alpha=0.85
-            )
-            estimates[f"{table}_out_page_rank_85" + suffix] = network.out_page_rank(
-                weights=w, alpha=0.85
-            )
-            estimates[f"{table}_in_page_rank_95" + suffix] = network.in_page_rank(
-                weights=w, alpha=0.95
-            )
-            estimates[f"{table}_out_page_rank_95" + suffix] = network.out_page_rank(
-                weights=w, alpha=0.95
-            )
-            estimates[
-                f"{table}_amplification_factor" + suffix
-            ] = network.amplification_factor()
-            estimates[f"{table}_absorption_rate" + suffix] = network.absorption_rate()
-
+    tables = [
+        ("fevd", None),
+        ("fev", None),
+        ("fevd", weights),
+        ("fev", weights),
+    ]
+    for (table_name, weights) in tables:
+        network = fevd.to_network(
+            horizon=horizon,
+            table_name=table_name,
+            normalize=False,
+            weights=weights,
+        )
+        network_estimates = collect_network_estimates(
+            network=network, weights=weights, data=data
+        )
+        weighted = "" if weights is None else "w"
+        network_estimates = network_estimates.add_prefix(f"{weighted}{table_name}_")
+        estimates = estimates.join(network_estimates)
     return estimates
