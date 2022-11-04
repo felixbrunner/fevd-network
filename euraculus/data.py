@@ -1244,6 +1244,7 @@ class DataMap:
 
             if columns is not None:
                 df_sample = df_sample[columns]
+            df_sample["sampling_date"] = sampling_date
             df_historic = df_historic.append(df_sample)
 
         return df_historic
@@ -1270,6 +1271,7 @@ class DataMap:
 
             if columns is not None:
                 df_sample = df_sample[columns]
+            df_sample["sampling_date"] = sampling_date
             df_future = df_future.append(df_sample)
 
         return df_future
