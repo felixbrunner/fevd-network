@@ -150,8 +150,8 @@ def herfindahl_index(values: np.ndarray, axis: int = 0) -> float:
     Returns:
         hhi: The Herfindahl-Hirschman index of concentration.
     """
-    weights = values / values.sum(axis=axis, keepdims=True)
-    hhi = (weights**2).sum(axis=axis)
+    weights = values / np.nansum(values, axis=axis, keepdims=True)
+    hhi = np.nansum(weights**2, axis=axis)
     if hhi.size == 1:
         hhi = hhi[0]
     return hhi
