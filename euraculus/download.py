@@ -12,6 +12,9 @@ import pandas as pd
 import wrds
 import yfinance
 
+import pandas_datareader
+from pandas_datareader._utils import RemoteDataError
+
 
 class WRDSDownloader:
     """Provides access to WRDS Database.
@@ -392,3 +395,41 @@ def download_yahoo_data(ticker: str) -> pd.DataFrame:
     """
     df = yfinance.Ticker(ticker).history(period="max")
     return df
+
+
+def download_famafrench_dataset(
+    name: str,
+    key=None,
+    start_date: str = "01/01/1900",
+    end_date: str = None,
+) -> dict:
+    """Download a dataset from Ken French's data library.
+
+    https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html
+
+    Args:
+        name: Name of the dataset or a dataset name to search for.
+        key: Key of the table to load, display data description if
+            no key is provided and return full dataset.
+        start_date: First date as dt.datetime or string, e.g. format 'YYYY-MM-DD'.
+        end_date: Last date as dt.datetime or string, e.g. format 'YYYY-MM-DD'.
+
+    Returns:
+        dataset: Table as a pandas Dataframe or full dataset as a dictionary.
+    """
+    try:
+        dataset = pandas_datareader.DataReader(
+            name=name, data_source="famafrench", start=start_date, end=end_date
+        )
+        if key is None:
+            print(dataset["DESCR"])
+            return dataset
+        else:
+            return dataset[key]
+    except RemoteDataError:
+        datasets = pandas_datareader.famafrench.get_available_datasets()
+        matches = [dataset for dataset in datasets if name in dataset]
+        print_matches = "\n    ".join(sorted(matches))
+        warnings.warn(
+            f"dataset '{name}' not found, try {len(matches)} similar datasets:\n    {print_matches}"
+        )
