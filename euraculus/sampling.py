@@ -219,8 +219,8 @@ class LargeCapSampler:
         return mean_mcap
 
     @staticmethod
-    def _get_mean_valuation_volatility(df: pd.DataFrame) -> pd.Series:
-        """Get average firm valuation volatilities from dataset.
+    def _get_mean_mcap_volatility(df: pd.DataFrame) -> pd.Series:
+        """Get average firm mcap volatilities from dataset.
 
         Return a series of average market capitalisations for contained permnos.
 
@@ -228,20 +228,17 @@ class LargeCapSampler:
             df : CRSP data with column 'mcap'.
 
         Returns:
-            mean_valuation_volatility: Permno, valuation_volatility pairs with average observed vv.
+            mean_mcap_volatility: Permno, mcap_volatility pairs with average observed vv.
         """
-        valuation_volatility = df["mcap"] * np.sqrt(df["var"].fillna(df["noisevar"]))
-        mean_valuation_volatility = (
-            valuation_volatility.unstack()
-            .mean()
-            .squeeze()
-            .rename("mean_valuation_volatility")
+        mcap_volatility = df["mcap"] * np.sqrt(df["var"].fillna(df["noisevar"]))
+        mean_mcap_volatility = (
+            mcap_volatility.unstack().mean().squeeze().rename("mean_mcap_volatility")
         )
-        return mean_valuation_volatility
+        return mean_mcap_volatility
 
     @staticmethod
-    def _get_last_valuation_volatility(df: pd.DataFrame) -> pd.Series:
-        """Get average firm valuation volatilities from dataset.
+    def _get_last_mcap_volatility(df: pd.DataFrame) -> pd.Series:
+        """Get average firm mcap volatilities from dataset.
 
         Return a series of average market capitalisations for contained permnos.
 
@@ -249,18 +246,18 @@ class LargeCapSampler:
             df : CRSP data with column 'mcap'.
 
         Returns:
-            mean_valuation_volatility: Permno, valuation volatilities pairs with average observed vv.
+            mean_mcap_volatility: Permno, mcap volatilities pairs with average observed vv.
         """
-        valuation_volatility = df["mcap"] * np.sqrt(df["var"].fillna(df["noisevar"]))
-        last_valuation_volatility = (
-            valuation_volatility.unstack()
+        mcap_volatility = df["mcap"] * np.sqrt(df["var"].fillna(df["noisevar"]))
+        last_mcap_volatility = (
+            mcap_volatility.unstack()
             .sort_index()
             .fillna(method="ffill", limit=1)
             .tail(1)
             .squeeze()
-            .rename("last_valuation_volatility")
+            .rename("last_mcap_volatility")
         )
-        return last_valuation_volatility
+        return last_mcap_volatility
 
     @staticmethod
     def _get_tickers(df: pd.DataFrame) -> pd.Series:
@@ -324,8 +321,8 @@ class LargeCapSampler:
             .join(self._has_obs(df_back, df_forward).rename("has_next_obs"))
             .join(self._get_last_mcaps(df_back))
             .join(self._get_mean_mcaps(df_back))
-            .join(self._get_last_valuation_volatility(df_back))
-            .join(self._get_mean_valuation_volatility(df_back))
+            .join(self._get_last_mcap_volatility(df_back))
+            .join(self._get_mean_mcap_volatility(df_back))
         )
 
         # set next obs to TRUE if there are no subsequent observations at all
@@ -345,14 +342,14 @@ class LargeCapSampler:
             .where(df_summary["has_next_obs"])
             .rank(ascending=False)
         )
-        df_summary["last_valuation_volatility_rank"] = (
-            df_summary["mean_valuation_volatility"]
+        df_summary["last_mcap_volatility_rank"] = (
+            df_summary["mean_mcap_volatility"]
             .where(df_summary["has_all_days"])
             .where(df_summary["has_next_obs"])
             .rank(ascending=False)
         )
-        df_summary["mean_valuation_volatility_rank"] = (
-            df_summary["mean_valuation_volatility"]
+        df_summary["mean_mcap_volatility_rank"] = (
+            df_summary["mean_mcap_volatility"]
             .where(df_summary["has_all_days"])
             .where(df_summary["has_next_obs"])
             .rank(ascending=False)

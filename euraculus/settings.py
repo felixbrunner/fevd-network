@@ -15,7 +15,7 @@ TIME_STEP = relativedelta(months=1, day=31)
 
 # sampling
 NUM_ASSETS = 100
-SAMPLING_VARIABLE = "mcap_volatility" # "mcap"
+SAMPLING_VARIABLE = "mcap_volatility"  # "mcap"
 ESTIMATION_WINDOW = 12
 FORECAST_WINDOW = 60
 
@@ -30,7 +30,7 @@ COV_GRID = {"alpha": np.geomspace(1e-3, 1e0, 25)}
 HORIZON = 21
 
 # analysis
-FORECASTING_WINDOWS = [1, 2, 3, 6, 9, 12, 18, 24, 36, 48, 60] # in months
+FORECAST_WINDOWS = [1, 2, 3, 6, 9, 12, 18, 24, 36, 48, 60]  # in months
 # FEVD_TABLES = [
 #     ("fevd", None),
 #     ("fev", None),
