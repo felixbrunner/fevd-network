@@ -64,7 +64,6 @@ class Network:
 
     def self_connectedness(
         self,
-        # **kwargs,
     ) -> np.ndarray:
         """Get the links of each node with itself.
 
@@ -159,7 +158,7 @@ class Network:
     def in_concentration(
         self,
         others_only: bool = True,
-        measure: str = "power_law_exponent",
+        measure: str = "herfindahl_index",
     ) -> np.ndarray:
         """Calculate the concentration of incoming links per node (row-wise).
 
@@ -202,7 +201,7 @@ class Network:
     def out_concentration(
         self,
         others_only: bool = True,
-        measure: str = "power_law_exponent",
+        measure: str = "herfindahl_index",
     ) -> np.ndarray:
         """Calculate the concentration of outgoing links per node (column-wise).
 

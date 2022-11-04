@@ -561,20 +561,27 @@ def describe_network(
     stats[f"asymmetry_offdiag"] = matrix_asymmetry(
         network.adjacency_matrix, drop_diag=True
     )
-    stats[f"concentration_out_connectedness"] = power_law_exponent(
+    stats[f"concentration_out_connectedness_powerlaw"] = power_law_exponent(
         network.out_connectedness(),
         invert=True,
     )
-    stats[f"concentration_out_eigenvector_centrality"] = power_law_exponent(
+    stats[f"concentration_full_out_connectedness_powerlaw"] = power_law_exponent(
+        network.out_connectedness(others_only=False),
+        invert=True,
+    )
+    stats[f"concentration_out_eigenvector_centrality_powerlaw"] = power_law_exponent(
         network.out_eigenvector_centrality(),
         invert=True,
     )
-    stats[f"concentration_out_page_rank"] = power_law_exponent(
+    stats[f"concentration_out_page_rank_powerlaw"] = power_law_exponent(
         network.out_page_rank(),
         invert=True,
     )
     stats[f"concentration_out_connectedness_herfindahl"] = herfindahl_index(
         network.out_connectedness(),
+    )
+    stats[f"concentration_full_out_connectedness_herfindahl"] = herfindahl_index(
+        network.out_connectedness(others_only=False),
     )
     stats[f"concentration_out_eigenvector_centrality_herfindahl"] = herfindahl_index(
         network.out_eigenvector_centrality(),
