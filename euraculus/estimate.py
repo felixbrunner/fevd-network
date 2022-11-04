@@ -116,7 +116,7 @@ def log_replace(df: pd.DataFrame, method: str = "min") -> pd.DataFrame:
 
 
 def construct_crsp_index(sampling_date: dt.datetime, data: DataMap) -> pd.Series:
-    """Constructs an equally weighted log valuation volatility index across the CRSP universe.
+    """Constructs an equally weighted log mcap volatility index across the CRSP universe.
 
     Args:
         data: DataMap to load data from.
@@ -185,8 +185,8 @@ def load_estimation_data(data: DataMap, sampling_date: dt.datetime) -> dict:
             "comnam",
             "last_mcap",
             "mean_mcap",
-            "last_valuation_volatility",
-            "mean_valuation_volatility",
+            "last_mcap_volatility",
+            "mean_mcap_volatility",
             "sic_division",
             "ff_sector",
             "ff_sector_ticker",
