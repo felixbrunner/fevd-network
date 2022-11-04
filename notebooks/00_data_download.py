@@ -48,8 +48,8 @@ data = DataMap(DATA_DIR)
 # ### Timeframe
 
 # %%
-# first_year = 1925
-first_year = FIRST_SAMPLING_DATE.year - 2
+first_year = 1925
+# first_year = FIRST_SAMPLING_DATE.year - 2
 last_year = LAST_SAMPLING_DATE.year + 1
 
 # %% [markdown]

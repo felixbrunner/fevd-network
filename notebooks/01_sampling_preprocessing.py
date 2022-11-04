@@ -22,6 +22,9 @@ from euraculus.settings import (
     LAST_SAMPLING_DATE,
     TIME_STEP,
     SAMPLING_VARIABLE,
+    ESTIMATION_WINDOW,
+    FORECAST_WINDOW,
+    NUM_ASSETS,
 )
 
 # %% [markdown]
@@ -32,7 +35,7 @@ from euraculus.settings import (
 
 # %%
 data = DataMap(DATA_DIR)
-sampler = LargeCapSampler(datamap=data, n_assets=100, back_offset=12, forward_offset=12)
+sampler = LargeCapSampler(datamap=data, n_assets=NUM_ASSETS, back_offset=ESTIMATION_WINDOW, forward_offset=FORECAST_WINDOW)
 
 # %% [markdown]
 # ## Conduct monthly sampling
@@ -41,7 +44,7 @@ sampler = LargeCapSampler(datamap=data, n_assets=100, back_offset=12, forward_of
 # ### Test single window
 
 # %%
-sampling_date = dt.datetime(year=2021, month=12, day=31)
+sampling_date = dt.datetime(year=1959, month=12, day=31)
 
 # %%
 # %%time
@@ -72,7 +75,7 @@ df_estimates["ff_sector_ticker"] = data.lookup_famafrench_sectors(
 df_estimates["gics_sector"] = data.lookup_gics_sectors(df_estimates["gics"].values)
 
 # %% [markdown]
-# ### Rolling window
+# ## Rolling window
 
 # %%
 # %%time
