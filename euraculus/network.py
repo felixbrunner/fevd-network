@@ -95,6 +95,19 @@ class Network:
             total_connectedness -= self.self_connectedness()
         return total_connectedness
 
+    def net_connectedness(
+        self,
+    ) -> np.ndarray:
+        """Get the differnece of links of each node (outgoing less incoming).
+
+        Returns:
+            net_connectedness: A (n_nodes * 1) vector with connectedness values.
+        """
+        net_connectedness = self.out_connectedness(
+            others_only=True
+        ) - self.in_connectedness(others_only=True)
+        return net_connectedness
+
     def amplification_factor(
         self,
         others_only: bool = False,
