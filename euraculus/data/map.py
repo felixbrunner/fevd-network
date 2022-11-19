@@ -520,7 +520,9 @@ class DataMap:
 
         return df
 
-    def load_aggregates(self, sampling_date: str, column: str = None) -> pd.DataFrame:
+    def load_historic_aggregates(
+        self, sampling_date: str, column: str = None
+    ) -> pd.DataFrame:
         """Load historic aggregates for a sampling period.
 
         Args:
@@ -533,7 +535,38 @@ class DataMap:
         """
         # prepare & load raw
         sampling_date = self._prepare_date(sampling_date)
-        df = self.read(f"samples/{sampling_date:%Y-%m-%d}/aggregates.csv")
+        df = self.read(f"samples/{sampling_date:%Y-%m-%d}/historic_aggregates.csv")
+
+        # format
+        df["date"] = pd.to_datetime(df["date"])
+        df = df.set_index("date")
+
+        # return data matrix if column is chosen
+        if column:
+            if type(column) != str:
+                raise ValueError(
+                    f"specify single column as a string, not {type(column)}"
+                )
+            df = df[column]
+
+        return df
+
+    def load_future_aggregates(
+        self, sampling_date: str, column: str = None
+    ) -> pd.DataFrame:
+        """Load future aggregates for a sampling period.
+
+        Args:
+            sampling_date: The sampling date as dt.datetime or string,
+                e.g. format 'YYYY-MM-DD'.
+            column: Name of a single column to be loaded (optional).
+
+        Returns:
+            df: Future aggregate data in tabular form.
+        """
+        # prepare & load raw
+        sampling_date = self._prepare_date(sampling_date)
+        df = self.read(f"samples/{sampling_date:%Y-%m-%d}/future_aggregates.csv")
 
         # format
         df["date"] = pd.to_datetime(df["date"])
@@ -750,83 +783,6 @@ class DataMap:
             df_summary = df_summary[columns]
 
         return df_summary
-
-    def make_sample_indices(self, sampling_date: str):
-        """Collects excess returns data on three asset indices.
-
-        Included indices are:
-            - equally-weighted
-            - value-weighted at the beginning of the observation period
-            - the SPY index
-
-        Args:
-            sampling_date: Reference date to filter descriptive data.
-                Can be dt.datetime or string, e.g. format 'YYYY-MM-DD'.
-
-        Returns:
-            historic_indices: Index observations for historic dates.
-            future_indices: Index observations for future dates.
-        """
-        # load required data
-        df_historic = self.load_historic(sampling_date=sampling_date, column="retadj")
-        historic_weights = self.load_historic(
-            sampling_date=sampling_date, column="mcap"
-        )
-        try:
-            df_future = self.load_future(sampling_date=sampling_date, column="retadj")
-            future_weights = self.load_future(
-                sampling_date=sampling_date, column="mcap"
-            )
-            future = True
-        except KeyError:
-            future = False
-        df_rf = self.load_rf()
-        df_spy = self.load_spy_data()[["ret"]]
-
-        # prepare data
-        df_historic -= df_rf.loc[df_historic.index].values
-        historic_weights = historic_weights / historic_weights.sum(
-            axis=1
-        ).values.reshape(-1, 1)
-        if future:
-            df_future -= df_rf.loc[df_future.index].values
-            future_weights = future_weights / future_weights.sum(axis=1).values.reshape(
-                -1, 1
-            )
-
-        # historic outputs
-        historic_indices = pd.DataFrame(
-            index=df_historic.index, columns=pd.Index(["ew", "vw", "spy"], name="index")
-        )
-        historic_indices["ew"] = df_historic.mean(axis=1)
-        historic_indices["vw"] = (df_historic * historic_weights).sum(axis=1)
-        try:
-            historic_indices["spy"] = (
-                df_spy.loc[df_historic.index].values
-                - df_rf.loc[df_historic.index].values
-            )
-        except KeyError:
-            pass
-
-        # future outputs
-        if future:
-            future_indices = pd.DataFrame(
-                index=df_future.index,
-                columns=pd.Index(["ew", "vw", "spy"], name="index"),
-            )
-            future_indices["ew"] = df_future.mean(axis=1)
-            future_indices["vw"] = (df_future * future_weights).sum(axis=1)
-            try:
-                future_indices["spy"] = (
-                    df_spy.loc[df_future.index].values
-                    - df_rf.loc[df_future.index].values
-                )
-            except KeyError:
-                pass
-        else:
-            future_indices = None
-
-        return (historic_indices, future_indices)
 
     def lookup_ticker(self, tickers: list, date: str) -> pd.DataFrame:
         """Looks up information for a specific ticker on a given date.
