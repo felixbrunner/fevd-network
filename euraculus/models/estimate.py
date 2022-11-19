@@ -1,16 +1,14 @@
-import warnings
 from dateutil.relativedelta import relativedelta
-import networkx as nx
 import numpy as np
 import pandas as pd
 import scipy as sp
-from sklearn.decomposition import PCA
 from sklearn.model_selection import GridSearchCV
-from euraculus.data import DataMap
-from euraculus.var import FactorVAR
-from euraculus.covar import GLASSO
-from euraculus.fevd import FEVD
-from euraculus.utils import (
+from euraculus.data.map import DataMap
+from euraculus.data.preprocess import prepare_log_data, log_replace
+from euraculus.models.var import FactorVAR
+from euraculus.models.covariance import GLASSO
+from euraculus.network.fevd import FEVD
+from euraculus.utils.utils import (
     matrix_asymmetry,
     shrinkage_factor,
     herfindahl_index,
@@ -20,144 +18,6 @@ from euraculus.utils import (
 import datetime as dt
 
 import euraculus
-
-
-def map_columns(
-    df: pd.DataFrame,
-    mapping: pd.Series,
-    mapping_name: str = None,
-) -> pd.DataFrame:
-    """Transform column index from given a mapping.
-
-    Args:
-        df: Original DataFrame with permnos as columns.
-        mapping: Series with column mapping.
-        mapping_name: The name of the new mapping
-
-    Returns:
-        df_: Relabeled DataFrame with newly mapped columns.
-
-    """
-    df_ = df.rename(columns=dict(mapping))
-    df_.columns.name = mapping_name
-
-    return df_
-
-
-def prepare_log_data(df_data: pd.DataFrame, df_fill: pd.DataFrame) -> pd.DataFrame:
-    """Fills missing intraday data with alternative data source, then take logs.
-
-    Args:
-        df_data: Intraday observations, e.g. volatilities.
-        df_fill: Alternative data, e.g. end of day bid-as spreads.
-
-    Returns:
-        df_logs: Logarithms of filled intraday variances.
-
-    """
-    # prepare filling values
-    no_fill = df_fill.bfill().isna()
-    minima = df_fill.replace(0, np.nan).min()
-    df_fill = df_fill.replace(0, np.nan).ffill().fillna(value=minima)
-    df_fill[no_fill] = np.nan
-
-    # fill in missing data
-    df_data[(df_data == 0) | (df_data.isna())] = df_fill
-    minima = df_data.replace(0, np.nan).min()
-    df_data = df_data.replace(0, np.nan).ffill().fillna(value=minima)
-
-    # logarithms
-    df_logs = np.log(df_data)
-    return df_logs
-
-
-def log_replace(df: pd.DataFrame, method: str = "min") -> pd.DataFrame:
-    """Take logarithms of input DataFrame and fills missing values.
-
-    The method argument specifies how missing values after taking logarithms
-    are to be filled (includes negative values before taking logs).
-
-    Args:
-        df: Input data in a DataFrame.
-        method: Method to fill missing values (includes negative values
-            before taking logs). Options are ["min", "mean", "interpolate", "zero"].
-
-    Returns:
-        df_: The transformed data.
-
-    """
-    # logarithms
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", RuntimeWarning)
-        df_ = np.log(df)
-        df_[df_ == -np.inf] = np.nan
-
-    # fill missing
-    if method == "min":
-        df_ = df_.fillna(value=df_.min())
-    elif method == "mean":
-        df_ = df_.fillna(df_.mean())
-    elif method == "interpolate":
-        df_ = df_.interpolate()
-    elif method == "zero":
-        df_ = df_.fillna(0)
-    elif method == "ffill":
-        df_ = df_.ffill()
-    else:
-        raise ValueError("method '{}' not defined".format(method))
-
-    # fill reamining gaps (e.g., at beginning when forward filling)
-    n_missing = df_.isna().sum().sum()
-    if n_missing > 0:
-        warnings.warn(f"filling {n_missing} missing values with minimum")
-        df_ = df_.fillna(value=df_.min())
-
-    return df_
-
-
-def construct_crsp_index(sampling_date: dt.datetime, data: DataMap) -> pd.Series:
-    """Constructs an equally weighted log mcap volatility index across the CRSP universe.
-
-    Args:
-        data: DataMap to load data from.
-        sampling_date: Last day in the sample.
-
-    Returns:
-        index: Constructed index series.
-
-    """
-    # set parameters
-    start_date = sampling_date - relativedelta(years=1) + relativedelta(days=1)
-
-    # load data
-    df_var = data.load_crsp_data(
-        start_date=start_date, end_date=sampling_date, column="var"
-    )
-    df_noisevar = data.load_crsp_data(
-        start_date=start_date, end_date=sampling_date, column="noisevar"
-    )
-    df_ret = data.load_crsp_data(
-        start_date=start_date, end_date=sampling_date, column="retadj"
-    )
-    df_mcap = data.load_crsp_data(
-        start_date=start_date, end_date=sampling_date, column="mcap"
-    )
-
-    # process data
-    df_var[df_var == 0] = df_noisevar
-    df_vola = np.sqrt(df_var.replace(0, np.nan))
-    df_lagged_mcap = df_mcap / (df_ret + 1)
-    df_lagged_mcap[df_lagged_mcap <= 0] = np.nan
-    df_log_mcap_vola = np.log(df_vola) + np.log(df_lagged_mcap)
-
-    # build index
-    index = (
-        df_log_mcap_vola.sub(df_log_mcap_vola.mean())
-        .div(df_log_mcap_vola.std())
-        .mean(axis=1)
-        .rename("crsp")
-    )
-    return index
 
 
 def load_estimation_data(data: DataMap, sampling_date: dt.datetime) -> dict:
@@ -171,13 +31,12 @@ def load_estimation_data(data: DataMap, sampling_date: dt.datetime) -> dict:
         df_info: Summarizing information.
         df_log_mcap_vola: Logarithm of value variance variable.
         df_factors: Factor data.
-
     """
     # asset data
     df_var = data.load_historic(sampling_date=sampling_date, column="var")
     df_noisevar = data.load_historic(sampling_date=sampling_date, column="noisevar")
-    df_ret = data.load_historic(sampling_date=sampling_date, column="retadj")
-    df_mcap = data.load_historic(sampling_date=sampling_date, column="mcap")
+    # df_ret = data.load_historic(sampling_date=sampling_date, column="retadj")
+    # df_mcap = data.load_historic(sampling_date=sampling_date, column="mcap")
     df_info = data.load_asset_estimates(
         sampling_date=sampling_date,
         columns=[
@@ -194,72 +53,19 @@ def load_estimation_data(data: DataMap, sampling_date: dt.datetime) -> dict:
         ],
     )
 
-    # prepare asset data
+    # prepare data
     df_vola = np.sqrt(df_var)
     df_noisevola = np.sqrt(df_noisevar)
-    df_lagged_mcap = df_mcap / (df_ret + 1)
+    # df_lagged_mcap = df_mcap / (df_ret + 1)
     df_log_vola = prepare_log_data(df_data=df_vola, df_fill=df_noisevola)
-    df_log_mcap = log_replace(df=df_lagged_mcap, method="ffill")
-    df_log_mcap_vola = df_log_vola + df_log_mcap
-    df_log_mcap_vola = map_columns(
-        df_log_mcap_vola, mapping=df_info["ticker"], mapping_name="ticker"
-    )
-
-    # factor data
-    df_factors = pd.DataFrame(index=df_var.index)
-
-    def prepare_spy_factor(df_spy):
-        open_prc = df_spy["prc"] / (1 + df_spy["ret"])
-        std = df_spy["var"] ** 0.5
-        factor = log_replace(open_prc * std, method="min").rename("spy")
-        return factor
-
-    def prepare_yahoo_factor(df_yahoo):
-        open_prc = df_yahoo["Open"]
-        std = np.sqrt(0.3607) * (np.log(df_yahoo["High"]) - np.log(df_yahoo["Low"]))
-        factor = log_replace(open_prc * std, method="min").rename("yahoo")
-        return factor
-
-    def prepare_ew_factor(df_obs):
-        factor = df_obs.sub(df_obs.mean()).div(df_obs.std()).mean(axis=1).rename("ew")
-        return factor
-
-    df_spy = data.load_spy_data().reindex(df_var.index)
-    spy_factor = prepare_spy_factor(df_spy)
-    df_factors = df_factors.join(spy_factor)
-
-    ew_factor = prepare_ew_factor(df_log_vola)  ##
-    df_factors = df_factors.join(ew_factor)
-
-    crsp_factor = construct_crsp_index(sampling_date=sampling_date, data=data)
-    df_factors = df_factors.join(crsp_factor)
-
-    for ticker in ["^VIX", "DX-Y.NYB", "^TNX"]:
-        df_yahoo = data.load_yahoo(ticker).reindex(df_var.index)
-        factor = prepare_yahoo_factor(df_yahoo).rename(ticker)
-        df_factors = df_factors.join(factor)
+    # df_log_mcap = log_replace(df=df_lagged_mcap, method="ffill")
+    # df_log_mcap_vola = df_log_vola + df_log_mcap
+    # df_log_mcap_vola = map_columns(
+    #     df_log_mcap_vola, mapping=df_info["ticker"], mapping_name="ticker"
+    # )
+    df_factors = data.load_historic_aggregates(sampling_date)
 
     return (df_info, df_log_vola, df_factors)  ##
-
-
-def construct_pca_factors(df: pd.DataFrame, n_factors: int) -> pd.DataFrame:
-    """Extracts the first principal components from a dataframe.
-
-    Args:
-        df: The dataset to extract the PCs.
-        n_factors: The number of components to be extracted.
-
-    Returns:
-        df_pca: Dataframe with the first PCs.
-
-    """
-    pca = PCA(n_components=n_factors)
-    df_pca = pd.DataFrame(
-        data=pca.fit_transform(df),
-        index=df.index,
-        columns=[f"pca_{i+1}" for i in range(n_factors)],
-    )
-    return df_pca
 
 
 def build_lookup_table(df_info: pd.DataFrame) -> pd.DataFrame:
@@ -270,7 +76,6 @@ def build_lookup_table(df_info: pd.DataFrame) -> pd.DataFrame:
 
     Returns:
         df_lookup: Lookup table with tickers as index and company names as values.
-
     """
     column_dict = {
         "ticker": "Tickers",
@@ -309,7 +114,6 @@ def estimate_fevd(
         cov_cv: Cross-validation object for the covariance.
         cov: The estimated covariance object.
         fevd: The constructed FEVD from the estimates.
-
     """
 
     # estimate var
@@ -353,7 +157,6 @@ def describe_data(df: pd.DataFrame) -> dict:
 
     Returns:
         stats: Key, value pairs of the calculated statistics.
-
     """
     stats = {
         "T": df.shape[0],
@@ -364,7 +167,7 @@ def describe_data(df: pd.DataFrame) -> dict:
 
 
 def describe_var(
-    var: euraculus.var.VAR,
+    var: euraculus.models.var.VAR,
     var_cv: GridSearchCV,
     var_data: pd.DataFrame,
     factor_data: pd.DataFrame = None,
@@ -402,7 +205,6 @@ def describe_var(
 
     Returns:
         stats: Key, value pairs of the calculated statistics.
-
     """
     ols_var = var.copy()
     ols_var.fit_ols(var_data=var_data, factor_data=factor_data)
@@ -422,6 +224,7 @@ def describe_var(
         "var_factor_r2_ols": ols_var.factor_r2(
             var_data=var_data, factor_data=factor_data
         ),
+        "var_df_full": var.df_full_,
         "var_df_used": var.df_used_,
         "var_nonzero_shrinkage": shrinkage_factor(
             array=var.var_1_matrix_,
@@ -464,7 +267,7 @@ def describe_var(
 
 
 def describe_cov(
-    cov: euraculus.covar.GLASSO,
+    cov: euraculus.models.covariance.GLASSO,
     cov_cv: GridSearchCV,
     data: pd.DataFrame,
 ) -> dict:
@@ -490,7 +293,6 @@ def describe_cov(
 
     Returns:
         stats: Key, value pairs of the calculated statistics.
-
     """
     stats = {
         "rho": cov_cv.best_params_["alpha"],
@@ -502,6 +304,8 @@ def describe_cov(
         )
         .logpdf(data)
         .mean(),  # /data.shape[1],
+        "cov_df_full": cov.df_full_,
+        "cov_df_used": cov.df_used_,
         "covar_density": cov.covariance_density_,
         "precision_density": cov.precision_density_,
         "covar_nonzero_shrinkage": shrinkage_factor(
@@ -531,7 +335,7 @@ def describe_cov(
 
 
 def describe_network(
-    network: euraculus.network.Network,
+    network: euraculus.network.network.Network,
     # weights: np.ndarray,
 ) -> dict:
     """Creates descriptive statistics of a Network.
@@ -596,7 +400,7 @@ def describe_network(
 
 
 def describe_fevd(
-    fevd: euraculus.fevd.FEVD,
+    fevd: euraculus.network.fevd.FEVD,
     horizon: int,
     data: pd.DataFrame,
     weights: np.ndarray,
@@ -615,7 +419,6 @@ def describe_fevd(
 
     Returns:
         stats: Key, value pairs of the calculated statistics.
-
     """
     # direct analysis of fevd
     stats = {}
@@ -695,7 +498,7 @@ def collect_data_estimates(
 
 
 def collect_var_estimates(
-    var: euraculus.var.VAR,
+    var: euraculus.models.var.VAR,
     var_data: pd.DataFrame,
     factor_data: pd.DataFrame,
 ) -> pd.DataFrame:
@@ -716,7 +519,6 @@ def collect_var_estimates(
 
     Returns:
         estimates: Extracted estimates in a DataFrame.
-
     """
     estimates = pd.DataFrame(index=var_data.columns)
     estimates["var_intercept"] = var.intercepts_
@@ -739,7 +541,7 @@ def collect_var_estimates(
 
 
 def collect_cov_estimates(
-    cov: euraculus.covar.GLASSO,
+    cov: euraculus.models.covariance.GLASSO,
     data: pd.DataFrame,
 ) -> pd.DataFrame:
     """Extract estimates from a GLASSO Covariance estimation.
@@ -754,7 +556,6 @@ def collect_cov_estimates(
 
     Returns:
         estimates: Extracted estimates in a DataFrame.
-
     """
     estimates = pd.DataFrame(index=data.columns)
     estimates["cov_variance"] = np.diag(cov.covariance_)
@@ -765,7 +566,7 @@ def collect_cov_estimates(
 
 
 def collect_network_estimates(
-    network: euraculus.network.Network,
+    network: euraculus.network.network.Network,
     data: pd.DataFrame,
     weights: np.ndarray,
 ) -> pd.DataFrame:
@@ -803,6 +604,7 @@ def collect_network_estimates(
     estimates[f"full_in_connectedness"] = network.in_connectedness(others_only=False)
     estimates[f"full_out_connectedness"] = network.out_connectedness(others_only=False)
     estimates[f"self_connectedness"] = network.self_connectedness()
+    estimates[f"net_connectedness"] = network.net_connectedness()
     estimates[f"total_connectedness"] = network.total_connectedness()
     estimates[f"in_concentration"] = network.in_concentration()
     estimates[f"out_concentration"] = network.out_concentration()
@@ -822,7 +624,7 @@ def collect_network_estimates(
 
 
 def collect_fevd_estimates(
-    fevd: euraculus.fevd.FEVD,
+    fevd: euraculus.network.fevd.FEVD,
     horizon: int,
     data: pd.DataFrame,
     weights: np.ndarray,

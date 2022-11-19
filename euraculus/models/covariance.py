@@ -4,7 +4,7 @@ from sklearn.base import BaseEstimator
 from sklearn.covariance import GraphicalLasso
 from sklearn.linear_model import LinearRegression
 
-from euraculus.net import ElasticNet
+from euraculus.models.elastic_net import ElasticNet
 
 
 class AdaptiveThresholdEstimator(BaseEstimator):
@@ -108,7 +108,7 @@ class AdaptiveThresholdEstimator(BaseEstimator):
         diff = self.covariance_ - self._sample_cov(data)
 
         # Frobenius norm
-        loss = (diff ** 2).sum()
+        loss = (diff**2).sum()
 
         return loss
 
@@ -124,7 +124,7 @@ class AdaptiveThresholdEstimator(BaseEstimator):
 
         # aggregate loss
         total_loss = (
-            np.triu((obs_losses ** 2).transpose((2, 0, 1)), k=exclude_diag)
+            np.triu((obs_losses**2).transpose((2, 0, 1)), k=exclude_diag)
             .transpose((1, 2, 0))
             .sum()
         )
@@ -145,13 +145,15 @@ class AdaptiveThresholdEstimator(BaseEstimator):
 
 
 class GLASSO(GraphicalLasso):
+    """"""
+
     def _covar_loss(self, data):
         """Frobenius norm loss wrt sample covariance matrix."""
         # differences
         diff = self.covariance_ - self._sample_cov(data)
 
         # norm
-        loss = (diff ** 2).sum()
+        loss = (diff**2).sum()
 
         return loss
 
@@ -167,7 +169,7 @@ class GLASSO(GraphicalLasso):
 
         # aggregate loss
         total_loss = (
-            np.triu((obs_losses ** 2).transpose((2, 0, 1)), k=exclude_diag)
+            np.triu((obs_losses**2).transpose((2, 0, 1)), k=exclude_diag)
             .transpose((1, 2, 0))
             .sum()
         )
@@ -210,6 +212,22 @@ class GLASSO(GraphicalLasso):
         sparsity = 1 - self.precision_density_
         return sparsity
 
+    @property
+    def n_series(self):
+        """The number of series the GLASSO is fitted to."""
+        return int(self.covariance_.shape[0])
+
+    @property
+    def df_full_(self):
+        """The degrees of freedom used by a full estimate."""
+        return self.n_series * (self.n_series - 1) // 2
+
+    @property
+    def df_used_(self):
+        """The degrees of freedom used by the estimator."""
+        off_diag = (np.count_nonzero(self.precision_) - self.n_series) / 2
+        return int(off_diag + self.n_series)
+
 
 class CorrelationNet:
     """A test of the regression correlation estimator."""
@@ -233,7 +251,7 @@ class CorrelationNet:
     def _build_X(self, data):
         n_series = self._n_series(data)
         t_periods = self._t_periods(data)
-        X = sp.sparse.kron(sp.sparse.eye(n_series ** 2), np.ones([t_periods, 1]))
+        X = sp.sparse.kron(sp.sparse.eye(n_series**2), np.ones([t_periods, 1]))
         return X
 
     def _build_y(self, data):

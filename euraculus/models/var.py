@@ -9,7 +9,7 @@ import sklearn
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import GridSearchCV, PredefinedSplit
 
-from euraculus.net import AdaptiveElasticNet, ElasticNet
+from euraculus.models.elastic_net import AdaptiveElasticNet, ElasticNet
 
 
 class VAR:

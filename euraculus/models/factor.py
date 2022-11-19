@@ -7,7 +7,7 @@ and on CRSP data in particular.
 import numpy as np
 import pandas as pd
 
-from euraculus.data import DataMap
+from euraculus.data.map import DataMap
 from kungfu import FactorModel
 
 

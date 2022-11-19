@@ -1,8 +1,9 @@
-import euraculus.plot as plot
-import euraculus.utils as utils
+import euraculus.utils.plot as plot
+import euraculus.utils.utils as utils
 
-from euraculus.covar import GLASSO
-from euraculus.fevd import FEVD
-from euraculus.net import ElasticNet
-from euraculus.var import FactorVAR, VAR
-from euraculus.data import DataMap
+from euraculus.models.covariance import GLASSO
+from euraculus.network.fevd import FEVD
+from euraculus.network.network import Network
+from euraculus.models.elastic_net import ElasticNet, AdaptiveElasticNet
+from euraculus.models.var import FactorVAR, VAR
+from euraculus.data.map import DataMap

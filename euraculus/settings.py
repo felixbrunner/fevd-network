@@ -15,6 +15,16 @@ TIME_STEP = relativedelta(months=1, day=31)
 
 # analysis
 FORECAST_WINDOWS = [1, 2, 3, 6, 9, 12, 18, 24, 36, 48, 60]  # in months
+INDICES = [
+    "crsp_ew",
+    "crsp_vw",
+    "sample_ew",
+    "sample_vw",
+    "spy_ret",
+    "vix_ret",
+    "dxy_ret",
+    "tnx_ret",
+]
 # FEVD_TABLES = [
 #     ("fevd", None),
 #     ("fev", None),
