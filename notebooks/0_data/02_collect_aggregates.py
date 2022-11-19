@@ -90,7 +90,7 @@ while sampling_date <= LAST_SAMPLING_DATE:
 
     # increment monthly end of month
     if sampling_date.month == 12:
-        print(f"Done sampling year {sampling_date.year}.")
+        print(f"Done collecting year {sampling_date.year}.")
     sampling_date += TIME_STEP
 
 # ## Extract future indices
@@ -151,7 +151,7 @@ while sampling_date <= LAST_SAMPLING_DATE:
 
     # increment monthly end of month
     if sampling_date.month == 12:
-        print(f"Done sampling year {sampling_date.year}.")
+        print(f"Done collecting year {sampling_date.year}.")
     sampling_date += TIME_STEP
 
 

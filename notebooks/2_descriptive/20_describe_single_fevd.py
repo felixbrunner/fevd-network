@@ -22,21 +22,20 @@ import seaborn as sns
 from sklearn.decomposition import PCA
 from sklearn.model_selection import GridSearchCV
 
-from euraculus.data import DataMap
-from euraculus.var import FactorVAR
-from euraculus.covar import GLASSO
-from euraculus.fevd import FEVD
-from euraculus.estimate import (
+from euraculus.data.map import DataMap
+from euraculus.models.var import FactorVAR
+from euraculus.models.covariance import GLASSO
+from euraculus.network.fevd import FEVD
+from euraculus.models.estimate import (
     load_estimation_data,
-    construct_pca_factors,
     build_lookup_table,
     estimate_fevd,
 )
-from euraculus.utils import (
+from euraculus.utils.utils import (
     autocorrcoef,
     prec_to_pcorr,
 )
-from euraculus.plot import (
+from euraculus.utils.plot import (
     distribution_plot,
     save_ax_as_pdf,
     missing_data_matrix,
@@ -57,10 +56,13 @@ from euraculus.settings import (
 # ### Parameters
 
 # %%
-sampling_date = dt.datetime(year=2021, month=12, day=31)
+sampling_date = dt.datetime(year=2022, month=3, day=31)
 
 # %%
 save_outputs = True
+
+# %%
+save_outputs = False
 
 # %% [markdown]
 # ### Load data
@@ -73,8 +75,8 @@ data = DataMap(DATA_DIR)
 df_info, df_log_vola, df_factors = load_estimation_data(
     data=data, sampling_date=sampling_date
 )
-df_pca = construct_pca_factors(df=df_log_vola, n_factors=2)
-df_factors = df_factors.merge(df_pca, right_index=True, left_index=True)
+# df_pca = construct_pca_factors(df=df_log_vola, n_factors=2)
+# df_factors = df_factors.merge(df_pca, right_index=True, left_index=True)
 df_summary = data.load_selection_summary(sampling_date=sampling_date)
 
 # %% [markdown]
@@ -94,7 +96,7 @@ if save_outputs:
 # ## Load estimates / Estimate
 
 # %%
-reestimate = False
+reestimate = True
 
 # %%
 # %%time
@@ -206,7 +208,7 @@ for pct in ax2.get_yticks()[1:-1]:
 elements = [area, scat, line[0]]
 labels = [e.get_label() for e in elements]
 ax.legend(elements, labels)  # , bbox_to_anchor=(1.05, 0.5), loc="center left")
-    
+
 # save
 if save_outputs:
     fig.savefig(
@@ -223,7 +225,9 @@ ax = distribution_plot(
     title="Distribution of Intraday Volatilities",
 )
 if save_outputs:
-    save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/data/histogram_volatility.pdf")
+    save_ax_as_pdf(
+        ax, save_path=f"../reports/{sampling_date.date()}/data/histogram_volatility.pdf"
+    )
 
 # %%
 ax = distribution_plot(
@@ -231,7 +235,10 @@ ax = distribution_plot(
     title="Distribution of Log Intraday Volatilities",
 )
 if save_outputs:
-    save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/data/histogram_log_volatility.pdf")
+    save_ax_as_pdf(
+        ax,
+        save_path=f"../reports/{sampling_date.date()}/data/histogram_log_volatility.pdf",
+    )
 
 # %%
 fig, axes = plt.subplots(10, 10, figsize=(20, 20))
@@ -257,7 +264,9 @@ ax = missing_data_matrix(
     title="Missing Data: Logged Dollar Volatility",
 )
 if save_outputs:
-    save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/data/matrix_missing_data.pdf")
+    save_ax_as_pdf(
+        ax, save_path=f"../reports/{sampling_date.date()}/data/matrix_missing_data.pdf"
+    )
 
 
 # %%
@@ -265,13 +274,13 @@ def reorder_matrix(
     df: np.ndarray, df_info: pd.DataFrame, sorting_columns: list, index_columns: list
 ) -> pd.DataFrame:
     """Reorder the rows and columns of a square matrix.
-    
+
     Args:
         df:
         df_info:
         sorting_columns:
         index_columns:
-        
+
     Returns:
         df_ordered:
         ordered_index:
@@ -287,7 +296,7 @@ def reorder_matrix(
 matrix, index = reorder_matrix(
     var_data.corr(),
     df_info,
-    ["ff_sector_ticker", "mean_valuation_volatility"],
+    ["ff_sector_ticker", "mean_mcap"],
     ["ff_sector_ticker", "ticker"],
 )
 primary_labels = index.get_level_values(1).tolist()
@@ -299,13 +308,16 @@ ax = matrix_heatmap(
     secondary_labels=secondary_labels,
 )
 if save_outputs:
-    save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/data/heatmap_total_correlation.pdf")
+    save_ax_as_pdf(
+        ax,
+        save_path=f"../reports/{sampling_date.date()}/data/heatmap_total_correlation.pdf",
+    )
 
 # %%
 matrix, index = reorder_matrix(
     autocorrcoef(var_data, lag=1),
     df_info,
-    ["ff_sector_ticker", "mean_valuation_volatility"],
+    ["ff_sector_ticker", "mean_mcap"],
     ["ff_sector_ticker", "ticker"],
 )
 primary_labels = index.get_level_values(1).tolist()
@@ -317,7 +329,10 @@ ax = matrix_heatmap(
     secondary_labels=secondary_labels,
 )
 if save_outputs:
-    save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/data/heatmap_total_autocorrelation.pdf")
+    save_ax_as_pdf(
+        ax,
+        save_path=f"../reports/{sampling_date.date()}/data/heatmap_total_autocorrelation.pdf",
+    )
 
 # %%
 pd.Series(np.diag(autocorrcoef(df_log_vola, lag=1))).plot(
@@ -334,7 +349,7 @@ plt.show()
 # %%
 # parameters
 n_pcs: int = 10
-    
+
 # create pca
 pca = PCA(n_components=n_pcs).fit(var_data)
 
@@ -352,27 +367,32 @@ ax.set_xlabel("Principal component")
 ax.set_ylabel("Explained variance ratio")
 
 if save_outputs:
-    save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/data/lineplot_pca_explained_variance.pdf")
+    save_ax_as_pdf(
+        ax,
+        save_path=f"../reports/{sampling_date.date()}/data/lineplot_pca_explained_variance.pdf",
+    )
 
 # %%
-df_factors.corr()
+df_corr = df_factors.join(pd.DataFrame(data=pca.transform(var_data), columns=[f"pc{i}" for i in range(1,11)], index=df_factors.index))
 
 # %%
 ax = matrix_heatmap(
-    df_factors.corr(),
+    df_corr.corr(),
     title="Factor correlations",
-
-    labels=df_factors.columns,
+    labels=df_corr.columns,
 )
 if save_outputs:
-    save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/data/heatmap_factor_correlation.pdf")
+    save_ax_as_pdf(
+        ax,
+        save_path=f"../reports/{sampling_date.date()}/data/heatmap_factor_correlation.pdf",
+    )
 
 # %%
-df_factors.plot(kind="hist", bins=100, alpha=0.5)
+df_factors[FACTORS].plot(kind="hist", bins=100, alpha=0.5)
 plt.show()
 
 # %%
-df_factors.plot()
+df_factors[FACTORS].plot()
 plt.show()
 
 # %% [markdown]
@@ -403,7 +423,7 @@ ols_var.fit(var_data=var_data, factor_data=factor_data, method="OLS")
 matrix, index = reorder_matrix(
     ols_var.var_1_matrix_,
     df_info,
-    ["ff_sector_ticker", "mean_valuation_volatility"],
+    ["ff_sector_ticker", "mean_mcap"],
     ["ff_sector_ticker", "ticker"],
 )
 primary_labels = index.get_level_values(1).tolist()
@@ -416,7 +436,10 @@ ax = matrix_heatmap(
     secondary_labels=secondary_labels,
 )
 if save_outputs:
-    save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/regression/heatmap_ols_var1_matrix.pdf")
+    save_ax_as_pdf(
+        ax,
+        save_path=f"../reports/{sampling_date.date()}/regression/heatmap_ols_var1_matrix.pdf",
+    )
 
 # %%
 print("OLS ESTIMATE")
@@ -440,7 +463,7 @@ print("VAR(1) matrix is {:.2f}% dense.".format(ols_var.var_density_ * 100))
 levels: int = 15
 logx: bool = True
 logy: bool = True
-    
+
 # create plot
 fig, ax = plt.subplots(1, 1, figsize=(10, 8))
 ax.set_title("Adaptive Elastic Net Hyper-Parameter Search Grid")
@@ -515,7 +538,9 @@ ax.set_xlim([min(x_values), max(x_values)])
 ax.set_ylim([min(y_values), max(y_values)])
 
 if save_outputs:
-    save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/regression/contour_var.pdf")
+    save_ax_as_pdf(
+        ax, save_path=f"../reports/{sampling_date.date()}/regression/contour_var.pdf"
+    )
 
 # %%
 print("AENET ESTIMATE")
@@ -533,7 +558,6 @@ print("VAR(1) matrix is {:.2f}% dense.".format(var.var_density_ * 100))
 # #### Elastic Net scatter losses
 
 # %%
-
 # extract data
 train_losses = -var_cv.cv_results_["mean_train_score"]
 valid_losses = -var_cv.cv_results_["mean_test_score"]
@@ -593,13 +617,15 @@ ax.add_artist(size_legend)
 ax.legend(loc="lower center")
 
 if save_outputs:
-    save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/regression/scatter_var.pdf")
+    save_ax_as_pdf(
+        ax, save_path=f"../reports/{sampling_date.date()}/regression/scatter_var.pdf"
+    )
 
 # %%
 matrix, index = reorder_matrix(
     var.var_1_matrix_,
     df_info,
-    ["ff_sector_ticker", "mean_valuation_volatility"],
+    ["ff_sector_ticker", "mean_mcap"],
     ["ff_sector_ticker", "ticker"],
 )
 primary_labels = index.get_level_values(1).tolist()
@@ -612,7 +638,10 @@ ax = matrix_heatmap(
     secondary_labels=secondary_labels,
 )
 if save_outputs:
-    save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/regression/heatmap_aenet_var1_matrix.pdf")
+    save_ax_as_pdf(
+        ax,
+        save_path=f"../reports/{sampling_date.date()}/regression/heatmap_aenet_var1_matrix.pdf",
+    )
 
 # %%
 factor_residuals = var.factor_residuals(var_data=var_data, factor_data=factor_data)
@@ -623,13 +652,16 @@ ax = distribution_plot(
     title="Distribution of VAR Factor Residuals",
 )
 if save_outputs:
-    save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/regression/histogram_VAR_factor_residuals.pdf")
+    save_ax_as_pdf(
+        ax,
+        save_path=f"../reports/{sampling_date.date()}/regression/histogram_VAR_factor_residuals.pdf",
+    )
 
 # %%
 matrix, index = reorder_matrix(
     factor_residuals.corr(),
     df_info,
-    ["ff_sector_ticker", "mean_valuation_volatility"],
+    ["ff_sector_ticker", "mean_mcap"],
     ["ff_sector_ticker", "ticker"],
 )
 primary_labels = index.get_level_values(1).tolist()
@@ -641,13 +673,16 @@ ax = matrix_heatmap(
     secondary_labels=secondary_labels,
 )
 if save_outputs:
-    save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/regression/heatmap_VAR_factor_residual_correlation.pdf")
+    save_ax_as_pdf(
+        ax,
+        save_path=f"../reports/{sampling_date.date()}/regression/heatmap_VAR_factor_residual_correlation.pdf",
+    )
 
 # %%
 matrix, index = reorder_matrix(
     autocorrcoef(factor_residuals, lag=1),
     df_info,
-    ["ff_sector_ticker", "mean_valuation_volatility"],
+    ["ff_sector_ticker", "mean_mcap"],
     ["ff_sector_ticker", "ticker"],
 )
 primary_labels = index.get_level_values(1).tolist()
@@ -659,7 +694,10 @@ ax = matrix_heatmap(
     secondary_labels=secondary_labels,
 )
 if save_outputs:
-    save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/regression/heatmap_VAR_factor_residual_autocorrelation.pdf")
+    save_ax_as_pdf(
+        ax,
+        save_path=f"../reports/{sampling_date.date()}/regression/heatmap_VAR_factor_residual_autocorrelation.pdf",
+    )
 
 # %%
 residuals = var.residuals(var_data=var_data, factor_data=factor_data)
@@ -670,13 +708,16 @@ ax = distribution_plot(
     title="Distribution of VAR Residuals",
 )
 if save_outputs:
-    save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/regression/histogram_VAR_residuals.pdf")
+    save_ax_as_pdf(
+        ax,
+        save_path=f"../reports/{sampling_date.date()}/regression/histogram_VAR_residuals.pdf",
+    )
 
 # %%
 matrix, index = reorder_matrix(
     residuals.corr(),
     df_info,
-    ["ff_sector_ticker", "mean_valuation_volatility"],
+    ["ff_sector_ticker", "mean_mcap"],
     ["ff_sector_ticker", "ticker"],
 )
 primary_labels = index.get_level_values(1).tolist()
@@ -688,13 +729,16 @@ ax = matrix_heatmap(
     secondary_labels=secondary_labels,
 )
 if save_outputs:
-    save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/regression/heatmap_VAR_residual_correlation.pdf")
+    save_ax_as_pdf(
+        ax,
+        save_path=f"../reports/{sampling_date.date()}/regression/heatmap_VAR_residual_correlation.pdf",
+    )
 
 # %%
 matrix, index = reorder_matrix(
     autocorrcoef(residuals, lag=1),
     df_info,
-    ["ff_sector_ticker", "mean_valuation_volatility"],
+    ["ff_sector_ticker", "mean_mcap"],
     ["ff_sector_ticker", "ticker"],
 )
 primary_labels = index.get_level_values(1).tolist()
@@ -706,13 +750,16 @@ ax = matrix_heatmap(
     secondary_labels=secondary_labels,
 )
 if save_outputs:
-    save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/regression/heatmap_VAR_residual_autocorrelation.pdf")
+    save_ax_as_pdf(
+        ax,
+        save_path=f"../reports/{sampling_date.date()}/regression/heatmap_VAR_residual_autocorrelation.pdf",
+    )
 
 # %%
 matrix, index = reorder_matrix(
     autocorrcoef(residuals, lag=2),
     df_info,
-    ["ff_sector_ticker", "mean_valuation_volatility"],
+    ["ff_sector_ticker", "mean_mcap"],
     ["ff_sector_ticker", "ticker"],
 )
 primary_labels = index.get_level_values(1).tolist()
@@ -724,13 +771,16 @@ ax = matrix_heatmap(
     secondary_labels=secondary_labels,
 )
 if save_outputs:
-    save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/regression/heatmap_VAR_residual_autocorrelation_2nd.pdf")
+    save_ax_as_pdf(
+        ax,
+        save_path=f"../reports/{sampling_date.date()}/regression/heatmap_VAR_residual_autocorrelation_2nd.pdf",
+    )
 
 # %%
 matrix, index = reorder_matrix(
     autocorrcoef(residuals, lag=3),
     df_info,
-    ["ff_sector_ticker", "mean_valuation_volatility"],
+    ["ff_sector_ticker", "mean_mcap"],
     ["ff_sector_ticker", "ticker"],
 )
 primary_labels = index.get_level_values(1).tolist()
@@ -742,7 +792,10 @@ ax = matrix_heatmap(
     secondary_labels=secondary_labels,
 )
 if save_outputs:
-    save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/regression/heatmap_VAR_residual_autocorrelation_3rd.pdf")
+    save_ax_as_pdf(
+        ax,
+        save_path=f"../reports/{sampling_date.date()}/regression/heatmap_VAR_residual_autocorrelation_3rd.pdf",
+    )
 
 # %% [markdown]
 # ### Covariance matrix
@@ -751,7 +804,7 @@ if save_outputs:
 matrix, index = reorder_matrix(
     residuals.cov(),
     df_info,
-    ["ff_sector_ticker", "mean_valuation_volatility"],
+    ["ff_sector_ticker", "mean_mcap"],
     ["ff_sector_ticker", "ticker"],
 )
 primary_labels = index.get_level_values(1).tolist()
@@ -764,13 +817,16 @@ ax = matrix_heatmap(
     secondary_labels=secondary_labels,
 )
 if save_outputs:
-    save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/covariance/heatmap_VAR_residual_covariance.pdf")
+    save_ax_as_pdf(
+        ax,
+        save_path=f"../reports/{sampling_date.date()}/covariance/heatmap_VAR_residual_covariance.pdf",
+    )
 
 # %%
 matrix, index = reorder_matrix(
     prec_to_pcorr(np.linalg.inv(residuals.cov())),
     df_info,
-    ["ff_sector_ticker", "mean_valuation_volatility"],
+    ["ff_sector_ticker", "mean_mcap"],
     ["ff_sector_ticker", "ticker"],
 )
 primary_labels = index.get_level_values(1).tolist()
@@ -782,7 +838,10 @@ ax = matrix_heatmap(
     secondary_labels=secondary_labels,
 )
 if save_outputs:
-    save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/covariance/heatmap_VAR_residual_partial_corr.pdf")
+    save_ax_as_pdf(
+        ax,
+        save_path=f"../reports/{sampling_date.date()}/covariance/heatmap_VAR_residual_partial_corr.pdf",
+    )
 
 # %% [markdown]
 # #### Plot GLASSO CV
@@ -838,13 +897,15 @@ ax.scatter(
 ax.legend()
 
 if save_outputs:
-    save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/covariance/line_cov_cv.pdf")
+    save_ax_as_pdf(
+        ax, save_path=f"../reports/{sampling_date.date()}/covariance/line_cov_cv.pdf"
+    )
 
 # %%
 matrix, index = reorder_matrix(
     cov.covariance_,
     df_info,
-    ["ff_sector_ticker", "mean_valuation_volatility"],
+    ["ff_sector_ticker", "mean_mcap"],
     ["ff_sector_ticker", "ticker"],
 )
 primary_labels = index.get_level_values(1).tolist()
@@ -859,13 +920,16 @@ ax = matrix_heatmap(
     secondary_labels=secondary_labels,
 )
 if save_outputs:
-    save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/covariance/heatmap_cov_matrix.pdf")
+    save_ax_as_pdf(
+        ax,
+        save_path=f"../reports/{sampling_date.date()}/covariance/heatmap_cov_matrix.pdf",
+    )
 
 # %%
 matrix, index = reorder_matrix(
     cov.precision_,
     df_info,
-    ["ff_sector_ticker", "mean_valuation_volatility"],
+    ["ff_sector_ticker", "mean_mcap"],
     ["ff_sector_ticker", "ticker"],
 )
 primary_labels = index.get_level_values(1).tolist()
@@ -878,13 +942,16 @@ ax = matrix_heatmap(
     secondary_labels=secondary_labels,
 )
 if save_outputs:
-    save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/covariance/heatmap_precision_matrix.pdf")
+    save_ax_as_pdf(
+        ax,
+        save_path=f"../reports/{sampling_date.date()}/covariance/heatmap_precision_matrix.pdf",
+    )
 
 # %%
 matrix, index = reorder_matrix(
     prec_to_pcorr(cov.precision_),
     df_info,
-    ["ff_sector_ticker", "mean_valuation_volatility"],
+    ["ff_sector_ticker", "mean_mcap"],
     ["ff_sector_ticker", "ticker"],
 )
 primary_labels = index.get_level_values(1).tolist()
@@ -896,7 +963,10 @@ ax = matrix_heatmap(
     secondary_labels=secondary_labels,
 )
 if save_outputs:
-    save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/covariance/heatmap_partial_corr_matrix.pdf")
+    save_ax_as_pdf(
+        ax,
+        save_path=f"../reports/{sampling_date.date()}/covariance/heatmap_partial_corr_matrix.pdf",
+    )
 
 # %%
 print(f"Precision matrix is {cov.precision_density_*100:.2f}% dense")
@@ -915,7 +985,7 @@ print(
 matrix, index = reorder_matrix(
     cov.covariance_ @ np.diag(np.diag(cov.covariance_) ** -0.5),
     df_info,
-    ["ff_sector_ticker", "mean_valuation_volatility"],
+    ["ff_sector_ticker", "mean_mcap"],
     ["ff_sector_ticker", "ticker"],
 )
 primary_labels = index.get_level_values(1).tolist()
@@ -928,13 +998,16 @@ ax = matrix_heatmap(
     secondary_labels=secondary_labels,
 )
 if save_outputs:
-    save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/network/heatmap_generalized_impulse_matrix.pdf")
+    save_ax_as_pdf(
+        ax,
+        save_path=f"../reports/{sampling_date.date()}/network/heatmap_generalized_impulse_matrix.pdf",
+    )
 
 # %%
 matrix, index = reorder_matrix(
     sp.linalg.sqrtm(cov.covariance_),
     df_info,
-    ["ff_sector_ticker", "mean_valuation_volatility"],
+    ["ff_sector_ticker", "mean_mcap"],
     ["ff_sector_ticker", "ticker"],
 )
 primary_labels = index.get_level_values(1).tolist()
@@ -947,7 +1020,10 @@ ax = matrix_heatmap(
     secondary_labels=secondary_labels,
 )
 if save_outputs:
-    save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/network/heatmap_sqrtm_impulse_matrix.pdf")
+    save_ax_as_pdf(
+        ax,
+        save_path=f"../reports/{sampling_date.date()}/network/heatmap_sqrtm_impulse_matrix.pdf",
+    )
 
 # %% [markdown]
 # #### VMA Matrices
@@ -960,7 +1036,7 @@ for h in [0, 1, 2, 3, 5, 10, 21]:
     matrix, index = reorder_matrix(
         fevd.vma_matrix(h),
         df_info,
-        ["ff_sector_ticker", "mean_valuation_volatility"],
+        ["ff_sector_ticker", "mean_mcap"],
         ["ff_sector_ticker", "ticker"],
     )
     primary_labels = index.get_level_values(1).tolist()
@@ -973,7 +1049,10 @@ for h in [0, 1, 2, 3, 5, 10, 21]:
         secondary_labels=secondary_labels,
     )
     if save_outputs:
-        save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/vma/heatmap_vma{h}_matrix.pdf")
+        save_ax_as_pdf(
+            ax,
+            save_path=f"../reports/{sampling_date.date()}/vma/heatmap_vma{h}_matrix.pdf",
+        )
     plt.show()
 
 # %% [markdown]
@@ -984,7 +1063,7 @@ for h in [0, 1, 2, 3, 5, 10, 21]:
     matrix, index = reorder_matrix(
         fevd.impulse_response_functions(h),
         df_info,
-        ["ff_sector_ticker", "mean_valuation_volatility"],
+        ["ff_sector_ticker", "mean_mcap"],
         ["ff_sector_ticker", "ticker"],
     )
     primary_labels = index.get_level_values(1).tolist()
@@ -997,7 +1076,10 @@ for h in [0, 1, 2, 3, 5, 10, 21]:
         secondary_labels=secondary_labels,
     )
     if save_outputs:
-        save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/irf/heatmap_ir{h}_matrix.pdf")
+        save_ax_as_pdf(
+            ax,
+            save_path=f"../reports/{sampling_date.date()}/irf/heatmap_ir{h}_matrix.pdf",
+        )
     plt.show()
 
 # %% [markdown]
@@ -1008,7 +1090,7 @@ for h in [0, 1, 2, 3, 5, 10, 21]:
     matrix, index = reorder_matrix(
         fevd.innovation_response_variances(h),
         df_info,
-        ["ff_sector_ticker", "mean_valuation_volatility"],
+        ["ff_sector_ticker", "mean_mcap"],
         ["ff_sector_ticker", "ticker"],
     )
     primary_labels = index.get_level_values(1).tolist()
@@ -1021,7 +1103,10 @@ for h in [0, 1, 2, 3, 5, 10, 21]:
         secondary_labels=secondary_labels,
     )
     if save_outputs:
-        save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/irv/heatmap_irv{h}_matrix.pdf")
+        save_ax_as_pdf(
+            ax,
+            save_path=f"../reports/{sampling_date.date()}/irv/heatmap_irv{h}_matrix.pdf",
+        )
     plt.show()
 
 # %% [markdown]
@@ -1035,7 +1120,7 @@ network = fevd.to_network(table_name="fevd", horizon=21)
 matrix, index = reorder_matrix(
     network.adjacency_matrix - np.diag(np.diag(network.adjacency_matrix)),
     df_info,
-    ["ff_sector_ticker", "mean_valuation_volatility"],
+    ["ff_sector_ticker", "mean_mcap"],
     ["ff_sector_ticker", "ticker"],
 )
 primary_labels = index.get_level_values(1).tolist()
@@ -1050,7 +1135,10 @@ ax = matrix_heatmap(
     secondary_labels=secondary_labels,
 )
 if save_outputs:
-    save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/network/heatmap_FEVD_adjacency.pdf")
+    save_ax_as_pdf(
+        ax,
+        save_path=f"../reports/{sampling_date.date()}/network/heatmap_FEVD_adjacency.pdf",
+    )
 
 # %%
 _ = draw_network(
@@ -1063,16 +1151,57 @@ _ = draw_network(
 )
 
 # %% [markdown]
-# #### FEV
+# ### Weighted FEVD
 
 # %%
-network = fevd.to_network(table_name = "fev", horizon=21)
+weights = df_info["mean_mcap"].values / df_info["mean_mcap"].values.sum()
+network = fevd.to_network(table_name="fevd", horizon=21, weights=weights)
 
 # %%
 matrix, index = reorder_matrix(
     network.adjacency_matrix - np.diag(np.diag(network.adjacency_matrix)),
     df_info,
-    ["ff_sector_ticker", "mean_valuation_volatility"],
+    ["ff_sector_ticker", "mean_mcap"],
+    ["ff_sector_ticker", "ticker"],
+)
+primary_labels = index.get_level_values(1).tolist()
+secondary_labels = index.get_level_values(0).tolist()
+ax = matrix_heatmap(
+    matrix,
+    title="Weighted FEVD Adjacency Matrix (off-diagonal values only)",
+    vmin=0,
+    cmap="binary",
+    infer_vmax=True,
+    labels=primary_labels,
+    secondary_labels=secondary_labels,
+)
+if save_outputs:
+    save_ax_as_pdf(
+        ax,
+        save_path=f"../reports/{sampling_date.date()}/network/heatmap_WFEVD_adjacency.pdf",
+    )
+
+# %%
+_ = draw_network(
+    network,
+    df_info,
+    title="Weighted FEVD Network",
+    save_path=f"../reports/{sampling_date.date()}/network/network_WFEVD.png"
+    if save_outputs
+    else None,
+)
+
+# %% [markdown]
+# #### FEV
+
+# %%
+network = fevd.to_network(table_name="fev", horizon=21)
+
+# %%
+matrix, index = reorder_matrix(
+    network.adjacency_matrix - np.diag(np.diag(network.adjacency_matrix)),
+    df_info,
+    ["ff_sector_ticker", "mean_mcap"],
     ["ff_sector_ticker", "ticker"],
 )
 primary_labels = index.get_level_values(1).tolist()
@@ -1087,7 +1216,10 @@ ax = matrix_heatmap(
     secondary_labels=secondary_labels,
 )
 if save_outputs:
-    save_ax_as_pdf(ax, save_path=f"../reports/{sampling_date.date()}/network/heatmap_FEV_adjacency.pdf")
+    save_ax_as_pdf(
+        ax,
+        save_path=f"../reports/{sampling_date.date()}/network/heatmap_FEV_adjacency.pdf",
+    )
 
 # %%
 _ = draw_network(
@@ -1095,6 +1227,47 @@ _ = draw_network(
     df_info,
     title="FEV Network",
     save_path=f"../reports/{sampling_date.date()}/network/network_FEV.png"
+    if save_outputs
+    else None,
+)
+
+# %% [markdown]
+# ### Weighted FEV
+
+# %%
+weights = df_info["mean_mcap"].values / df_info["mean_mcap"].values.sum()
+network = fevd.to_network(table_name="fev", horizon=21, weights=weights)
+
+# %%
+matrix, index = reorder_matrix(
+    network.adjacency_matrix - np.diag(np.diag(network.adjacency_matrix)),
+    df_info,
+    ["ff_sector_ticker", "mean_mcap"],
+    ["ff_sector_ticker", "ticker"],
+)
+primary_labels = index.get_level_values(1).tolist()
+secondary_labels = index.get_level_values(0).tolist()
+ax = matrix_heatmap(
+    matrix,
+    title="Weighted FEVD Adjacency Matrix (off-diagonal values only)",
+    vmin=0,
+    cmap="binary",
+    infer_vmax=True,
+    labels=primary_labels,
+    secondary_labels=secondary_labels,
+)
+if save_outputs:
+    save_ax_as_pdf(
+        ax,
+        save_path=f"../reports/{sampling_date.date()}/network/heatmap_WFEVD_adjacency.pdf",
+    )
+
+# %%
+_ = draw_network(
+    network,
+    df_info,
+    title="Weighted FEV Network",
+    save_path=f"../reports/{sampling_date.date()}/network/network_WFEV.png"
     if save_outputs
     else None,
 )
@@ -1108,7 +1281,7 @@ data.lookup_ticker(
 
 # %%
 # degree distribution
-fig, ax = plt.subplots(1,1)
+fig, ax = plt.subplots(1, 1)
 ax.hist(network.adjacency_matrix.flatten(), bins=100)
 ax.set_xscale("linear")
 ax.set_yscale("log")
@@ -1118,7 +1291,9 @@ plt.show()
 # ### Contributions
 
 # %%
-network = fevd.to_network(table_name="fevd", horizon=21, weights=df_info["mean_mcap"].values)
+network = fevd.to_network(
+    table_name="fevd", horizon=21, weights=df_info["mean_mcap"].values
+)
 
 # %%
 # network = fevd.to_network(table_name = "fev", horizon=21)
@@ -1198,7 +1373,7 @@ ax = contribution_bars(
 # %%
 ax = contribution_bars(
     scores=network.in_page_rank(
-        weights=df_info["mean_valuation_volatility"].values.reshape(-1, 1),
+        weights=df_info["mean_mcap_volatility"].values.reshape(-1, 1),
         alpha=0.85,
     ).flatten(),
     names=df_info["ticker"],
@@ -1209,7 +1384,7 @@ ax = contribution_bars(
 # %%
 ax = contribution_bars(
     scores=network.out_page_rank(
-        weights=df_info["mean_valuation_volatility"].values.reshape(-1, 1),
+        weights=df_info["mean_mcap_volatility"].values.reshape(-1, 1),
         alpha=0.85,
     ).flatten(),
     names=df_info["ticker"],
@@ -1220,7 +1395,7 @@ ax = contribution_bars(
 # %%
 ax = contribution_bars(
     scores=network.in_page_rank(
-        weights=df_info["mean_valuation_volatility"].values.reshape(-1, 1),
+        weights=df_info["mean_mcap_volatility"].values.reshape(-1, 1),
         alpha=0.95,
     ).flatten(),
     names=df_info["ticker"],
@@ -1231,7 +1406,7 @@ ax = contribution_bars(
 # %%
 ax = contribution_bars(
     scores=network.out_page_rank(
-        weights=df_info["mean_valuation_volatility"].values.reshape(-1, 1),
+        weights=df_info["mean_mcap_volatility"].values.reshape(-1, 1),
         alpha=0.95,
     ).flatten(),
     names=df_info["ticker"],
