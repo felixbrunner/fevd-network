@@ -13,14 +13,13 @@ import pandas as pd
 
 from sklearn.model_selection import GridSearchCV
 
-from euraculus.covar import GLASSO, AdaptiveThresholdEstimator
-from euraculus.data import DataMap
-from euraculus.fevd import FEVD
-from euraculus.var import FactorVAR
+from euraculus.models.covariance import GLASSO, AdaptiveThresholdEstimator
+from euraculus.data.map import DataMap
+from euraculus.network.fevd import FEVD
+from euraculus.models.var import FactorVAR
 
-from euraculus.estimate import (
+from euraculus.models.estimate import (
     load_estimation_data,
-    construct_pca_factors,
     estimate_fevd,
 )
 from euraculus.settings import (
@@ -45,7 +44,7 @@ data = DataMap(DATA_DIR)
 # ### Test single period
 
 # %%
-sampling_date = dt.datetime(year=2021, month=12, day=31)
+sampling_date = FIRST_SAMPLING_DATE  # dt.datetime(year=2022, month=3, day=31)
 
 # %%
 # %%time
@@ -53,8 +52,6 @@ sampling_date = dt.datetime(year=2021, month=12, day=31)
 df_info, df_log_vola, df_factors = load_estimation_data(
     data=data, sampling_date=sampling_date
 )
-df_pca = construct_pca_factors(df=df_log_vola, n_factors=1)
-df_factors = df_factors.join(df_pca)
 
 # estimate
 var_data = df_log_vola
@@ -72,19 +69,13 @@ residuals = var.residuals(var_data=var_data, factor_data=factor_data)
 
 
 # %%
-# FIRST_SAMPLING_DATE = dt.datetime(year=2009, month=6, day=30)
-
-# %%
 # %%time
-
 sampling_date = FIRST_SAMPLING_DATE
 while sampling_date <= LAST_SAMPLING_DATE:
     # load data
     df_info, df_log_vola, df_factors = load_estimation_data(
         data=data, sampling_date=sampling_date
     )
-    df_pca = construct_pca_factors(df=df_log_vola, n_factors=1)
-    df_factors = df_factors.join(df_pca)
 
     # estimate
     var_data = df_log_vola

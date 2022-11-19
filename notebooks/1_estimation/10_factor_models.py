@@ -18,8 +18,8 @@ import numpy as np
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 
-from euraculus.data import DataMap
-from euraculus.factor import (
+from euraculus.data.map import DataMap
+from euraculus.models.factor import (
     CAPM,
     Carhart4FactorModel,
     FactorModel,
@@ -27,14 +27,15 @@ from euraculus.factor import (
     SPY1FactorModel,
     SPYVariance1FactorModel,
 )
-from euraculus.estimate import prepare_log_data
-from euraculus.factor import estimate_models
-from euraculus.utils import months_difference
+from euraculus.models.estimate import prepare_log_data
+from euraculus.models.factor import estimate_models
+from euraculus.utils.utils import months_difference
 from euraculus.settings import (
     DATA_DIR,
     FIRST_SAMPLING_DATE,
     LAST_SAMPLING_DATE,
     TIME_STEP,
+    FORECAST_WINDOWS,
 )
 
 # %% [markdown]
@@ -69,6 +70,7 @@ var_models = {
 
 # %%
 # %%time
+FIRST_SAMPLING_DATE = max(FIRST_SAMPLING_DATE, dt.datetime(year=1927, month=6, day=30))
 sampling_date = FIRST_SAMPLING_DATE
 while sampling_date <= LAST_SAMPLING_DATE:
     # get excess return samples
@@ -105,7 +107,7 @@ while sampling_date < LAST_SAMPLING_DATE:
 
     # slice expanding window
     df_expanding_estimates = pd.DataFrame(index=df_future.columns)
-    for window_length in range(1, 13):
+    for window_length in FORECAST_WINDOWS:
         if (
             months_difference(end_date=LAST_SAMPLING_DATE, start_date=sampling_date)
             >= window_length
@@ -184,7 +186,7 @@ while sampling_date < LAST_SAMPLING_DATE:
 
     # slice expanding window
     df_expanding_estimates = pd.DataFrame(index=df_future.columns)
-    for window_length in range(1, 13):
+    for window_length in FORECAST_WINDOWS:
         if (
             months_difference(end_date=LAST_SAMPLING_DATE, start_date=sampling_date)
             >= window_length

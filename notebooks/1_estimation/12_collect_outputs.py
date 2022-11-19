@@ -13,13 +13,14 @@ import pandas as pd
 
 from sklearn.model_selection import GridSearchCV
 
-from euraculus.covar import GLASSO, AdaptiveThresholdEstimator
-from euraculus.data import DataMap
-from euraculus.fevd import FEVD
-from euraculus.var import FactorVAR
-from euraculus.utils import months_difference
+from euraculus.models.covariance import GLASSO, AdaptiveThresholdEstimator
+from euraculus.data.map import DataMap
+from euraculus.network.fevd import FEVD
+from euraculus.models.var import FactorVAR
+from euraculus.utils.utils import months_difference
+from dateutil.relativedelta import relativedelta
 
-from euraculus.estimate import (
+from euraculus.models.estimate import (
     describe_data,
     describe_var,
     describe_cov,
@@ -34,9 +35,6 @@ from euraculus.settings import (
     FIRST_SAMPLING_DATE,
     LAST_SAMPLING_DATE,
     TIME_STEP,
-    # FACTORS,
-    # VAR_GRID,
-    # COV_GRID,
     HORIZON,
     FORECAST_WINDOWS,
 )
@@ -54,13 +52,17 @@ df_rf = data.load_rf()
 # ### Test a single period
 
 # %%
-sampling_date = dt.datetime(year=2019, month=12, day=31)
+sampling_date = dt.datetime(year=1927, month=6, day=30)
 
 # %%
 # %%time
 # read data & estimates
 df_historic = data.load_historic(sampling_date=sampling_date, column="retadj")
-df_future = data.load_future(sampling_date=sampling_date, column="retadj") if sampling_date < LAST_SAMPLING_DATE else None
+df_future = (
+    data.load_future(sampling_date=sampling_date, column="retadj")
+    if sampling_date < LAST_SAMPLING_DATE
+    else None
+)
 var_data = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/var_data.pkl")
 factor_data = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/factor_data.pkl")
 var_cv = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/var_cv.pkl")
@@ -69,7 +71,9 @@ cov_cv = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/cov_cv.pkl")
 cov = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/cov.pkl")
 fevd = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/fevd.pkl")
 residuals = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/residuals.pkl")
-weights = data.load_asset_estimates(sampling_date=sampling_date, columns=["mean_mcap"]).values.reshape(-1, 1)
+weights = data.load_asset_estimates(
+    sampling_date=sampling_date, columns=["mean_mcap"]
+).values.reshape(-1, 1)
 weights /= weights.sum()
 
 # collect estimation statistics
@@ -81,8 +85,10 @@ stats.update(describe_cov(cov=cov, cov_cv=cov_cv, data=residuals))
 stats.update(describe_fevd(fevd=fevd, horizon=HORIZON, data=var_data, weights=weights))
 
 # collect estimates
-estimates = collect_data_estimates(df_historic, df_future, df_rf, FORECASTING_WINDOWS)
-estimates =estimates.join( collect_var_estimates(var=var, var_data=var_data, factor_data=factor_data))
+estimates = collect_data_estimates(df_historic, df_future, df_rf, FORECAST_WINDOWS)
+estimates = estimates.join(
+    collect_var_estimates(var=var, var_data=var_data, factor_data=factor_data)
+)
 estimates = estimates.join(collect_cov_estimates(cov=cov, data=residuals))
 estimates = estimates.join(
     collect_fevd_estimates(fevd=fevd, horizon=HORIZON, data=var_data, weights=weights)
@@ -93,9 +99,6 @@ estimates = estimates.join(
 
 
 # %%
-# FIRST_SAMPLING_DATE = dt.datetime(year=2012, month=4, day=30)
-
-# %%
 # %%time
 
 sampling_date = FIRST_SAMPLING_DATE
@@ -103,7 +106,11 @@ while sampling_date <= LAST_SAMPLING_DATE:
 
     # load estimates
     df_historic = data.load_historic(sampling_date=sampling_date, column="retadj")
-    df_future = data.load_future(sampling_date=sampling_date, column="retadj") if sampling_date < LAST_SAMPLING_DATE else None
+    df_future = (
+        data.load_future(sampling_date=sampling_date, column="retadj")
+        if sampling_date < LAST_SAMPLING_DATE
+        else None
+    )
     var_data = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/var_data.pkl")
     factor_data = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/factor_data.pkl")
     var_cv = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/var_cv.pkl")
@@ -112,7 +119,9 @@ while sampling_date <= LAST_SAMPLING_DATE:
     cov = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/cov.pkl")
     fevd = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/fevd.pkl")
     residuals = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/residuals.pkl")
-    weights = data.load_asset_estimates(sampling_date=sampling_date, columns=["mean_mcap"]).values.reshape(-1, 1)
+    weights = data.load_asset_estimates(
+        sampling_date=sampling_date, columns=["mean_mcap"]
+    ).values.reshape(-1, 1)
     weights /= weights.sum()
 
     # collect aggregate statistics
@@ -121,14 +130,20 @@ while sampling_date <= LAST_SAMPLING_DATE:
         describe_var(var=var, var_cv=var_cv, var_data=var_data, factor_data=factor_data)
     )
     stats.update(describe_cov(cov=cov, cov_cv=cov_cv, data=residuals))
-    stats.update(describe_fevd(fevd=fevd, horizon=HORIZON, data=var_data, weights=weights))
+    stats.update(
+        describe_fevd(fevd=fevd, horizon=HORIZON, data=var_data, weights=weights)
+    )
 
     # collect asset-level estimates
-    estimates = collect_data_estimates(df_historic, df_future, df_rf, FORECASTING_WINDOWS)
-    estimates = estimates.join( collect_var_estimates(var=var, var_data=var_data, factor_data=factor_data))
+    estimates = collect_data_estimates(df_historic, df_future, df_rf, FORECAST_WINDOWS)
+    estimates = estimates.join(
+        collect_var_estimates(var=var, var_data=var_data, factor_data=factor_data)
+    )
     estimates = estimates.join(collect_cov_estimates(cov=cov, data=residuals))
     estimates = estimates.join(
-        collect_fevd_estimates(fevd=fevd, horizon=HORIZON, data=var_data, weights=weights)
+        collect_fevd_estimates(
+            fevd=fevd, horizon=HORIZON, data=var_data, weights=weights
+        )
     )
 
     # store
@@ -145,50 +160,4 @@ while sampling_date <= LAST_SAMPLING_DATE:
 
     # increment monthly end of month
     print(f"Completed calculations at {sampling_date:%Y-%m-%d}")
-    sampling_date += TIME_STEP
-
-# %% [markdown]
-# ## Indices summary stats
-
-# %%
-# %%time
-sampling_date = FIRST_SAMPLING_DATE
-while sampling_date <= LAST_SAMPLING_DATE:
-    # get samples
-    historic_indices, future_indices = data.make_sample_indices(
-        sampling_date=sampling_date
-    )
-
-    # calculate stats
-    df_stats = pd.DataFrame(index=historic_indices.columns)
-    df_stats["ret_excess"] = (1 + historic_indices).prod() - 1
-    df_stats["var_annual"] = historic_indices.var() * 252
-
-    if sampling_date < LAST_SAMPLING_DATE:
-        # slice expanding window
-        df_expanding_estimates = pd.DataFrame(index=future_indices.columns)
-        for window_length in range(1, 13):
-            if (
-                months_difference(end_date=LAST_SAMPLING_DATE, start_date=sampling_date)
-                >= window_length
-            ):
-                end_date = sampling_date + relativedelta(months=window_length, day=31)
-                df_window = future_indices[future_indices.index <= end_date]
-
-                # calculate stats in window
-                df_stats[f"ret_excess_next{window_length}M"] = (
-                    1 + df_window
-                ).prod() - 1
-                df_stats[f"var_annual_next{window_length}M".format(window_length)] = (
-                    df_window.var() * 252
-                )
-
-    # store
-    data.store(
-        data=df_stats,
-        path=f"samples/{sampling_date:%Y-%m-%d}/index_estimates.csv",
-    )
-
-    # increment monthly end of month
-    print(f"Completed summary stats estimation at {sampling_date:%Y-%m-%d}")
     sampling_date += TIME_STEP
