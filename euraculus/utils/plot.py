@@ -309,8 +309,7 @@ def draw_network(
     ff_sector_codes = {tick: i for i, tick in enumerate(ff_sector_tickers)}
 
     # calculations to highlight nodes/edges
-    out_eigenvector_centrality = network.out_eigenvector_centrality()
-    out_page_rank = network.out_page_rank()
+    net_connectedness = network.net_connectedness()
     include_edges = table > np.percentile(table, q=90, axis=None, keepdims=True)
 
     # plot
@@ -322,8 +321,7 @@ def draw_network(
     node_options = {
         "node_size": 750
         + (
-            df_info["mean_valuation_volatility"]
-            / df_info["mean_valuation_volatility"].mean()
+            df_info["mean_mcap_volatility"] / df_info["mean_mcap_volatility"].mean()
         ).values
         * 250,
         "node_color": [
@@ -332,20 +330,20 @@ def draw_network(
         ],
         "linewidths": [
             4
-            if e > np.percentile(out_eigenvector_centrality, 80)
+            if nc > np.percentile(net_connectedness, 80)
             else 4
-            if p > np.percentile(out_page_rank, 80)
+            if nc < np.percentile(net_connectedness, 20)
             else 0
-            for (e, p) in zip(out_eigenvector_centrality, out_page_rank)
+            for nc in net_connectedness
         ],
         "alpha": 0.9,
         "edgecolors": [
             "w"
-            if e > np.percentile(out_eigenvector_centrality, 80)
+            if nc > np.percentile(net_connectedness, 80)
             else "grey"
-            if p > np.percentile(out_page_rank, 80)
+            if nc < np.percentile(net_connectedness, 20)
             else "r"
-            for (e, p) in zip(out_eigenvector_centrality, out_page_rank)
+            for nc in net_connectedness
         ],
         "node_shape": "o",
     }
@@ -396,7 +394,7 @@ def draw_network(
                 markerfacecolor="none",
                 markeredgewidth=2,
                 markeredgecolor="w",
-                label="Eigenvector centrality",
+                label="Influencers",
                 markersize=10,
                 linewidth=0,
             ),
@@ -407,12 +405,12 @@ def draw_network(
                 markerfacecolor="none",
                 markeredgewidth=2,
                 markeredgecolor="grey",
-                label="Page rank",
+                label="Followers",
                 markersize=10,
                 linewidth=0,
             ),
         ],
-        title="Most influential assets",
+        title="Most connected assets",
         loc="lower right",
         edgecolor="k",
     )
