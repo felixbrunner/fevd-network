@@ -30,7 +30,7 @@
 *.eps
 
 # Specifically ignore folders
-data/
+./data/
 dropbox/
 euraculus/.ipynb_checkpoints/
 notebooks/.ipynb_checkpoints/

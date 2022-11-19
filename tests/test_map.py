@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from pandas.testing import assert_frame_equal
 
-from euraculus.data import DataMap
+from euraculus.data.map import DataMap
 
 datamap = DataMap(datapath="/home/rubelrennfix/projects/euraculus/data")
 
