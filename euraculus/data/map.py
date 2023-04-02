@@ -171,14 +171,6 @@ class DataMap:
         # check path variables
         if not path.exists():
             hits = self.search(query=path.name)
-            # if len(hits) == 1:
-            #     warnings.warn(
-            #         "file at '{}' does not exist, reading file '{}' from datamap instead".format(
-            #             path, hits[0]
-            #         )
-            #     )
-            #     path = hits[0]
-            # else:
             raise ValueError(
                 f"file at '{path}' does not exist, found {len(hits)} similar files in datamap: {hits if len(hits) > 0 else None}"
             )
@@ -221,6 +213,12 @@ class DataMap:
             if "date" in df_left.columns:
                 df_left.date = pd.to_datetime(df_left.date)
 
+        # write data to disk if no file exists
+        except ValueError:
+            print(f"creating file '{path.name}' at {path.parent}.")
+            self.dump(data, path=path)
+
+        try:
             # check for duplicates
             duplicates = set(df_left.columns).intersection(set(data.columns))
             if len(duplicates) > 0:
@@ -242,10 +240,22 @@ class DataMap:
             self.dump(df_merged, path=path)
             del self.files[-1]
 
-        # write data to disk if no file exists
-        except ValueError:
-            print(f"creating file '{path.name}' at {path.parent}.")
-            self.dump(data, path=path)
+        # extend series object
+        except AttributeError:
+            # check for duplicates
+            s_old = df_left.set_index(df_left.columns[0]).squeeze()
+            duplicates = set(s_old.index).intersection(set(data.index))
+            if len(duplicates) > 0:
+                warnings.warn(
+                    f"indices {duplicates} already stored and will be overwritten"
+                )
+
+            # update
+            s_merged = s_old.append(pd.Series(data))
+
+            # write combined data to disk
+            self.dump(s_merged, path=path)
+            del self.files[-1]
 
     def load_famafrench_factors(self, model: str = None) -> pd.DataFrame:
         """Loads Fama/French factor data from drive.
