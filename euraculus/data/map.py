@@ -213,49 +213,49 @@ class DataMap:
             if "date" in df_left.columns:
                 df_left.date = pd.to_datetime(df_left.date)
 
+            try:
+                # check for duplicates
+                duplicates = set(df_left.columns).intersection(set(data.columns))
+                if len(duplicates) > 0:
+                    warnings.warn(
+                        f"columns {duplicates} already stored and will be overwritten"
+                    )
+                df_left = df_left.drop(columns=duplicates)
+
+                # combine
+                df_merged = (
+                    df_left.merge(
+                        data, how="outer", left_on=data.index.names, right_index=True
+                    )
+                    .set_index(data.index.names)
+                    .dropna(how="all")
+                )
+
+                # write combined data to disk
+                self.dump(df_merged, path=path)
+                del self.files[-1]
+
+            # extend series object
+            except AttributeError:
+                # check for duplicates
+                s_old = df_left.set_index(df_left.columns[0]).squeeze()
+                duplicates = set(s_old.index).intersection(set(data.index))
+                if len(duplicates) > 0:
+                    warnings.warn(
+                        f"indices {duplicates} already stored and will be overwritten"
+                    )
+
+                # update
+                s_merged = s_old.append(pd.Series(data))
+
+                # write combined data to disk
+                self.dump(s_merged, path=path)
+                del self.files[-1]
+
         # write data to disk if no file exists
         except ValueError:
             print(f"creating file '{path.name}' at {path.parent}.")
             self.dump(data, path=path)
-
-        try:
-            # check for duplicates
-            duplicates = set(df_left.columns).intersection(set(data.columns))
-            if len(duplicates) > 0:
-                warnings.warn(
-                    f"columns {duplicates} already stored and will be overwritten"
-                )
-            df_left = df_left.drop(columns=duplicates)
-
-            # combine
-            df_merged = (
-                df_left.merge(
-                    data, how="outer", left_on=data.index.names, right_index=True
-                )
-                .set_index(data.index.names)
-                .dropna(how="all")
-            )
-
-            # write combined data to disk
-            self.dump(df_merged, path=path)
-            del self.files[-1]
-
-        # extend series object
-        except AttributeError:
-            # check for duplicates
-            s_old = df_left.set_index(df_left.columns[0]).squeeze()
-            duplicates = set(s_old.index).intersection(set(data.index))
-            if len(duplicates) > 0:
-                warnings.warn(
-                    f"indices {duplicates} already stored and will be overwritten"
-                )
-
-            # update
-            s_merged = s_old.append(pd.Series(data))
-
-            # write combined data to disk
-            self.dump(s_merged, path=path)
-            del self.files[-1]
 
     def load_famafrench_factors(self, model: str = None) -> pd.DataFrame:
         """Loads Fama/French factor data from drive.
