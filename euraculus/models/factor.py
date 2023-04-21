@@ -47,6 +47,24 @@ class Carhart4FactorModel(FactorModel):
         self.factor_data = df_c4
 
 
+class FamaFrench5FactorModel(FactorModel):
+    """Fama/French 5-Factor model with market, value, size, profitability, and investment factors."""
+
+    def __init__(self, datamap: DataMap):
+        """Load and store mktrf, hml, smb, rmw, cma factor data."""
+        df_ff5 = datamap.load_famafrench_factors(model="ff5f")
+        self.factor_data = df_ff5
+
+
+class Q5FactorModel(FactorModel):
+    """Q 5-Factor model with market, size, investment, roe, and growth factors."""
+
+    def __init__(self, datamap: DataMap):
+        """Load and store mkt, me, ia, row, eg factor data."""
+        df_q = datamap.load_q_factors(q_model=True)
+        self.factor_data = df_q
+
+
 class SPYVariance1FactorModel(FactorModel):
     """Variance 1-Factor model with intraday log variance of SPY as single factor."""
 
