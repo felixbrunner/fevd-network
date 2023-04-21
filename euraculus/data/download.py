@@ -483,5 +483,6 @@ def download_q_factor_dataset(
         dataset: Table as a pandas Dataframe.
     """
     df_q = pd.read_csv(url)
-    df_q["DATE"] = pd.to_datetime(df_q["DATE"], format="%Y%m%d")
+    df_q["date"] = pd.to_datetime(df_q["DATE"], format="%Y%m%d")
+    df_q = df_q.set_index("date")
     return df_q

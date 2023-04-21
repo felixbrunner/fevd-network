@@ -10,7 +10,7 @@ from dateutil.relativedelta import relativedelta
 
 import pandas as pd
 
-from euraculus.settings import DATA_DIR, TIME_STEP
+from euraculus.settings import DATA_DIR, STORAGE_DIR, TIME_STEP
 
 
 class DataMap:
@@ -268,7 +268,6 @@ class DataMap:
             umd
 
         Args:
-            # year (optional): To only load observation of a single year.
             model (optional): To load data only for one of the following options
                 ['capm', 'rf', 'ff3f', 'c4f']
 
@@ -279,12 +278,14 @@ class DataMap:
         # read & prepare
         df_famafrench = self.read("raw/ff_factors.pkl")
         df_famafrench.index = pd.to_datetime(df_famafrench.index, yearfirst=True)
+        df_famafrench5 = self.read("raw/ff5_factors.pkl")
+        df_famafrench5.index = pd.to_datetime(df_famafrench5.index, yearfirst=True)
 
         # subselection of factors
         if model:
-            if not model in ["capm", "rf", "ff3f", "c4f"]:
+            if not model in ["capm", "rf", "ff3f", "c4f", "ff5f"]:
                 raise ValueError(
-                    f"model '{model}' not available, available options are ['capm', 'rf', 'ff3f', 'c4f']"
+                    f"model '{model}' not available, available options are ['capm', 'rf', 'ff3f', 'c4f', 'ff5f']"
                 )
             elif model == "capm":
                 df_famafrench = df_famafrench[["mktrf"]]
@@ -294,8 +295,40 @@ class DataMap:
                 df_famafrench = df_famafrench[["mktrf", "smb", "hml"]]
             elif model == "c4f":
                 df_famafrench = df_famafrench[["mktrf", "smb", "hml", "umd"]]
+            elif model == "ff5f":
+                df_famafrench = df_famafrench5[["mktrf", "smb", "hml", "rmw", "cma"]]
 
         return df_famafrench
+
+    def load_q_factors(self, q_model: bool = False) -> pd.DataFrame:
+        """Loads Q factor data from drive.
+
+        Args:
+            q_model (optional): To load data only for the q-factor model only.
+
+        Returns:
+            df_q: Loaded data in tabular form.
+        """
+
+        # read & prepare
+        df_q = self.read("raw/q_factors.pkl")
+        df_q = df_q.rename(
+            columns={
+                "R_F": "rf",
+                "R_MKT": "mkt",
+                "R_ME": "me",
+                "R_IA": "ia",
+                "R_ROE": "roe",
+                "R_EG": "eg",
+            }
+        )
+        df_q.index = pd.to_datetime(df_q.index, yearfirst=True)
+
+        # subselection of factors
+        if q_model:
+            df_q = df_q[["R_MKT", "R_ME", "R_IA", "R_ROE", "R_EG"]]
+
+        return df_q
 
     def load_spy_data(self, series: str = None) -> pd.DataFrame:
         """Loads SPY data from disk.
@@ -483,7 +516,7 @@ class DataMap:
         """
         # prepare & load raw
         sampling_date = self._prepare_date(sampling_date)
-        df = self.read(f"samples/{sampling_date:%Y-%m-%d}/historic_daily.csv")
+        df = self.read(f"{STORAGE_DIR}/{sampling_date:%Y-%m-%d}/historic_daily.csv")
 
         # format
         df["date"] = pd.to_datetime(df["date"])
@@ -513,7 +546,7 @@ class DataMap:
         """
         # prepare & load raw
         sampling_date = self._prepare_date(sampling_date)
-        df = self.read(f"samples/{sampling_date:%Y-%m-%d}/future_daily.csv")
+        df = self.read(f"{STORAGE_DIR}/{sampling_date:%Y-%m-%d}/future_daily.csv")
 
         # format
         df["date"] = pd.to_datetime(df["date"])
@@ -545,7 +578,9 @@ class DataMap:
         """
         # prepare & load raw
         sampling_date = self._prepare_date(sampling_date)
-        df = self.read(f"samples/{sampling_date:%Y-%m-%d}/historic_aggregates.csv")
+        df = self.read(
+            f"{STORAGE_DIR}/{sampling_date:%Y-%m-%d}/historic_aggregates.csv"
+        )
 
         # format
         df["date"] = pd.to_datetime(df["date"])
@@ -576,7 +611,7 @@ class DataMap:
         """
         # prepare & load raw
         sampling_date = self._prepare_date(sampling_date)
-        df = self.read(f"samples/{sampling_date:%Y-%m-%d}/future_aggregates.csv")
+        df = self.read(f"{STORAGE_DIR}/{sampling_date:%Y-%m-%d}/future_aggregates.csv")
 
         # format
         df["date"] = pd.to_datetime(df["date"])
@@ -611,26 +646,26 @@ class DataMap:
         if sampling_date:
             sampling_date = self._prepare_date(sampling_date)
             df_estimates = self.read(
-                path=f"samples/{sampling_date:%Y-%m-%d}/asset_estimates.csv"
+                path=f"{STORAGE_DIR}/{sampling_date:%Y-%m-%d}/asset_estimates.csv"
             )
             df_estimates = df_estimates.set_index("permno")
 
         # read multiple files
         else:
             df_estimates = pd.DataFrame()
-            for sample in (self.datapath / "samples").iterdir():
+            for sample in (self.datapath / STORAGE_DIR).iterdir():
                 if sample.name == ".ipynb_checkpoints":
                     pass
                 else:
                     try:
                         df_sample = self.read(
-                            path=f"samples/{sample.name}/asset_estimates.csv"
+                            path=f"{STORAGE_DIR}/{sample.name}/asset_estimates.csv"
                         )
                         df_sample["sampling_date"] = pd.to_datetime(sample.name)
                         df_estimates = df_estimates.append(df_sample)
                     except ValueError:
                         warnings.warn(
-                            f"file at 'samples/{sample.name}/asset_estimates.csv' does not exist, will be skipped"
+                            f"file at '{STORAGE_DIR}/{sample.name}/asset_estimates.csv' does not exist, will be skipped"
                         )
             df_estimates = df_estimates.set_index(["sampling_date", "permno"])
 
@@ -661,26 +696,26 @@ class DataMap:
         if sampling_date:
             sampling_date = self._prepare_date(sampling_date)
             df_estimates = self.read(
-                path=f"samples/{sampling_date:%Y-%m-%d}/index_estimates.csv"
+                path=f"{STORAGE_DIR}/{sampling_date:%Y-%m-%d}/index_estimates.csv"
             )
             df_estimates = df_estimates.set_index("index")
 
         # read multiple files
         else:
             df_estimates = pd.DataFrame()
-            for sample in (self.datapath / "samples").iterdir():
+            for sample in (self.datapath / STORAGE_DIR).iterdir():
                 if sample.name == ".ipynb_checkpoints":
                     pass
                 else:
                     try:
                         df_sample = self.read(
-                            path=f"samples/{sample.name}/index_estimates.csv"
+                            path=f"{STORAGE_DIR}/{sample.name}/index_estimates.csv"
                         )
                         df_sample["sampling_date"] = pd.to_datetime(sample.name)
                         df_estimates = df_estimates.append(df_sample)
                     except ValueError:
                         warnings.warn(
-                            f"file at 'samples/{sample.name}/index_estimates.csv' does not exist, will be skipped"
+                            f"file at '{STORAGE_DIR}/{sample.name}/index_estimates.csv' does not exist, will be skipped"
                         )
             df_estimates = df_estimates.set_index(["sampling_date", "index"])
 
@@ -711,26 +746,26 @@ class DataMap:
         if sampling_date:
             sampling_date = self._prepare_date(sampling_date)
             df_summary = self.read(
-                path=f"samples/{sampling_date:%Y-%m-%d}/selection_summary.csv"
+                path=f"{STORAGE_DIR}/{sampling_date:%Y-%m-%d}/selection_summary.csv"
             )
             df_summary = df_summary.set_index("permno")
 
         # read multiple files
         else:
             df_summary = pd.DataFrame()
-            for sample in (self.datapath / "samples").iterdir():
+            for sample in (self.datapath / STORAGE_DIR).iterdir():
                 if sample.name == ".ipynb_checkpoints":
                     pass
                 else:
                     try:
                         df_sample = self.read(
-                            path=f"samples/{sample.name}/selection_summary.csv"
+                            path=f"{STORAGE_DIR}/{sample.name}/selection_summary.csv"
                         )
                         df_sample["sampling_date"] = pd.to_datetime(sample.name)
                         df_summary = df_summary.append(df_sample)
                     except ValueError:
                         warnings.warn(
-                            f"file at 'samples/{sample.name}/selection_summary.csv' does not exist, will be skipped"
+                            f"file at '{STORAGE_DIR}/{sample.name}/selection_summary.csv' does not exist, will be skipped"
                         )
             df_summary = df_summary.set_index(["sampling_date", "permno"])
 
@@ -762,27 +797,27 @@ class DataMap:
         if sampling_date:
             sampling_date = self._prepare_date(sampling_date)
             df_summary = self.read(
-                path=f"samples/{sampling_date:%Y-%m-%d}/{filename}.csv"
+                path=f"{STORAGE_DIR}/{sampling_date:%Y-%m-%d}/{filename}.csv"
             )
             df_summary = df_summary.set_index("statistic")
 
         # read multiple files
         else:
             df_summary = pd.DataFrame()
-            for sample in (self.datapath / "samples").iterdir():
+            for sample in (self.datapath / STORAGE_DIR).iterdir():
                 if sample.name == ".ipynb_checkpoints":
                     pass
                 else:
                     try:
                         df_sample = self.read(
-                            path=f"samples/{sample.name}/{filename}.csv"
+                            path=f"{STORAGE_DIR}/{sample.name}/{filename}.csv"
                         )
                         df_sample = df_sample.set_index("statistic")
                         df_sample.loc["sampling_date"] = pd.to_datetime(sample.name)
                         df_summary = df_summary.append(df_sample.T)
                     except ValueError:
                         warnings.warn(
-                            f"file at 'samples/{sample.name}/{filename}.csv' does not exist, will be skipped"
+                            f"file at '{STORAGE_DIR}/{sample.name}/{filename}.csv' does not exist, will be skipped"
                         )
             df_summary = df_summary.set_index("sampling_date").convert_dtypes()
 
@@ -1174,7 +1209,7 @@ class DataMap:
         """
         df_historic = pd.DataFrame()
 
-        for sample_path in (self.datapath / "samples").iterdir():
+        for sample_path in (self.datapath / STORAGE_DIR).iterdir():
             sampling_date = self._prepare_date(sample_path.name)
             df_sample = self.load_historic(sampling_date=sampling_date)
             df_sample = self._slice_daterange(
@@ -1201,7 +1236,7 @@ class DataMap:
         """
         df_future = pd.DataFrame()
 
-        for sample_path in (self.datapath / "samples").iterdir():
+        for sample_path in (self.datapath / STORAGE_DIR).iterdir():
             sampling_date = self._prepare_date(sample_path.name)
             df_sample = self.load_future(sampling_date=sampling_date)
             df_sample = self._slice_daterange(
