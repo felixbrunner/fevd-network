@@ -326,7 +326,7 @@ class DataMap:
 
         # subselection of factors
         if q_model:
-            df_q = df_q[["R_MKT", "R_ME", "R_IA", "R_ROE", "R_EG"]]
+            df_q = df_q[["mkt", "me", "ia", "roe", "eg"]]
 
         return df_q
 
