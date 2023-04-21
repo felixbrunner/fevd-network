@@ -299,6 +299,22 @@ class WRDSDownloader:
         df = df.astype({"permno": int, "exchcd": int}).set_index("permno")
         return df
 
+    def download_crsp_indices(self) -> pd.core.frame.DataFrame:
+        """Download CRSP index returns.
+
+        Returns:
+            df (pandas.DataFrame): The downloaded data in tabular form.
+        """
+        query = """
+            SELECT
+            date,
+            vwretd,
+            ewretd
+            FROM crsp.dsi ;
+            """
+        df = self.query(query).set_index("date")
+        return df
+
     def download_famafrench_factors(self) -> pd.core.frame.DataFrame:
         """Download Fama and French factor data from CRSP.
 
@@ -309,6 +325,22 @@ class WRDSDownloader:
         query = """
             SELECT *
             FROM ff_all.factors_daily 
+            """
+        #    WHERE date BETWEEN '01/01/2000' AND '12/31/2019'
+
+        df = self.query(query).set_index("date")
+        return df
+
+    def download_famafrench_5_factors(self) -> pd.core.frame.DataFrame:
+        """Download Fama and French 5 factor data from CRSP.
+
+        Returns:
+            df (pandas.DataFrame): The downloaded data in tabular form.
+
+        """
+        query = """
+            SELECT *
+            FROM ff_all.fivefactors_daily 
             """
         #    WHERE date BETWEEN '01/01/2000' AND '12/31/2019'
 
@@ -429,7 +461,7 @@ def download_famafrench_dataset(
             print(dataset["DESCR"])
             return dataset
         else:
-            return dataset[key]
+            return dataset[key].div(100)
     except RemoteDataError:
         datasets = pandas_datareader.famafrench.get_available_datasets()
         matches = [dataset for dataset in datasets if name in dataset]
@@ -437,3 +469,19 @@ def download_famafrench_dataset(
         warnings.warn(
             f"dataset '{name}' not found, try {len(matches)} similar datasets:\n    {print_matches}"
         )
+
+
+def download_q_factor_dataset(
+    url: str = "https://global-q.org/uploads/1/2/2/6/122679606/q5_factors_daily_2022.csv",
+):
+    """Download the Q-Factor dataset from 'https://global-q.org'.
+
+    Args:
+        url: URL to the file to download.
+
+    Returns:
+        dataset: Table as a pandas Dataframe.
+    """
+    df_q = pd.read_csv(url)
+    df_q["DATE"] = pd.to_datetime(df_q["DATE"], format="%Y%m%d")
+    return df_q
