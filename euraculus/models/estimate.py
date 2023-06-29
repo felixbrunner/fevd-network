@@ -65,7 +65,39 @@ def load_estimation_data(data: DataMap, sampling_date: dt.datetime) -> dict:
     # )
     df_factors = data.load_historic_aggregates(sampling_date)
 
-    return (df_info, df_log_vola, df_factors)  ##
+    return (df_info, df_log_vola, df_factors)
+
+
+def load_return_estimation_data(data: DataMap, sampling_date: dt.datetime) -> dict:
+    """Load the data necessary for return covariance estimation from disk.
+
+    Args:
+        data: DataMap to load data from.
+        sampling_date: Last day in the sample.
+
+    Returns:
+        df_info: Summarizing information.
+        df_ret: Logarithm of value variance variable.
+    """
+    # asset data
+    df_ret = data.load_historic(sampling_date=sampling_date, column="retadj")
+    df_info = data.load_asset_estimates(
+        sampling_date=sampling_date,
+        columns=[
+            "ticker",
+            "comnam",
+            "last_mcap",
+            "mean_mcap",
+            "last_mcap_volatility",
+            "mean_mcap_volatility",
+            "sic_division",
+            "ff_sector",
+            "ff_sector_ticker",
+            "gics_sector",
+        ],
+    )
+
+    return (df_info, df_ret)
 
 
 def build_lookup_table(df_info: pd.DataFrame) -> pd.DataFrame:
@@ -129,7 +161,7 @@ def estimate_fevd(
 
     # estimate covariance
     cov_cv = GridSearchCV(
-        GLASSO(max_iter=200),
+        GLASSO(max_iter=400),
         param_grid=cov_grid,
         cv=12,
         n_jobs=-1,
@@ -142,6 +174,33 @@ def estimate_fevd(
     fevd = FEVD(var.var_1_matrix_, cov.covariance_)
 
     return (var_cv, var, cov_cv, cov, fevd)
+
+
+def estimate_sigma(
+    ret_data: pd.DataFrame,
+    sigma_grid: dict,
+) -> tuple:
+    """Perform all estimation steps necessary to construct FEVD.
+
+    Args:
+        ret_data: Dataframe with the data panel for the VAR.
+        sigma_grid: Grid with covariance hyperparameters.
+
+    Returns:
+        sigma_cv: Cross-validation object for the covariance.
+        sigma: The estimated covariance object.
+    """
+    sigma_cv = GridSearchCV(
+        GLASSO(max_iter=400),
+        param_grid=sigma_grid,
+        cv=12,
+        n_jobs=-1,
+        verbose=1,
+        return_train_score=True,
+    ).fit(ret_data)
+    sigma = sigma_cv.best_estimator_
+
+    return (sigma_cv, sigma)
 
 
 def describe_data(df: pd.DataFrame) -> dict:
@@ -218,12 +277,34 @@ def describe_var(
         "var_mean_connection": var.var_1_matrix_.mean(),
         "var_mean_abs_connection": abs(var.var_1_matrix_).mean(),
         "var_asymmetry": matrix_asymmetry(M=var.var_1_matrix_),
-        "var_r2": var.r2(var_data=var_data, factor_data=factor_data),
-        "var_r2_ols": ols_var.r2(var_data=var_data, factor_data=factor_data),
-        "var_factor_r2": var.factor_r2(var_data=var_data, factor_data=factor_data),
-        "var_factor_r2_ols": ols_var.factor_r2(
-            var_data=var_data, factor_data=factor_data
+        "var_r2": var.r2(var_data=var_data, factor_data=factor_data, weighting="equal"),
+        "var_r2_ols": ols_var.r2(
+            var_data=var_data, factor_data=factor_data, weighting="equal"
         ),
+        "var_component_r2_factors": var.component_r2s(
+            var_data=var_data, factor_data=factor_data, weighting="equal"
+        )["factors"],
+        "var_component_r2_spillovers": var.component_r2s(
+            var_data=var_data, factor_data=factor_data, weighting="equal"
+        )["var"],
+        "var_component_r2_factors_ols": ols_var.component_r2s(
+            var_data=var_data, factor_data=factor_data, weighting="equal"
+        )["factors"],
+        "var_component_r2_spillovers_ols": ols_var.component_r2s(
+            var_data=var_data, factor_data=factor_data, weighting="equal"
+        )["var"],
+        "var_partial_r2_factors": var.partial_r2s(
+            var_data=var_data, factor_data=factor_data, weighting="equal"
+        )["factors"],
+        "var_partial_r2_spillovers": var.partial_r2s(
+            var_data=var_data, factor_data=factor_data, weighting="equal"
+        )["var"],
+        "var_partial_r2_factors_ols": ols_var.partial_r2s(
+            var_data=var_data, factor_data=factor_data, weighting="equal"
+        )["factors"],
+        "var_partial_r2_spillovers_ols": ols_var.partial_r2s(
+            var_data=var_data, factor_data=factor_data, weighting="equal"
+        )["var"],
         "var_df_full": var.df_full_,
         "var_df_used": var.df_used_,
         "var_nonzero_shrinkage": shrinkage_factor(
@@ -451,6 +532,7 @@ def describe_fevd(
 
 
 def collect_data_estimates(
+    var_data: pd.DataFrame,
     df_historic: pd.DataFrame,
     df_future: pd.DataFrame,
     df_rf: pd.DataFrame,
@@ -459,6 +541,7 @@ def collect_data_estimates(
     """Calculate return and variance estimates for various horizons.
 
     Args:
+        var_data: Data the estimation is performed on.
         df_historic: Dataframe with past returns.
         df_future: Dataframe with subsequent returns.
         df_rf: Dataframe with risk-free returns.
@@ -473,6 +556,8 @@ def collect_data_estimates(
     df_historic -= df_rf.loc[df_historic.index].values
     estimates["ret_excess"] = (1 + df_historic).prod() - 1
     estimates["var_annual"] = df_historic.var() * 252
+    estimates["xvar_data_mean"] = var_data.mean()
+    estimates["xvar_data_var"] = var_data.var()
 
     # forecasts
     if df_future is not None:
@@ -536,6 +621,21 @@ def collect_var_estimates(
     estimates["var_residual_variance"] = np.diag(residuals.cov())
     estimates["var_systematic_variance"] = var.systematic_variances(
         factor_data=factor_data
+    )
+    estimates["var_component_r2_factors"] = var.component_r2s(
+        var_data=var_data, factor_data=factor_data, weighting="granular"
+    )["factors"]
+    estimates["var_component_r2_spillovers"] = var.component_r2s(
+        var_data=var_data, factor_data=factor_data, weighting="granular"
+    )["var"]
+    estimates["var_partial_r2_factors"] = var.partial_r2s(
+        var_data=var_data, factor_data=factor_data, weighting="granular"
+    )["factors"]
+    estimates["var_partial_r2_spillovers"] = var.partial_r2s(
+        var_data=var_data, factor_data=factor_data, weighting="granular"
+    )["var"]
+    estimates["var_r2"] = var.r2(
+        var_data=var_data, factor_data=factor_data, weighting="granular"
     )
     return estimates
 
