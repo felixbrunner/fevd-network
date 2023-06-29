@@ -1691,45 +1691,6 @@ class FactorVAR(VAR):
             )
         return residuals
 
-    def factor_r2(
-        self,
-        var_data: np.ndarray = None,
-        factor_data: np.ndarray = None,
-        weighting: str = "equal",
-    ):
-        """Calculate goodness of fit from the fitted factor loadings and input data.
-
-        Args:
-            var_data: (t_periods, n_series) array with observations.
-            factor_data: (t_periods, k_factors) array with factor observations.
-            weighting: Indicates how to weigh dependent variables. Available
-                options are ["equal", "variance", "granular"].
-
-        Returns:
-            factor_r2: The goodness of fit statistic for the factor loadings.
-        """
-        levels = var_data[self.p_lags :].mean().values
-        tss = np.nansum(
-            (var_data[self.p_lags :] - levels) ** 2,
-            axis=0,
-        )
-        residuals = self.factor_residuals(var_data=var_data, factor_data=factor_data)
-        residuals -= residuals.mean()
-        rss = np.nansum(
-            residuals**2,
-            axis=0,
-        )
-        if weighting == "equal":
-            factor_r2 = 1 - rss.sum() / tss.sum()
-        elif weighting == "variance":
-            variances = var_data[self.p_lags :].mean().values
-            factor_r2 = 1 - (rss / variances).sum() / (tss / variances).sum()
-        elif weighting == "granular":
-            factor_r2 = 1 - rss / tss
-        else:
-            raise ValueError("weighting method '{}' not available".format(weighting))
-        return factor_r2
-
     def systematic_variances(
         self,
         factor_data: np.ndarray = None,
