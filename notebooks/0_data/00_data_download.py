@@ -24,7 +24,7 @@
 # %autoreload 2
 
 from euraculus.data.map import DataMap
-from euraculus.data.download import WRDSDownloader, download_yahoo_data
+from euraculus.data.download import WRDSDownloader, download_yahoo_data, download_q_factor_dataset
 from euraculus.settings import (
     DATA_DIR,
     FIRST_SAMPLING_DATE,
@@ -48,7 +48,7 @@ data = DataMap(DATA_DIR)
 # ### Timeframe
 
 # %%
-first_year = 1925
+first_year = 2022
 # first_year = FIRST_SAMPLING_DATE.year - 2
 last_year = LAST_SAMPLING_DATE.year + 1
 
@@ -117,12 +117,27 @@ df_gics = db.download_gics_table()
 data.dump(df_gics, "raw/gics.pkl")
 
 # %% [markdown]
-# ## Download FF data
+# ## CRSP index data
+
+# %%
+# %%time
+df_index = db.download_crsp_indices()
+data.dump(df_index, "raw/crsp_index.pkl")
+
+# %% [markdown]
+# ## Download Factor data
 
 # %%
 # %%time
 df_ff = db.download_famafrench_factors()
 data.dump(df_ff, "raw/ff_factors.pkl")
+df_ff5 = db.download_famafrench_5_factors()
+data.dump(df_ff5, "raw/ff5_factors.pkl")
+
+# %%
+# %%time
+df_q = download_q_factor_dataset()
+data.dump(df_q, "raw/q_factors.pkl")
 
 # %% [markdown]
 # ## SPDR Trust SPY Index data
