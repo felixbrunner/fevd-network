@@ -18,6 +18,7 @@ from euraculus.data.map import DataMap
 from euraculus.data.sampling import LargeCapSampler
 from euraculus.settings import (
     DATA_DIR,
+    STORAGE_DIR,
     FIRST_SAMPLING_DATE,
     LAST_SAMPLING_DATE,
     TIME_STEP,
@@ -82,7 +83,7 @@ df_estimates["ff_sector_ticker"] = data.lookup_famafrench_sectors(
 df_estimates["gics_sector"] = data.lookup_gics_sectors(df_estimates["gics"].values)
 
 # %% [markdown]
-# ## Rolling window
+# ### Rolling window
 
 # %%
 # %%time
@@ -90,7 +91,9 @@ df_estimates["gics_sector"] = data.lookup_gics_sectors(df_estimates["gics"].valu
 sampling_date = FIRST_SAMPLING_DATE
 while sampling_date <= LAST_SAMPLING_DATE:
     # get sample
-    df_historic, df_future, df_summary = sampler.sample(sampling_date)
+    df_historic, df_future, df_summary = sampler.sample(
+        sampling_date, sampling_variable=SAMPLING_VARIABLE
+    )
     df_estimates = df_summary.loc[df_historic.index.get_level_values("permno").unique()]
     df_estimates["ticker"] = df_historic["ticker"].unstack().iloc[-1, :].values
     df_estimates["sic"] = (
@@ -121,19 +124,19 @@ while sampling_date <= LAST_SAMPLING_DATE:
     # dump
     data.store(
         df_historic,
-        f"samples/{sampling_date:%Y-%m-%d}/historic_daily.csv",
+        f"{STORAGE_DIR}/{sampling_date:%Y-%m-%d}/historic_daily.csv",
     )
     data.store(
         df_future,
-        f"samples/{sampling_date:%Y-%m-%d}/future_daily.csv",
+        f"{STORAGE_DIR}/{sampling_date:%Y-%m-%d}/future_daily.csv",
     )
     data.store(
         df_summary,
-        f"samples/{sampling_date:%Y-%m-%d}/selection_summary.csv",
+        f"{STORAGE_DIR}/{sampling_date:%Y-%m-%d}/selection_summary.csv",
     )
     data.store(
         df_estimates,
-        f"samples/{sampling_date:%Y-%m-%d}/asset_estimates.csv",
+        f"{STORAGE_DIR}/{sampling_date:%Y-%m-%d}/asset_estimates.csv",
     )
 
     # increment monthly end of month
