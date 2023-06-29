@@ -106,9 +106,45 @@ def estimate_models(models: dict, data: pd.DataFrame) -> tuple:
         df_estimates = df_estimates.join(
             model.r2_.to_frame().add_prefix("{}_".format(name))
         )  # r2
-        df_residuals[name + "_resid"] = model.residuals_.stack()  # resiudals
+        df_residuals[name + "_resid"] = model.residuals_.stack()  # residuals
+        df_residuals[name + "_alpharesid"] = (
+            model.residuals_ + model.alphas_
+        ).stack()  # residuals with intercept
 
     return (df_estimates, df_residuals)
+
+
+def predict_factor_returns(models: dict, data: pd.DataFrame) -> tuple:
+    """Predict factor returns for a set of models and collect the results.
+
+    Args:
+        models: Name, FactorModel pairs to define the set of models estimated.
+        data: The returns data to estimate the factor models on.
+
+    Returns:
+        df_errors: Model residuals (pricing errors) for all estimated models.
+
+    """
+    # set up storage array
+    df_errors = pd.DataFrame(index=data.stack().index)
+
+    # predict
+    for name, model in models.items():
+        try:
+            preds = model.predict(data)
+            errors = data - preds
+            df_errors[name + "_future_error"] = errors.stack()  # errors
+
+            preds = model.predict(data, constant=False)
+            errors = data - preds
+            df_errors[
+                name + "_future_alphaerror"
+            ] = errors.stack()  # errors with intercept
+
+        except:
+            pass
+
+    return df_errors
 
 
 def decompose_variance(
