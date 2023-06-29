@@ -17,9 +17,11 @@ from euraculus.settings import (
     LAST_SAMPLING_DATE,
     TIME_STEP,
     ESTIMATION_WINDOW,
+    SPLIT_DATE,
 )
 from tqdm import tqdm
-from euraculus.data.preprocess import construct_index, count_obs, construct_normalized_vola_index
+from euraculus.data.preprocess import construct_index, count_obs, construct_normalized_vola_index, prepare_log_data
+from kungfu.plotting import add_recession_bars
 # -
 
 # ## Setup
@@ -32,7 +34,7 @@ df_vix = data.load_yahoo("^VIX")
 df_dxy = data.load_yahoo("DX-Y.NYB")
 df_tnx = data.load_yahoo("^TNX")
 
-# ## Extract historic indices
+# ## Extract historic index stats (monthly)
 
 # %%time
 # extract aggregate information for each sample
@@ -82,6 +84,7 @@ while sampling_date <= LAST_SAMPLING_DATE:
     df_historic_aggregates["tnx_ret"] = df_tnx.reindex(index)["ret"].sub(rf)
     df_historic_aggregates["tnx_vola"] = np.sqrt(df_tnx.reindex(index)["var"])
     
+    
     # store
     data.store(
         df_historic_aggregates,
@@ -93,12 +96,12 @@ while sampling_date <= LAST_SAMPLING_DATE:
         print(f"Done collecting year {sampling_date.year}.")
     sampling_date += TIME_STEP
 
-# ## Extract future indices
+# ## Extract future index stats (monthly)
 
 # %%time
 # extract aggregate information for each sample
 sampling_date = FIRST_SAMPLING_DATE
-while sampling_date <= LAST_SAMPLING_DATE:
+while sampling_date < LAST_SAMPLING_DATE:
     # load & set up
     df_future = data.load_future(sampling_date=sampling_date)
     index = df_future.iloc[:, 0].unstack().index
@@ -154,35 +157,24 @@ while sampling_date <= LAST_SAMPLING_DATE:
         print(f"Done collecting year {sampling_date.year}.")
     sampling_date += TIME_STEP
 
-
-
-
-
-
-
-
-
-
-
-
-
-from sklearn.decomposition import PCA
+# ## Construct daily indices
 
 # +
 # %%time
 
-df_indices = pd.DataFrame()
+df_indices = pd.DataFrame(index=pd.Index([], name="date"))
 for year in tqdm(range(FIRST_SAMPLING_DATE.year - 1, LAST_SAMPLING_DATE.year + 1)):
     df_year = pd.DataFrame()
 
     # load data
     df_crsp = data.load_crsp_data(dt.datetime(year, 1, 1), dt.datetime(year, 12, 31))
-    df_var = df_crsp["var"].unstack()
-    df_noisevar = df_crsp["noisevar"].unstack()
+    df_noisevar = df_crsp["noisevar"].astype(float).replace(0, np.nan).unstack()
+    df_var = df_crsp["var"].replace(0, np.nan).unstack()
+    df_log_vola = prepare_log_data(np.sqrt(df_var), np.sqrt(df_noisevar))
     df_ret = df_crsp["retadj"].unstack()
-    df_mcap = df_crsp["mcap"].unstack()
-
-    # process data
+    df_mcap = df_crsp["mcap"].clip(lower=0).unstack()
+    
+    # process
     df_var[df_var == 0] = df_noisevar
     df_weights = df_mcap.div(df_mcap.sum(axis=1), axis=0)
 
@@ -191,28 +183,24 @@ for year in tqdm(range(FIRST_SAMPLING_DATE.year - 1, LAST_SAMPLING_DATE.year + 1
     df_year["var_vw"] = df_var.mul(df_weights).sum(axis=1)
     df_year["ret_ew"] = df_ret.mean(axis=1)
     df_year["ret_vw"] = df_ret.mul(df_weights).sum(axis=1)
+    df_year["logvola_ew"] = df_log_vola.mean(axis=1)
+    df_year["logvola_vw"] = df_log_vola.mul(df_weights).sum(axis=1)
     df_year["num_var"] = df_var.count(axis=1)
     df_year["num_noisevar"] = df_noisevar.count(axis=1)
     df_year["num_ret"] = df_ret.count(axis=1)
 
     # append
     df_indices = df_indices.append(df_year)
+    
+df_indices = df_indices\
+    .merge(df_rf, how="outer", left_index=True, right_index=True)\
+    .merge(df_spy[["ret", "var"]].add_prefix("spy_"), how="outer", left_index=True, right_index=True) \
+    .merge(df_vix[["Close", "ret", "var"]].add_prefix("vix_"), how="outer", left_index=True, right_index=True) \
+    .merge(df_dxy[["Close", "ret", "var"]].add_prefix("dxy_"), how="outer", left_index=True, right_index=True) \
+    .merge(df_tnx[["Close", "ret", "var"]].add_prefix("tnx_"), how="outer", left_index=True, right_index=True)
 
-    # print(f"finished index construction in year {year}")
-# -
-
-ax = np.log(df_indices["ret_ew"] + 1).cumsum().plot(label="cumulative return")
-ax.plot(df_indices["ret_ew"] * 250, alpha=0.5, label="daily return (annualized)")
-ax.plot(df_indices["var_ew"] * 1000, label="daily variance index * 1000")
-ax.plot(df_indices["ret_ew"].rolling(250).std() * 250, label="rolling annual return")
-ax.legend()
-
-ax = df_indices["num_ret"].plot(label="return")
-ax.plot(df_indices["num_var"], label="high-low variance")
-ax.plot(df_indices["num_noisevar"], label="bid-ask variance")
-ax.legend()
-
-
-((df_indices["var_ew"] * 250) ** 0.5).plot()
-
-
+# store
+data.store(
+    df_indices,
+    f"analysis/df_daily_indices.pkl",
+)
