@@ -309,7 +309,7 @@ def draw_network(
     ff_sector_codes = {tick: i for i, tick in enumerate(ff_sector_tickers)}
 
     # calculations to highlight nodes/edges
-    net_connectedness = network.net_connectedness()
+    connectedness = network.out_connectedness()
     include_edges = table > np.percentile(table, q=90, axis=None, keepdims=True)
 
     # plot
@@ -328,23 +328,46 @@ def draw_network(
             sector_colors[ff_sector_codes[i]]
             for i in df_info["ff_sector_ticker"].values
         ],
-        "linewidths": [
-            4
-            if nc > np.percentile(net_connectedness, 80)
-            else 4
-            if nc < np.percentile(net_connectedness, 20)
-            else 0
-            for nc in net_connectedness
-        ],
+        # "linewidths": [
+        #     4
+        #     # if c > np.percentile(connectedness, 80)
+        #     # else 4
+        #     # if c < np.percentile(connectedness, 20)
+        #     # else 0
+        #     for c in connectedness
+        # ],
+        # "linewidths": [4 * c[0] / connectedness.max() for c in connectedness],
+        # "linewidths": abs(
+        #     8
+        #     * (
+        #         (
+        #             connectedness.squeeze().argsort().argsort()
+        #             / (len(connectedness) - 1)
+        #             - 0.5
+        #         )
+        #     )
+        # ).tolist(),
+        # "linewidths": abs(
+        #     1
+        #     + 3
+        #     * ((connectedness.squeeze().argsort().argsort() / (len(connectedness) - 1)))
+        # ).tolist(),
+        "linewidths": (1 + 3 * connectedness.squeeze() / connectedness.max()).tolist(),
         "alpha": 0.9,
-        "edgecolors": [
-            "w"
-            if nc > np.percentile(net_connectedness, 80)
-            else "grey"
-            if nc < np.percentile(net_connectedness, 20)
-            else "r"
-            for nc in net_connectedness
-        ],
+        # "edgecolors": [
+        #     "w"
+        #     if nc > np.percentile(net_connectedness, 80)
+        #     else "grey"
+        #     if nc < np.percentile(net_connectedness, 20)
+        #     else "r"
+        #     for nc in net_connectedness
+        # ],
+        # "edgecolors": [
+        #     plt.get_cmap("gray")(c[0] / connectedness.max()) for c in connectedness
+        # ],
+        "edgecolors": plt.get_cmap("gray")(
+            connectedness.squeeze().argsort().argsort() / (len(connectedness) - 1)
+        ),
         "node_shape": "o",
     }
     nx.draw_networkx_nodes(G=g, pos=layout, ax=ax, **node_options)
@@ -394,7 +417,7 @@ def draw_network(
                 markerfacecolor="none",
                 markeredgewidth=2,
                 markeredgecolor="w",
-                label="Influencers",
+                label="Key Assets",
                 markersize=10,
                 linewidth=0,
             ),
@@ -405,12 +428,12 @@ def draw_network(
                 markerfacecolor="none",
                 markeredgewidth=2,
                 markeredgecolor="grey",
-                label="Followers",
+                label="Satellite Assets",
                 markersize=10,
                 linewidth=0,
             ),
         ],
-        title="Most connected assets",
+        title="Network Position",
         loc="lower right",
         edgecolor="k",
     )
