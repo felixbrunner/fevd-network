@@ -29,8 +29,12 @@
 *.png
 *.eps
 
+# Ignore tables
+*.tex
+
 # Specifically ignore folders
 ./data/
+./outputs/
 dropbox/
 *.ipynb_checkpoints/
 euraculus.egg-info/
