@@ -5,7 +5,7 @@ install:
 		requirements/requirements-ci.txt \
 		requirements/requirements-dev.txt
 	pip install -e .
-	sudo apt-get install libgfortran3
+	sudo apt-get install libgfortran5
 
 requirements:
 	pip install pip-tools
