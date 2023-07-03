@@ -33,8 +33,9 @@
 *.tex
 
 # Specifically ignore folders
-./data/
-./outputs/
+.venv/
+data/
+outputs/
 dropbox/
 *.ipynb_checkpoints/
 euraculus.egg-info/
