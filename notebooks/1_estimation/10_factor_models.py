@@ -24,19 +24,23 @@ from euraculus.models.factor import (
     Carhart4FactorModel,
     FactorModel,
     FamaFrench3FactorModel,
+    FamaFrench5FactorModel,
+    Q5FactorModel,
     SPY1FactorModel,
     SPYVariance1FactorModel,
 )
 from euraculus.models.estimate import prepare_log_data
-from euraculus.models.factor import estimate_models
+from euraculus.models.factor import estimate_models, predict_factor_returns
 from euraculus.utils.utils import months_difference
 from euraculus.settings import (
     DATA_DIR,
-    FIRST_SAMPLING_DATE,
     LAST_SAMPLING_DATE,
     TIME_STEP,
     FORECAST_WINDOWS,
+    SPLIT_DATE,
 )
+
+FIRST_SAMPLING_DATE = SPLIT_DATE
 
 # %% [markdown]
 # ## Set up
@@ -55,6 +59,8 @@ ret_models = {
     "capm": CAPM(data),
     "ff3": FamaFrench3FactorModel(data),
     "c4": Carhart4FactorModel(data),
+    "ff5": FamaFrench5FactorModel(data),
+    "q5": Q5FactorModel(data),
 }
 
 # %%
@@ -70,8 +76,8 @@ var_models = {
 
 # %%
 # %%time
-FIRST_SAMPLING_DATE = max(FIRST_SAMPLING_DATE, dt.datetime(year=1927, month=6, day=30))
-sampling_date = FIRST_SAMPLING_DATE
+FIRST_ESTIMATION_DATE = max(SPLIT_DATE, dt.datetime(year=1927, month=6, day=30))
+sampling_date = FIRST_ESTIMATION_DATE
 while sampling_date <= LAST_SAMPLING_DATE:
     # get excess return samples
     df_historic = data.load_historic(sampling_date=sampling_date, column="retadj")
@@ -80,6 +86,12 @@ while sampling_date <= LAST_SAMPLING_DATE:
     # estimate models backwards
     df_estimates, df_residuals = estimate_models(ret_models, df_historic)
 
+    # predict future values from future factors
+    if sampling_date < LAST_SAMPLING_DATE:
+        df_future = data.load_future(sampling_date=sampling_date, column="retadj")
+        df_future -= df_rf.loc[df_future.index].values
+        df_errors = predict_factor_returns(ret_models, df_future)
+
     # store
     data.store(
         data=df_residuals, path=f"samples/{sampling_date:%Y-%m-%d}/historic_daily.csv"
@@ -87,6 +99,11 @@ while sampling_date <= LAST_SAMPLING_DATE:
     data.store(
         data=df_estimates, path=f"samples/{sampling_date:%Y-%m-%d}/asset_estimates.csv"
     )
+    if sampling_date < LAST_SAMPLING_DATE:
+        data.store(
+            data=df_errors,
+            path=f"samples/{sampling_date:%Y-%m-%d}/future_daily.csv",
+        )
 
     # increment monthly end of month
     print(
@@ -99,7 +116,7 @@ while sampling_date <= LAST_SAMPLING_DATE:
 
 # %%
 # %%time
-sampling_date = FIRST_SAMPLING_DATE
+sampling_date = FIRST_ESTIMATION_DATE
 while sampling_date < LAST_SAMPLING_DATE:
     # get excess return samples
     df_future = data.load_future(sampling_date=sampling_date, column="retadj")
@@ -107,6 +124,7 @@ while sampling_date < LAST_SAMPLING_DATE:
 
     # slice expanding window
     df_expanding_estimates = pd.DataFrame(index=df_future.columns)
+    df_expanding_residuals = pd.DataFrame(index=df_future.stack().index)
     for window_length in FORECAST_WINDOWS:
         if (
             months_difference(end_date=LAST_SAMPLING_DATE, start_date=sampling_date)
@@ -121,6 +139,11 @@ while sampling_date < LAST_SAMPLING_DATE:
             # collect
             df_estimates = df_estimates.add_suffix(f"_next{window_length}M")
             df_expanding_estimates = df_expanding_estimates.join(df_estimates)
+            if window_length in [1, 12]:
+                df_residuals = df_residuals.add_suffix(f"_next{window_length}M")
+                df_expanding_residuals = df_expanding_residuals.join(
+                    df_residuals, how="outer"
+                )
 
     # store
     data.store(
@@ -128,7 +151,7 @@ while sampling_date < LAST_SAMPLING_DATE:
         path=f"samples/{sampling_date:%Y-%m-%d}/asset_estimates.csv",
     )
     data.store(
-        data=df_residuals,
+        data=df_expanding_residuals,
         path=f"samples/{sampling_date:%Y-%m-%d}/future_daily.csv",
     )
 
@@ -146,7 +169,7 @@ while sampling_date < LAST_SAMPLING_DATE:
 
 # %%
 # %%time
-sampling_date = FIRST_SAMPLING_DATE
+sampling_date = FIRST_ESTIMATION_DATE
 while sampling_date <= LAST_SAMPLING_DATE:
     # get excess return samples
     df_var = data.load_historic(sampling_date=sampling_date, column="var")
@@ -177,7 +200,7 @@ while sampling_date <= LAST_SAMPLING_DATE:
 
 # %%
 # %%time
-sampling_date = FIRST_SAMPLING_DATE
+sampling_date = FIRST_ESTIMATION_DATE
 while sampling_date < LAST_SAMPLING_DATE:
     # get excess return samples
     df_var = data.load_future(sampling_date=sampling_date, column="var")
