@@ -52,7 +52,7 @@ df_rf = data.load_rf()
 # ### Test a single period
 
 # %%
-sampling_date = dt.datetime(year=1927, month=6, day=30)
+sampling_date = LAST_SAMPLING_DATE  # dt.datetime(year=2022, month=3, day=31)
 
 # %%
 # %%time
@@ -74,7 +74,7 @@ residuals = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/residuals.pkl")
 weights = data.load_asset_estimates(
     sampling_date=sampling_date, columns=["mean_mcap"]
 ).values.reshape(-1, 1)
-weights /= weights.sum()
+weights /= weights.mean()
 
 # collect estimation statistics
 stats = describe_data(var_data)
@@ -85,7 +85,9 @@ stats.update(describe_cov(cov=cov, cov_cv=cov_cv, data=residuals))
 stats.update(describe_fevd(fevd=fevd, horizon=HORIZON, data=var_data, weights=weights))
 
 # collect estimates
-estimates = collect_data_estimates(df_historic, df_future, df_rf, FORECAST_WINDOWS)
+estimates = collect_data_estimates(
+    var_data, df_historic, df_future, df_rf, FORECAST_WINDOWS
+)
 estimates = estimates.join(
     collect_var_estimates(var=var, var_data=var_data, factor_data=factor_data)
 )
@@ -122,7 +124,7 @@ while sampling_date <= LAST_SAMPLING_DATE:
     weights = data.load_asset_estimates(
         sampling_date=sampling_date, columns=["mean_mcap"]
     ).values.reshape(-1, 1)
-    weights /= weights.sum()
+    weights /= weights.mean()
 
     # collect aggregate statistics
     stats = describe_data(var_data)
@@ -135,7 +137,9 @@ while sampling_date <= LAST_SAMPLING_DATE:
     )
 
     # collect asset-level estimates
-    estimates = collect_data_estimates(df_historic, df_future, df_rf, FORECAST_WINDOWS)
+    estimates = collect_data_estimates(
+        var_data, df_historic, df_future, df_rf, FORECAST_WINDOWS
+    )
     estimates = estimates.join(
         collect_var_estimates(var=var, var_data=var_data, factor_data=factor_data)
     )
