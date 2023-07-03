@@ -33,16 +33,16 @@ sampling_date = FIRST_SAMPLING_DATE
 while sampling_date <= LAST_SAMPLING_DATE:
     # get samples
     historic_indices = data.load_historic_aggregates(sampling_date=sampling_date)[INDICES]
-    future_indices = data.load_future_aggregates(sampling_date=sampling_date)[INDICES]
 
     # calculate stats
-    df_stats = pd.DataFrame(index=historic_indices.columns)
+    df_stats = pd.DataFrame(index=pd.Index(historic_indices.columns, name="index"))
     df_stats["ret_excess"] = (1 + historic_indices).prod() - 1
     df_stats["var_annual"] = historic_indices.var() * 252
 
     if sampling_date < LAST_SAMPLING_DATE:
         # slice expanding window
-        df_expanding_estimates = pd.DataFrame(index=future_indices.columns)
+        future_indices = data.load_future_aggregates(sampling_date=sampling_date)[INDICES]
+        df_expanding_estimates = pd.DataFrame(index=pd.Index(future_indices.columns, name="index"))
         for window_length in FORECAST_WINDOWS:
             if (
                 months_difference(end_date=LAST_SAMPLING_DATE, start_date=sampling_date)
@@ -66,5 +66,5 @@ while sampling_date <= LAST_SAMPLING_DATE:
     )
 
     # increment monthly end of month
-    print(f"Completed summary stats estimation at {sampling_date:%Y-%m-%d}")
+    print(f"Completed index summary stats estimation at {sampling_date:%Y-%m-%d}")
     sampling_date += TIME_STEP
