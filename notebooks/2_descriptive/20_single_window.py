@@ -44,11 +44,13 @@ from euraculus.utils.plot import (
     contribution_bars,
 )
 from euraculus.settings import (
+    OUTPUT_DIR,
     DATA_DIR,
     FACTORS,
     VAR_GRID,
     COV_GRID,
     HORIZON,
+    SECTOR_COLORS,
 )
 
 # %% [markdown]
@@ -60,9 +62,6 @@ sampling_date = dt.datetime(year=2022, month=3, day=31)
 
 # %%
 save_outputs = True
-
-# %%
-save_outputs = False
 
 # %% [markdown]
 # ### Load data
@@ -88,15 +87,18 @@ df_tickers = build_lookup_table(df_info)
 # store
 if save_outputs:
     kf.frame.FinancialDataFrame(df_tickers).export_to_latex(
-        filename="tickers.tex", path=f"../reports/{sampling_date.date()}/"
+        filename="tickers.tex", path=str(OUTPUT_DIR / f"{sampling_date.date()}/")
     )
-    data.dump(data=df_tickers, path=f"../reports/{sampling_date.date()}/tickers.csv")
+    data.dump(data=df_tickers, path=str(OUTPUT_DIR / f"{sampling_date.date()}/tickers.csv"))
+
+# %%
+df_tickers
 
 # %% [markdown]
 # ## Load estimates / Estimate
 
 # %%
-reestimate = True
+reestimate = False
 
 # %%
 # %%time
@@ -142,7 +144,7 @@ else:
 
 # %%
 # create plot
-fig, ax = plt.subplots(1, 1, figsize=(18, 6))
+fig, ax = plt.subplots(1, 1, figsize=(18, 10))
 ax2 = ax.twinx()
 colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
 ax.set_title(f"Firm Size Distribution ({sampling_date.date()})")
@@ -150,11 +152,12 @@ ax.set_title(f"Firm Size Distribution ({sampling_date.date()})")
 # prepare data
 mcaps = df_summary["last_mcap"] * 1e3
 mcaps = mcaps.loc[mcaps > 0].sort_values(ascending=False).reset_index(drop=True)
+mcaps.index = mcaps.index+1
 cumulative = pd.Series([0]).append(mcaps.cumsum()) / mcaps.sum()
 
 # firm sizes
 area = ax.fill_between(
-    x=mcaps.index + 1,
+    x=mcaps.index,
     y1=mcaps,
     # y2=1e0,
     label="Asset market capitalization",
@@ -164,16 +167,16 @@ area = ax.fill_between(
     # hatch="|",
 )
 ax.scatter(
-    mcaps.index + 1,
+    mcaps.index,
     mcaps,
     marker=".",
     color=colors[0],
     s=5,
 )
 scat = ax.scatter(
-    mcaps.index[:100] + 1,
-    mcaps[:100],
-    label="100 largest assets",
+    x=df_summary.loc[var_data.columns, "last_mcap_rank"].values,
+    y=df_summary.loc[var_data.columns, "last_mcap"].values * 1e3,
+    label="100 sampled assets",
     marker="x",
     color=colors[1],
 )
@@ -212,11 +215,14 @@ ax.legend(elements, labels)  # , bbox_to_anchor=(1.05, 0.5), loc="center left")
 # save
 if save_outputs:
     fig.savefig(
-        f"../reports/{sampling_date.date()}/data/value_concentration.pdf",
+        OUTPUT_DIR / f"{sampling_date.date()}/data/value_concentration.pdf",
         format="pdf",
         dpi=200,
         bbox_inches="tight",
     )
+
+# %%
+cumulative[10]
 
 # %%
 ax = distribution_plot(
@@ -226,7 +232,7 @@ ax = distribution_plot(
 )
 if save_outputs:
     save_ax_as_pdf(
-        ax, save_path=f"../reports/{sampling_date.date()}/data/histogram_volatility.pdf"
+        ax, save_path=OUTPUT_DIR / f"{sampling_date.date()}/data/histogram_volatility.pdf"
     )
 
 # %%
@@ -237,7 +243,7 @@ ax = distribution_plot(
 if save_outputs:
     save_ax_as_pdf(
         ax,
-        save_path=f"../reports/{sampling_date.date()}/data/histogram_log_volatility.pdf",
+        save_path=OUTPUT_DIR / f"{sampling_date.date()}/data/histogram_log_volatility.pdf",
     )
 
 # %%
@@ -265,7 +271,7 @@ ax = missing_data_matrix(
 )
 if save_outputs:
     save_ax_as_pdf(
-        ax, save_path=f"../reports/{sampling_date.date()}/data/matrix_missing_data.pdf"
+        ax, save_path=OUTPUT_DIR / f"{sampling_date.date()}/data/matrix_missing_data.pdf"
     )
 
 
@@ -310,7 +316,7 @@ ax = matrix_heatmap(
 if save_outputs:
     save_ax_as_pdf(
         ax,
-        save_path=f"../reports/{sampling_date.date()}/data/heatmap_total_correlation.pdf",
+        save_path=OUTPUT_DIR / f"{sampling_date.date()}/data/heatmap_total_correlation.pdf",
     )
 
 # %%
@@ -331,7 +337,7 @@ ax = matrix_heatmap(
 if save_outputs:
     save_ax_as_pdf(
         ax,
-        save_path=f"../reports/{sampling_date.date()}/data/heatmap_total_autocorrelation.pdf",
+        save_path=OUTPUT_DIR / f"{sampling_date.date()}/data/heatmap_total_autocorrelation.pdf",
     )
 
 # %%
@@ -369,7 +375,7 @@ ax.set_ylabel("Explained variance ratio")
 if save_outputs:
     save_ax_as_pdf(
         ax,
-        save_path=f"../reports/{sampling_date.date()}/data/lineplot_pca_explained_variance.pdf",
+        save_path=OUTPUT_DIR / f"{sampling_date.date()}/data/lineplot_pca_explained_variance.pdf",
     )
 
 # %%
@@ -384,7 +390,7 @@ ax = matrix_heatmap(
 if save_outputs:
     save_ax_as_pdf(
         ax,
-        save_path=f"../reports/{sampling_date.date()}/data/heatmap_factor_correlation.pdf",
+        save_path=OUTPUT_DIR / f"{sampling_date.date()}/data/heatmap_factor_correlation.pdf",
     )
 
 # %%
@@ -438,16 +444,13 @@ ax = matrix_heatmap(
 if save_outputs:
     save_ax_as_pdf(
         ax,
-        save_path=f"../reports/{sampling_date.date()}/regression/heatmap_ols_var1_matrix.pdf",
+        save_path=OUTPUT_DIR / f"{sampling_date.date()}/regression/heatmap_ols_var1_matrix.pdf",
     )
 
 # %%
 print("OLS ESTIMATE")
 print(
-    "total R2: {:.2f}%\nfactor R2: {:.2f}%".format(
-        ols_var.r2(var_data=var_data, factor_data=factor_data) * 100,
-        ols_var.factor_r2(var_data=var_data, factor_data=factor_data) * 100,
-    )
+    f"R2: {ols_var.r2(var_data=var_data, factor_data=factor_data) * 100:.2f}"
 )
 print("Partial R2: ", ols_var.partial_r2s(var_data=var_data, factor_data=factor_data))
 print(
@@ -539,16 +542,13 @@ ax.set_ylim([min(y_values), max(y_values)])
 
 if save_outputs:
     save_ax_as_pdf(
-        ax, save_path=f"../reports/{sampling_date.date()}/regression/contour_var.pdf"
+        ax, save_path=OUTPUT_DIR / f"{sampling_date.date()}/regression/contour_var.pdf"
     )
 
 # %%
 print("AENET ESTIMATE")
 print(
-    "total R2: {:.2f}%\nfactor R2: {:.2f}%".format(
-        var.r2(var_data=var_data, factor_data=factor_data) * 100,
-        var.factor_r2(var_data=var_data, factor_data=factor_data) * 100,
-    )
+    f"R2: {var.r2(var_data=var_data, factor_data=factor_data) * 100:.2f}"
 )
 print("Partial R2: ", var.partial_r2s(var_data=var_data, factor_data=factor_data))
 print("Component R2: ", var.component_r2s(var_data=var_data, factor_data=factor_data))
@@ -618,7 +618,7 @@ ax.legend(loc="lower center")
 
 if save_outputs:
     save_ax_as_pdf(
-        ax, save_path=f"../reports/{sampling_date.date()}/regression/scatter_var.pdf"
+        ax, save_path=OUTPUT_DIR / f"{sampling_date.date()}/regression/scatter_var.pdf"
     )
 
 # %%
@@ -640,7 +640,7 @@ ax = matrix_heatmap(
 if save_outputs:
     save_ax_as_pdf(
         ax,
-        save_path=f"../reports/{sampling_date.date()}/regression/heatmap_aenet_var1_matrix.pdf",
+        save_path=OUTPUT_DIR / f"{sampling_date.date()}/regression/heatmap_aenet_var1_matrix.pdf",
     )
 
 # %%
@@ -654,7 +654,7 @@ ax = distribution_plot(
 if save_outputs:
     save_ax_as_pdf(
         ax,
-        save_path=f"../reports/{sampling_date.date()}/regression/histogram_VAR_factor_residuals.pdf",
+        save_path=OUTPUT_DIR / f"{sampling_date.date()}/regression/histogram_VAR_factor_residuals.pdf",
     )
 
 # %%
@@ -675,7 +675,7 @@ ax = matrix_heatmap(
 if save_outputs:
     save_ax_as_pdf(
         ax,
-        save_path=f"../reports/{sampling_date.date()}/regression/heatmap_VAR_factor_residual_correlation.pdf",
+        save_path=OUTPUT_DIR / f"{sampling_date.date()}/regression/heatmap_VAR_factor_residual_correlation.pdf",
     )
 
 # %%
@@ -696,7 +696,7 @@ ax = matrix_heatmap(
 if save_outputs:
     save_ax_as_pdf(
         ax,
-        save_path=f"../reports/{sampling_date.date()}/regression/heatmap_VAR_factor_residual_autocorrelation.pdf",
+        save_path=OUTPUT_DIR / f"{sampling_date.date()}/regression/heatmap_VAR_factor_residual_autocorrelation.pdf",
     )
 
 # %%
@@ -710,7 +710,7 @@ ax = distribution_plot(
 if save_outputs:
     save_ax_as_pdf(
         ax,
-        save_path=f"../reports/{sampling_date.date()}/regression/histogram_VAR_residuals.pdf",
+        save_path=OUTPUT_DIR / f"{sampling_date.date()}/regression/histogram_VAR_residuals.pdf",
     )
 
 # %%
@@ -731,7 +731,7 @@ ax = matrix_heatmap(
 if save_outputs:
     save_ax_as_pdf(
         ax,
-        save_path=f"../reports/{sampling_date.date()}/regression/heatmap_VAR_residual_correlation.pdf",
+        save_path=OUTPUT_DIR / f"{sampling_date.date()}/regression/heatmap_VAR_residual_correlation.pdf",
     )
 
 # %%
@@ -752,7 +752,7 @@ ax = matrix_heatmap(
 if save_outputs:
     save_ax_as_pdf(
         ax,
-        save_path=f"../reports/{sampling_date.date()}/regression/heatmap_VAR_residual_autocorrelation.pdf",
+        save_path=OUTPUT_DIR / f"{sampling_date.date()}/regression/heatmap_VAR_residual_autocorrelation.pdf",
     )
 
 # %%
@@ -773,7 +773,7 @@ ax = matrix_heatmap(
 if save_outputs:
     save_ax_as_pdf(
         ax,
-        save_path=f"../reports/{sampling_date.date()}/regression/heatmap_VAR_residual_autocorrelation_2nd.pdf",
+        save_path=OUTPUT_DIR / f"{sampling_date.date()}/regression/heatmap_VAR_residual_autocorrelation_2nd.pdf",
     )
 
 # %%
@@ -794,7 +794,7 @@ ax = matrix_heatmap(
 if save_outputs:
     save_ax_as_pdf(
         ax,
-        save_path=f"../reports/{sampling_date.date()}/regression/heatmap_VAR_residual_autocorrelation_3rd.pdf",
+        save_path=OUTPUT_DIR / f"{sampling_date.date()}/regression/heatmap_VAR_residual_autocorrelation_3rd.pdf",
     )
 
 # %% [markdown]
@@ -819,7 +819,7 @@ ax = matrix_heatmap(
 if save_outputs:
     save_ax_as_pdf(
         ax,
-        save_path=f"../reports/{sampling_date.date()}/covariance/heatmap_VAR_residual_covariance.pdf",
+        save_path=OUTPUT_DIR / f"{sampling_date.date()}/covariance/heatmap_VAR_residual_covariance.pdf",
     )
 
 # %%
@@ -840,7 +840,7 @@ ax = matrix_heatmap(
 if save_outputs:
     save_ax_as_pdf(
         ax,
-        save_path=f"../reports/{sampling_date.date()}/covariance/heatmap_VAR_residual_partial_corr.pdf",
+        save_path=OUTPUT_DIR / f"{sampling_date.date()}/covariance/heatmap_VAR_residual_partial_corr.pdf",
     )
 
 # %% [markdown]
@@ -867,8 +867,7 @@ ax.plot(
     marker="s",
     label="mean training loss",
     linestyle="--",
-)
-# ax.axhline(-cov_cv.best_score_, label='Best Adaptive Threshold Estimate', linestyle=':', linewidth=1, color='k')
+)# ax.axhline(-cov_cv.best_score_, label='Best Adaptive Threshold Estimate', linestyle=':', linewidth=1, color='k')
 
 colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
 ax.axvline(
@@ -898,7 +897,7 @@ ax.legend()
 
 if save_outputs:
     save_ax_as_pdf(
-        ax, save_path=f"../reports/{sampling_date.date()}/covariance/line_cov_cv.pdf"
+        ax, save_path=OUTPUT_DIR / f"{sampling_date.date()}/covariance/line_cov_cv.pdf"
     )
 
 # %%
@@ -922,7 +921,7 @@ ax = matrix_heatmap(
 if save_outputs:
     save_ax_as_pdf(
         ax,
-        save_path=f"../reports/{sampling_date.date()}/covariance/heatmap_cov_matrix.pdf",
+        save_path=OUTPUT_DIR / f"{sampling_date.date()}/covariance/heatmap_cov_matrix.pdf",
     )
 
 # %%
@@ -944,7 +943,7 @@ ax = matrix_heatmap(
 if save_outputs:
     save_ax_as_pdf(
         ax,
-        save_path=f"../reports/{sampling_date.date()}/covariance/heatmap_precision_matrix.pdf",
+        save_path=OUTPUT_DIR / f"{sampling_date.date()}/covariance/heatmap_precision_matrix.pdf",
     )
 
 # %%
@@ -965,7 +964,7 @@ ax = matrix_heatmap(
 if save_outputs:
     save_ax_as_pdf(
         ax,
-        save_path=f"../reports/{sampling_date.date()}/covariance/heatmap_partial_corr_matrix.pdf",
+        save_path=OUTPUT_DIR / f"{sampling_date.date()}/covariance/heatmap_partial_corr_matrix.pdf",
     )
 
 # %%
@@ -1000,7 +999,7 @@ ax = matrix_heatmap(
 if save_outputs:
     save_ax_as_pdf(
         ax,
-        save_path=f"../reports/{sampling_date.date()}/network/heatmap_generalized_impulse_matrix.pdf",
+        save_path=OUTPUT_DIR / f"{sampling_date.date()}/network/heatmap_generalized_impulse_matrix.pdf",
     )
 
 # %%
@@ -1022,7 +1021,7 @@ ax = matrix_heatmap(
 if save_outputs:
     save_ax_as_pdf(
         ax,
-        save_path=f"../reports/{sampling_date.date()}/network/heatmap_sqrtm_impulse_matrix.pdf",
+        save_path=OUTPUT_DIR / f"{sampling_date.date()}/network/heatmap_sqrtm_impulse_matrix.pdf",
     )
 
 # %% [markdown]
@@ -1051,7 +1050,7 @@ for h in [0, 1, 2, 3, 5, 10, 21]:
     if save_outputs:
         save_ax_as_pdf(
             ax,
-            save_path=f"../reports/{sampling_date.date()}/vma/heatmap_vma{h}_matrix.pdf",
+            save_path=OUTPUT_DIR / f"{sampling_date.date()}/vma/heatmap_vma{h}_matrix.pdf",
         )
     plt.show()
 
@@ -1078,7 +1077,7 @@ for h in [0, 1, 2, 3, 5, 10, 21]:
     if save_outputs:
         save_ax_as_pdf(
             ax,
-            save_path=f"../reports/{sampling_date.date()}/irf/heatmap_ir{h}_matrix.pdf",
+            save_path=OUTPUT_DIR / f"{sampling_date.date()}/irf/heatmap_ir{h}_matrix.pdf",
         )
     plt.show()
 
@@ -1105,7 +1104,7 @@ for h in [0, 1, 2, 3, 5, 10, 21]:
     if save_outputs:
         save_ax_as_pdf(
             ax,
-            save_path=f"../reports/{sampling_date.date()}/irv/heatmap_irv{h}_matrix.pdf",
+            save_path=OUTPUT_DIR / f"{sampling_date.date()}/irv/heatmap_irv{h}_matrix.pdf",
         )
     plt.show()
 
@@ -1137,7 +1136,7 @@ ax = matrix_heatmap(
 if save_outputs:
     save_ax_as_pdf(
         ax,
-        save_path=f"../reports/{sampling_date.date()}/network/heatmap_FEVD_adjacency.pdf",
+        save_path=OUTPUT_DIR / f"{sampling_date.date()}/network/heatmap_FEVD_adjacency.pdf",
     )
 
 # %%
@@ -1145,7 +1144,7 @@ _ = draw_network(
     network,
     df_info,
     title="FEVD Network",
-    save_path=f"../reports/{sampling_date.date()}/network/network_FEVD.png"
+    save_path=OUTPUT_DIR / f"{sampling_date.date()}/network/network_FEVD.png"
     if save_outputs
     else None,
 )
@@ -1154,7 +1153,7 @@ _ = draw_network(
 # ### Weighted FEVD
 
 # %%
-weights = df_info["mean_mcap"].values / df_info["mean_mcap"].values.sum()
+weights = df_info["mean_mcap"].values / df_info["mean_mcap"].values.mean()
 network = fevd.to_network(table_name="fevd", horizon=21, weights=weights)
 
 # %%
@@ -1178,7 +1177,7 @@ ax = matrix_heatmap(
 if save_outputs:
     save_ax_as_pdf(
         ax,
-        save_path=f"../reports/{sampling_date.date()}/network/heatmap_WFEVD_adjacency.pdf",
+        save_path=OUTPUT_DIR / f"{sampling_date.date()}/network/heatmap_WFEVD_adjacency.pdf",
     )
 
 # %%
@@ -1186,10 +1185,13 @@ _ = draw_network(
     network,
     df_info,
     title="Weighted FEVD Network",
-    save_path=f"../reports/{sampling_date.date()}/network/network_WFEVD.png"
+    save_path=OUTPUT_DIR / f"{sampling_date.date()}/network/network_WFEVD.png"
     if save_outputs
     else None,
 )
+
+# %%
+pd.Series(index=df_info.ticker, data=network.net_connectedness().squeeze()).sort_values().tail(20)
 
 # %% [markdown]
 # #### FEV
@@ -1218,7 +1220,7 @@ ax = matrix_heatmap(
 if save_outputs:
     save_ax_as_pdf(
         ax,
-        save_path=f"../reports/{sampling_date.date()}/network/heatmap_FEV_adjacency.pdf",
+        save_path=OUTPUT_DIR / f"{sampling_date.date()}/network/heatmap_FEV_adjacency.pdf",
     )
 
 # %%
@@ -1226,7 +1228,7 @@ _ = draw_network(
     network,
     df_info,
     title="FEV Network",
-    save_path=f"../reports/{sampling_date.date()}/network/network_FEV.png"
+    save_path=OUTPUT_DIR / f"{sampling_date.date()}/network/network_FEV.png"
     if save_outputs
     else None,
 )
@@ -1235,7 +1237,7 @@ _ = draw_network(
 # ### Weighted FEV
 
 # %%
-weights = df_info["mean_mcap"].values / df_info["mean_mcap"].values.sum()
+weights = df_info["mean_mcap"].values / df_info["mean_mcap"].values.mean()
 network = fevd.to_network(table_name="fev", horizon=21, weights=weights)
 
 # %%
@@ -1259,7 +1261,7 @@ ax = matrix_heatmap(
 if save_outputs:
     save_ax_as_pdf(
         ax,
-        save_path=f"../reports/{sampling_date.date()}/network/heatmap_WFEVD_adjacency.pdf",
+        save_path=OUTPUT_DIR / f"{sampling_date.date()}/network/heatmap_WFEVD_adjacency.pdf",
     )
 
 # %%
@@ -1267,23 +1269,35 @@ _ = draw_network(
     network,
     df_info,
     title="Weighted FEV Network",
-    save_path=f"../reports/{sampling_date.date()}/network/network_WFEV.png"
+    save_path=OUTPUT_DIR / f"{sampling_date.date()}/network/network_WFEV.png"
     if save_outputs
     else None,
 )
 
 # %%
+
+# %%
+pd.Series(index=df_info.ticker.values, data=network.net_connectedness().squeeze()).sort_values()
+
+# %%
 # ticker lookup
 data.lookup_ticker(
-    tickers=["MO", "PM", "CHTR", "SNOW", "ZM", "SQ", "MU"],
+    tickers=["DHR", "PM", "CHTR", "SNOW", "ZM", "SQ", "MU"],
     date=sampling_date,
+)
+
+# %%
+# ticker lookup
+data.lookup_ticker(
+    tickers=["PCG"],
+    date=dt.datetime(year=1987, month=1, day=31),
 )
 
 # %%
 # degree distribution
 fig, ax = plt.subplots(1, 1)
 ax.hist(network.adjacency_matrix.flatten(), bins=100)
-ax.set_xscale("linear")
+ax.set_xscale("log")
 ax.set_yscale("log")
 plt.show()
 
