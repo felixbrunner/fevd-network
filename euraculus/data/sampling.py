@@ -134,8 +134,6 @@ class LargeCapSampler:
             aggregated_mcap,
             how="left",
             on=["date", "permco"],
-            # right_on=["date", "permco"],
-            # left_index=True,
         ).set_index(["date", "permno"])
 
         return df_aggregated, selected_permnos
@@ -443,9 +441,10 @@ class LargeCapSampler:
         sampling_date = self._prepare_date(sampling_date)
         df_historic, df_future = self._load_sampling_data(sampling_date)
         df_historic, selected_permnos = self._aggregate_permco(df_historic)
-        df_future, _ = self._aggregate_permco(
-            df_future, selected_permnos=selected_permnos
-        )
+        if len(df_future) > 0:
+            df_future, _ = self._aggregate_permco(
+                df_future, selected_permnos=selected_permnos
+            )
 
         # select assets
         df_summary = self._describe_sampling_data(df_historic, df_future)
