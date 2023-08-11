@@ -159,6 +159,7 @@ class WRDSDownloader:
             mn.naics AS crsp_naics,
             COALESCE(cn1.naics, cn2.naics) AS comp_naics,
             COALESCE(cn1.gsubind, cn2.gsubind) AS gic,
+            COALESCE(cn1.cusip, cn2.cusip) AS cusip,
             dsf.ret,
             del.dlret,
             dsf.shrout * dsf.prc AS mcap,
