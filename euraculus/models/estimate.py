@@ -64,6 +64,8 @@ def load_estimation_data(data: DataMap, sampling_date: dt.datetime) -> dict:
     #     df_log_mcap_vola, mapping=df_info["ticker"], mapping_name="ticker"
     # )
     df_factors = data.load_historic_aggregates(sampling_date)
+    df_indices = data.read("analysis/df_daily_indices.pkl")
+    df_factors = df_factors.join(df_indices, rsuffix="_index")
 
     return (df_info, df_log_vola, df_factors)
 
