@@ -1,3 +1,19 @@
+# ---
+# jupyter:
+#   jupytext:
+#     cell_metadata_filter: -all
+#     custom_cell_magics: kql
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.11.2
+#   kernelspec:
+#     display_name: .venv
+#     language: python
+#     name: python3
+# ---
+
 # %% [markdown]
 # # Rolling Factor FEVD estimation
 # ## Imports
@@ -31,6 +47,7 @@ from euraculus.settings import (
     VAR_GRID,
     COV_GRID,
     HORIZON,
+    FIRST_ESTIMATION_DATE,
 )
 
 # %% [markdown]
@@ -44,7 +61,7 @@ data = DataMap(DATA_DIR)
 # ### Test single period
 
 # %%
-sampling_date = FIRST_SAMPLING_DATE  # dt.datetime(year=2022, month=3, day=31)
+sampling_date = FIRST_ESTIMATION_DATE #dt.datetime(year=2022, month=3, day=31)
 
 # %%
 # %%time
@@ -70,7 +87,7 @@ residuals = var.residuals(var_data=var_data, factor_data=factor_data)
 
 # %%
 # %%time
-sampling_date = FIRST_SAMPLING_DATE
+sampling_date = FIRST_ESTIMATION_DATE
 while sampling_date <= LAST_SAMPLING_DATE:
     # load data
     df_info, df_log_vola, df_factors = load_estimation_data(

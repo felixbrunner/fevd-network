@@ -1,3 +1,20 @@
+# -*- coding: utf-8 -*-
+# ---
+# jupyter:
+#   jupytext:
+#     cell_metadata_filter: -all
+#     custom_cell_magics: kql
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.11.2
+#   kernelspec:
+#     display_name: .venv
+#     language: python
+#     name: python3
+# ---
+
 # %% [markdown]
 # # Description of Rolling Estimation
 # ## Imports
@@ -21,6 +38,7 @@ from euraculus.settings import (
     TIME_STEP,
     ESTIMATION_WINDOW,
     COLORS,
+    LAST_ANALYSIS_DATE,
 )
 from kungfu.plotting import add_recession_bars
 
@@ -41,11 +59,11 @@ save_outputs = True
 # %%
 # %%time
 data = DataMap()
-df_summary = data.read("analysis/df_summary.pkl")
-df_stats = data.read("analysis/df_stats.pkl")
-df_index = data.read("analysis/df_index.pkl")
-df_estimates = data.read("analysis/df_estimates.pkl")
-df_indices = data.read("analysis/df_daily_indices.pkl")
+df_summary = data.read("analysis/df_summary.pkl")[:LAST_ANALYSIS_DATE]
+df_stats = data.read("analysis/df_stats.pkl")[:LAST_ANALYSIS_DATE]
+df_index = data.read("analysis/df_index.pkl")[:LAST_ANALYSIS_DATE]
+df_estimates = data.read("analysis/df_estimates.pkl")[:LAST_ANALYSIS_DATE]
+df_indices = data.read("analysis/df_daily_indices.pkl")[:LAST_ANALYSIS_DATE]
 
 # %%
 df_stats.index.get_loc(SPLIT_DATE) / len(df_stats)
@@ -54,9 +72,9 @@ df_stats.index.get_loc(SPLIT_DATE) / len(df_stats)
 df_stats["cov_used_df"] = (
     df_stats["precision_density"] * df_stats["N"] ** 2 - df_stats["N"]
 ) / 2 + df_stats["N"]
-df_stats["sigma_used_df"] = (
-    df_stats["precision_density_ret"] * df_stats["N"] ** 2 - df_stats["N"]
-) / 2 + df_stats["N"]
+# df_stats["sigma_used_df"] = (
+#     df_stats["precision_density_ret"] * df_stats["N"] ** 2 - df_stats["N"]
+# ) / 2 + df_stats["N"]
 df_stats["var_regular_lost_df"] = df_stats["N"] ** 2 + df_stats["N"] + df_stats["N"]
 df_stats["covar_regular_lost_df"] = (df_stats["N"] * (df_stats["N"] - 1)) / 2
 df_stats["sigma_regular_lost_df"] = (df_stats["N"] * (df_stats["N"] - 1)) / 2
@@ -260,6 +278,42 @@ plt.show()
 # ## Indices
 
 # %%
+df_plot = pd.DataFrame()
+df_plot["value-weighted logvariance index"] = np.exp(df_indices["logvola_vw"])[SPLIT_DATE:]*np.sqrt(252)
+df_plot["equally-weighted logvariance index"] = np.exp(df_indices["logvola_ew"])[SPLIT_DATE:]*np.sqrt(252)
+df_plot["value-weighted variance index"] = df_indices["vola_vw"][SPLIT_DATE:]*np.sqrt(252)
+df_plot["equally-weighted variance index"] = df_indices["vola_ew"][SPLIT_DATE:]*np.sqrt(252)
+df_plot["VIX"] = df_indices["vix_Close"]/100
+df_plot.plot()
+
+# %%
+df_plot.corr()
+
+# %%
+df_plot = pd.DataFrame()
+df_plot["value-weighted logvariance index"] = np.exp(df_indices["logvola_vw_99"])[SPLIT_DATE:]*np.sqrt(252)
+df_plot["equally-weighted logvariance index"] = np.exp(df_indices["logvola_ew_99"])[SPLIT_DATE:]*np.sqrt(252)
+df_plot["value-weighted variance index"] = df_indices["vola_vw_99"][SPLIT_DATE:]*np.sqrt(252)
+df_plot["equally-weighted variance index"] = df_indices["vola_ew_99"][SPLIT_DATE:]*np.sqrt(252)
+df_plot["VIX"] = df_indices["vix_Close"]/100
+df_plot.plot()
+
+# %%
+df_plot.corr()
+
+# %%
+fig, ax = plt.subplots(1,1)
+ax.plot(np.exp(df_indices["logvola_vw"])[SPLIT_DATE:]*np.sqrt(252)*100, label="value-weighted logvariance index", linewidth=0.8, linestyle="-")
+ax.plot(np.exp(df_indices["logvola_ew"])[SPLIT_DATE:]*np.sqrt(252)*100, label="equally-weighted logvariance index", linewidth=0.8, linestyle="--")
+ax.plot((df_indices["vola_vw"])[SPLIT_DATE:]*np.sqrt(252)*100, label="value-weighted variance index", linewidth=0.8, linestyle="-")
+ax.plot((df_indices["vola_ew"])[SPLIT_DATE:]*np.sqrt(252)*100, label="equally-weighted variance index", linewidth=0.8, linestyle="--")
+ax.plot(df_indices["vix_Close"], label="VIX", linewidth=0.8)# linestyle="-.")
+ax.set_xlim([SPLIT_DATE, df_indices.index[-1]])
+ax.legend()
+# add_recession_bars(ax)
+plt.show()
+
+# %%
 fig, ax = plt.subplots(1,1)
 ax.plot(np.exp(df_indices["logvola_vw"])[SPLIT_DATE:]*np.sqrt(252)*100, label="value-weighted variance index", linewidth=0.8, linestyle="-")
 ax.plot(np.exp(df_indices["logvola_ew"])[SPLIT_DATE:]*np.sqrt(252)*100, label="equally-weighted variance index", linewidth=0.8, linestyle="--")
@@ -297,31 +351,6 @@ plt.show()
 
 # %%
 (df_indices[["logvola_ew", "logvola_vw", "vix_Close"]])[SPLIT_DATE:].corr()
-
-# %%
-df_vola_indices = pd.DataFrame()
-df_vola_indices["ew"] = np.exp(df_indices["logvola_ew"])*np.sqrt(252)
-df_vola_indices["vw"] = np.exp(df_indices["logvola_vw"])*np.sqrt(252)
-df_vola_indices["vix"] = df_indices["vix_Close"] / 100
-# df_vola_indices["ret2"] = np.sqrt((df_indices["ret_vw"]**2)*252)#.rolling(21).mean()
-
-# %%
-df_vola_indices[SPLIT_DATE:].plot()
-
-# %%
-df_vola_indices.join(df_vola_indices.shift(21), rsuffix="_lag")[SPLIT_DATE:].corr()
-
-# %%
-df_vola_indices
-
-# %%
-df_vola_indices.join(df_indices["ret_vw"].rolling(250).var().shift(-250), rsuffix="_lag")[SPLIT_DATE:].corr()
-
-# %%
-df_vola_indices[SPLIT_DATE:].idxmax()
-
-# %%
-df_vola_indices[SPLIT_DATE:].iloc[7500:10000, :].idxmax()
 
 # %% [markdown]
 # ## Aggregate plots
@@ -736,7 +765,10 @@ ax.legend(loc="lower center", ncol=3)
 df_stats[["fevd_avg_connectedness", "fevd_concentration_out_connectedness_herfindahl"]].corr().iloc[0, 1]
 
 # %%
-fig, ax = plt.subplots(1, 1, figsize=(20, 4))
+df_stats["fevd_avg_connectedness"][df_stats["fevd_avg_connectedness"]>0.2]
+
+# %%
+fig, ax = plt.subplots(1, 1, figsize=(14, 4))
 
 ax.plot(df_stats["fevd_avg_connectedness"][SPLIT_DATE:], label = "FEVD connectedness", color=COLORS[0])
 ax.plot(df_stats["fevd_avg_connectedness"].rolling(12).mean()[SPLIT_DATE:], label = "12-Month moving average", color="k", linestyle=":")

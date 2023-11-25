@@ -1,3 +1,19 @@
+# ---
+# jupyter:
+#   jupytext:
+#     cell_metadata_filter: -all
+#     custom_cell_magics: kql
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.11.2
+#   kernelspec:
+#     display_name: .venv
+#     language: python
+#     name: python3
+# ---
+
 # %% [markdown]
 # # Data Sampling & Preparation
 # This notebook serves to perform the sampling of the largest companies by market capitalization at the end of each month.
@@ -26,6 +42,7 @@ from euraculus.settings import (
     ESTIMATION_WINDOW,
     FORECAST_WINDOW,
     NUM_ASSETS,
+    SPLIT_DATE,
 )
 
 # %% [markdown]
@@ -50,7 +67,7 @@ sampler = LargeCapSampler(
 # ### Test single window
 
 # %%
-sampling_date = dt.datetime(year=1926, month=12, day=31)
+sampling_date = dt.datetime(year=1973, month=7, day=31)
 
 # %%
 # %%time
@@ -63,6 +80,7 @@ df_estimates["sic"] = (
     df_historic["comp_sic"]
     .fillna(df_historic["crsp_sic"])
     .unstack()
+    .ffill()
     .iloc[-1, :]
     .astype(int)
     .values
@@ -71,6 +89,7 @@ df_estimates["naics"] = (
     df_historic["comp_naics"]
     .fillna(df_historic["crsp_naics"])
     .unstack()
+    .ffill()
     .iloc[-1, :]
     .values
 )
@@ -88,7 +107,7 @@ df_estimates["gics_sector"] = data.lookup_gics_sectors(df_estimates["gics"].valu
 # %%
 # %%time
 # perform monthly sampling and store samples locally
-sampling_date = FIRST_SAMPLING_DATE
+sampling_date = SPLIT_DATE #FIRST_SAMPLING_DATE
 while sampling_date <= LAST_SAMPLING_DATE:
     # get sample
     df_historic, df_future, df_summary = sampler.sample(
@@ -96,10 +115,12 @@ while sampling_date <= LAST_SAMPLING_DATE:
     )
     df_estimates = df_summary.loc[df_historic.index.get_level_values("permno").unique()]
     df_estimates["ticker"] = df_historic["ticker"].unstack().iloc[-1, :].values
+    # df_estimates["cusip"] = df_historic["cusip"].unstack().iloc[-1, :].values
     df_estimates["sic"] = (
         df_historic["comp_sic"]
         .fillna(df_historic["crsp_sic"])
         .unstack()
+        .ffill()
         .iloc[-1, :]
         .astype(int)
         .values
@@ -108,6 +129,7 @@ while sampling_date <= LAST_SAMPLING_DATE:
         df_historic["comp_naics"]
         .fillna(df_historic["crsp_naics"])
         .unstack()
+        .ffill()
         .iloc[-1, :]
         .values
     )

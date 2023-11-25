@@ -1,4 +1,20 @@
 # -*- coding: utf-8 -*-
+# ---
+# jupyter:
+#   jupytext:
+#     cell_metadata_filter: -all
+#     custom_cell_magics: kql
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.11.2
+#   kernelspec:
+#     display_name: .venv
+#     language: python
+#     name: python3
+# ---
+
 # %% [markdown]
 # # Regularized Factor FEVD estimation - Single window
 # ## Imports
@@ -59,6 +75,8 @@ from euraculus.settings import (
 
 # %%
 sampling_date = dt.datetime(year=2022, month=3, day=31)
+# sampling_date = dt.datetime(year=2022, month=12, day=31)
+# sampling_date = dt.datetime(year=1993, month=5, day=31)
 
 # %%
 save_outputs = True
@@ -93,6 +111,33 @@ if save_outputs:
 
 # %%
 df_tickers
+
+# %%
+df_hist = data.load_historic(sampling_date=sampling_date)
+
+# %%
+df_hist["anndummy"].unstack().sum().value_counts()
+
+# %%
+doubledumm = df_hist["anndummy"].unstack().replace(0, np.nan).ffill(limit=1).replace(np.nan, 0).stack()
+
+# %%
+annret = (df_hist["retadj"] * doubledumm).groupby("date").mean()
+
+# %%
+annres = (df_hist["capm_alpharesid"] * doubledumm).groupby("date").mean()
+
+# %%
+annret.plot()
+
+# %%
+annres.plot()
+
+# %%
+annret.to_frame().join(annres.rename("res")).std() # * np.sqrt(250)
+
+# %%
+annret.to_frame().join(annres.rename("res")).corr()
 
 # %% [markdown]
 # ## Load estimates / Estimate
@@ -144,7 +189,7 @@ else:
 
 # %%
 # create plot
-fig, ax = plt.subplots(1, 1, figsize=(18, 10))
+fig, ax = plt.subplots(1, 1, figsize=(14, 8))
 ax2 = ax.twinx()
 colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
 ax.set_title(f"Firm Size Distribution ({sampling_date.date()})")
@@ -225,6 +270,7 @@ if save_outputs:
 cumulative[10]
 
 # %%
+fig, ax = plt.subplots(figsize=(10,6))
 ax = distribution_plot(
     np.exp(var_data).fillna(0).stack(),
     drop_tails=0.01,
@@ -236,6 +282,7 @@ if save_outputs:
     )
 
 # %%
+fig, ax = plt.subplots(figsize=(10,6))
 ax = distribution_plot(
     var_data.stack(),
     title="Distribution of Log Intraday Volatilities",
@@ -566,7 +613,7 @@ kappas = pd.Series([d["alpha"] for d in var_cv.cv_results_["params"]])
 best = var_cv.best_index_
 
 # figure parameters
-fig, ax = plt.subplots(1, 1)
+fig, ax = plt.subplots(1, 1, figsize=(14,8))
 colors = np.log(lambdas)
 sizes = (np.log(kappas) + 12) * 20
 
@@ -647,6 +694,7 @@ if save_outputs:
 factor_residuals = var.factor_residuals(var_data=var_data, factor_data=factor_data)
 
 # %%
+fig, ax = plt.subplots(figsize=(10,6))
 ax = distribution_plot(
     factor_residuals.stack(),
     title="Distribution of VAR Factor Residuals",
@@ -703,6 +751,7 @@ if save_outputs:
 residuals = var.residuals(var_data=var_data, factor_data=factor_data)
 
 # %%
+fig, ax = plt.subplots(figsize=(10,6))
 ax = distribution_plot(
     residuals.stack(),
     title="Distribution of VAR Residuals",
@@ -848,7 +897,7 @@ if save_outputs:
 
 # %%
 # create plot
-fig, ax = plt.subplots(1, 1)
+fig, ax = plt.subplots(1, 1, figsize=(14, 6))
 ax.set_xscale("log")
 ax.set_xlabel("ρ (0=sample cov, $\infty = diag(\hat{\Sigma}$))")
 ax.set_ylabel("Mean Cross-Validation Loss")
@@ -1140,10 +1189,13 @@ if save_outputs:
     )
 
 # %%
+pd.Series(index=df_info.ticker.values, data = network.net_connectedness().squeeze()).sort_values()
+
+# %%
 _ = draw_network(
     network,
     df_info,
-    title="FEVD Network",
+    title=f"FEVD Network ({sampling_date.date()})",
     save_path=OUTPUT_DIR / f"{sampling_date.date()}/network/network_FEVD.png"
     if save_outputs
     else None,
@@ -1184,7 +1236,7 @@ if save_outputs:
 _ = draw_network(
     network,
     df_info,
-    title="Weighted FEVD Network",
+    title=f"Weighted FEVD Network ({sampling_date.date()})",
     save_path=OUTPUT_DIR / f"{sampling_date.date()}/network/network_WFEVD.png"
     if save_outputs
     else None,
@@ -1227,7 +1279,7 @@ if save_outputs:
 _ = draw_network(
     network,
     df_info,
-    title="FEV Network",
+    title=f"FEV Network ({sampling_date.date()})",
     save_path=OUTPUT_DIR / f"{sampling_date.date()}/network/network_FEV.png"
     if save_outputs
     else None,
@@ -1268,10 +1320,56 @@ if save_outputs:
 _ = draw_network(
     network,
     df_info,
-    title="Weighted FEV Network",
+    title=f"Weighted FEV Network ({sampling_date.date()})",
     save_path=OUTPUT_DIR / f"{sampling_date.date()}/network/network_WFEV.png"
     if save_outputs
     else None,
+)
+
+# %% [markdown]
+# #### Gamma
+
+# %%
+from euraculus.network.network import Network
+
+# %%
+D = fevd.to_network(table_name="fevd", horizon=21).adjacency_matrix
+D_minus = D - np.diag(np.diag(D))
+Gamma = np.linalg.inv(np.eye(100) - D_minus)
+network = Network(Gamma)
+
+# %%
+matrix, index = reorder_matrix(
+    network.adjacency_matrix - np.diag(np.diag(network.adjacency_matrix)),
+    df_info,
+    ["ff_sector_ticker", "mean_mcap"],
+    ["ff_sector_ticker", "ticker"],
+)
+primary_labels = index.get_level_values(1).tolist()
+secondary_labels = index.get_level_values(0).tolist()
+ax = matrix_heatmap(
+    matrix,
+    title="FEV Adjacency Matrix (off-diagonal values only)",
+    vmin=0,
+    cmap="binary",
+    infer_vmax=True,
+    labels=primary_labels,
+    secondary_labels=secondary_labels,
+)
+# if save_outputs:
+#     save_ax_as_pdf(
+#         ax,
+#         save_path=OUTPUT_DIR / f"{sampling_date.date()}/network/heatmap_FEV_adjacency.pdf",
+#     )
+
+# %%
+_ = draw_network(
+    network,
+    df_info,
+    title="Gamma Network",
+    # save_path=OUTPUT_DIR / f"{sampling_date.date()}/network/network_FEV.png"
+    # if save_outputs
+    # else None,
 )
 
 # %%

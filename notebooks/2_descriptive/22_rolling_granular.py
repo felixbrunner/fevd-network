@@ -18,6 +18,7 @@ from euraculus.settings import (
     TIME_STEP,
     ESTIMATION_WINDOW,
     SECTOR_COLORS,
+    FIRST_ESTIMATION_DATE,
 )
 from kungfu.plotting import add_recession_bars
 import kungfu as kf
@@ -34,10 +35,16 @@ save_outputs = True
 data = DataMap(DATA_DIR)
 df_estimates = data.read("analysis/df_estimates.pkl")
 
+df_estimates["ncusip"][FIRST_ESTIMATION_DATE:].unstack().notna().sum(axis=1)#.to_csv(f"{OUTPUT_DIR}/sampled_assets.csv")
+
+df_estimates["ticker"][FIRST_ESTIMATION_DATE:].unstack().notna().sum(axis=1)#.to_csv(f"{OUTPUT_DIR}/sampled_assets.csv")
+
 # ## Granular analysis
 
 # +
-df_in = df_estimates[SPLIT_DATE:]["fevd_in_connectedness"].unstack()
+df_in = df_estimates["fevd_in_connectedness"].unstack()[SPLIT_DATE:]
+df_in = df_in.loc[:, df_in.notna().sum()>0]
+
 fig, ax = plt.subplots(1, 1, figsize=(20, 5*1.2))
 ax.set_xlim([df_in.index[0], df_in.index[-1]])
 ax.set_ylim([0, 0.5])
@@ -104,7 +111,9 @@ if save_outputs:
     save_ax_as_pdf(ax, save_path=OUTPUT_DIR / "rolling/fevd_in_connectedness.pdf")
 
 # +
-df_in = df_estimates[SPLIT_DATE:]["fevd_out_connectedness"].unstack()
+df_in = df_estimates["fevd_out_connectedness"].unstack()[SPLIT_DATE:]
+df_in = df_in.loc[:, df_in.notna().sum()>0]
+
 fig, ax = plt.subplots(1, 1, figsize=(20, 13))
 ax.set_xlim([df_in.index[0], df_in.index[-1]])
 ax.set_ylim([0, 1.3])
@@ -171,7 +180,9 @@ if save_outputs:
     save_ax_as_pdf(ax, save_path=OUTPUT_DIR / "rolling/fevd_out_connectedness.pdf")
 
 # +
-df_in = df_estimates[SPLIT_DATE:]["wfevd_out_connectedness"].unstack()
+df_in = df_estimates["wfevd_out_connectedness"].unstack()[SPLIT_DATE:]
+df_in = df_in.loc[:, df_in.notna().sum()>0]
+
 fig, ax = plt.subplots(1, 1, figsize=(20, 13))
 ax.set_xlim([df_in.index[0], df_in.index[-1]])
 # ax.set_ylim([0, 1.3])
@@ -236,12 +247,11 @@ sector_legend = ax.legend(
 )
 if save_outputs:
     save_ax_as_pdf(ax, save_path=OUTPUT_DIR / "rolling/wfevd_out_connectedness.pdf")
-# -
-
-df_estimates.loc[(series.dropna().index[-1], permno), "ff_sector"]
 
 # +
-df_in = df_estimates[SPLIT_DATE:]["wfevd_out_connectedness"].unstack().div(df_estimates[SPLIT_DATE:]["wfevd_out_connectedness"].groupby("sampling_date").sum().values.reshape(-1, 1))/0.01
+df_in = df_estimates["wfevd_out_connectedness"].unstack()[SPLIT_DATE:].div(df_estimates["wfevd_out_connectedness"].groupby("sampling_date").sum()[SPLIT_DATE:].values.reshape(-1, 1))/0.01
+df_in = df_in.loc[:, df_in.notna().sum()>0]
+
 fig, ax = plt.subplots(1, 1, figsize=(20, 13))
 ax.set_xlim([df_in.index[0], df_in.index[-1]])
 # ax.set_ylim([0, 1.3])
@@ -445,7 +455,9 @@ add_recession_bars(
 )
 
 # +
-df_in = df_estimates[SPLIT_DATE:]["wfevd_full_out_connectedness"].unstack()
+df_in = df_estimates["wfevd_full_out_connectedness"].unstack()[SPLIT_DATE:]
+df_in = df_in.loc[:, df_in.notna().sum()>0]
+
 fig, ax = plt.subplots(1, 1, figsize=(20, 13))
 ax.set_xlim([df_in.index[0], df_in.index[-1]])
 # ax.set_ylim([0, 1.3])
@@ -512,7 +524,9 @@ if save_outputs:
     save_ax_as_pdf(ax, save_path=OUTPUT_DIR / "rolling/wfevd_full_out_connectedness.pdf")
 
 # +
-df_in = df_estimates[SPLIT_DATE:]["mean_mcap"].unstack().div(df_estimates[SPLIT_DATE:]["mean_mcap"].groupby("sampling_date").sum().values.reshape(-1, 1))*100
+df_in = df_estimates["mean_mcap"].unstack()[SPLIT_DATE:].div(df_estimates["mean_mcap"].groupby("sampling_date").sum()[SPLIT_DATE:].values.reshape(-1, 1))/0.01
+df_in = df_in.loc[:, df_in.notna().sum()>0]
+
 fig, ax = plt.subplots(1, 1, figsize=(20, 13))
 ax.set_xlim([df_in.index[0], df_in.index[-1]])
 # ax.set_ylim([0, 1.3])
@@ -1274,3 +1288,5 @@ data.lookup_ticker(
     tickers=["WYE", "FOXA", "WMX", "XTO", "WB", "ENE", "GME", "BA"],
     date=None,
 )
+
+

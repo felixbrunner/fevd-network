@@ -1,6 +1,23 @@
+# ---
+# jupyter:
+#   jupytext:
+#     cell_metadata_filter: -all
+#     custom_cell_magics: kql
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.11.2
+#   kernelspec:
+#     display_name: .venv
+#     language: python
+#     name: python3
+# ---
+
+# %% [markdown]
 # ## Set up
 
-# +
+# %%
 # %load_ext autoreload
 # %autoreload 2
 
@@ -17,19 +34,23 @@ from euraculus.settings import (
     TIME_STEP,
     FORECAST_WINDOWS,
     INDICES,
+    FIRST_ESTIMATION_DATE,
 )
-# -
 
+# %% [markdown]
 # ## Set up
 # ### Data
 
+# %%
 data = DataMap(DATA_DIR)
 df_rf = data.load_rf()
 
+# %% [markdown]
 # ## Indices summary stats
 
+# %%
 # %%time
-sampling_date = FIRST_SAMPLING_DATE
+sampling_date = FIRST_ESTIMATION_DATE
 while sampling_date <= LAST_SAMPLING_DATE:
     # get samples
     historic_indices = data.load_historic_aggregates(sampling_date=sampling_date)[INDICES]

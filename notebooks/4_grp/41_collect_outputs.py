@@ -36,15 +36,13 @@ from euraculus.models.var import FactorVAR
 from euraculus.utils.utils import months_difference
 from dateutil.relativedelta import relativedelta
 
-from euraculus.models.estimate import (
+from euraculus.models.estimate_vec import (
     describe_data,
-    describe_var,
-    describe_cov,
-    describe_fevd,
+    describe_vec,
+    describe_structure,
     collect_data_estimates,
-    collect_var_estimates,
-    collect_cov_estimates,
-    collect_fevd_estimates,
+    collect_vec_estimates,
+    collect_structural_estimates,
 )
 from euraculus.settings import (
     DATA_DIR,
@@ -80,37 +78,34 @@ df_future = (
     if sampling_date < LAST_SAMPLING_DATE
     else None
 )
-var_data = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/var_data.pkl")
-factor_data = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/factor_data.pkl")
-var_cv = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/var_cv.pkl")
-var = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/var.pkl")
-cov_cv = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/cov_cv.pkl")
-cov = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/cov.pkl")
-fevd = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/fevd.pkl")
-residuals = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/residuals.pkl")
+vec_data = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/vec_data.pkl")
+factor_data = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/vec_factor_data.pkl")
+vec_cv = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/vec_cv.pkl")
+vec = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/vec.pkl")
+residuals = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/vec_residuals.pkl")
 weights = data.load_asset_estimates(
     sampling_date=sampling_date, columns=["mean_mcap"]
 ).values.reshape(-1, 1)
 weights /= weights.mean()
 
 # collect estimation statistics
-stats = describe_data(var_data)
+stats = describe_data(vec_data)
 stats.update(
-    describe_var(var=var, var_cv=var_cv, var_data=var_data, factor_data=factor_data)
+    describe_vec(vec=vec, vec_cv=vec_cv, vec_data=vec_data, factor_data=factor_data)
 )
-stats.update(describe_cov(cov=cov, cov_cv=cov_cv, data=residuals))
-stats.update(describe_fevd(fevd=fevd, horizon=HORIZON, data=var_data, weights=weights))
+stats.update(
+    describe_structure(vec=vec, weights=None)
+)
 
-# collect estimates
+# # collect estimates
 estimates = collect_data_estimates(
-    var_data, df_historic, df_future, df_rf, FORECAST_WINDOWS
+    vec_data, df_historic, df_future, df_rf, FORECAST_WINDOWS
 )
 estimates = estimates.join(
-    collect_var_estimates(var=var, var_data=var_data, factor_data=factor_data)
+    collect_vec_estimates(vec=vec, vec_data=vec_data, factor_data=factor_data)
 )
-estimates = estimates.join(collect_cov_estimates(cov=cov, data=residuals))
 estimates = estimates.join(
-    collect_fevd_estimates(fevd=fevd, horizon=HORIZON, data=var_data, weights=weights)
+    collect_structural_estimates(vec=vec, data=vec_data, weights=None)
 )
 
 # %% [markdown]
@@ -122,52 +117,45 @@ estimates = estimates.join(
 sampling_date = FIRST_ESTIMATION_DATE
 while sampling_date <= LAST_SAMPLING_DATE:
 
-    # load estimates
+    # read data & estimates
     df_historic = data.load_historic(sampling_date=sampling_date, column="retadj")
     df_future = (
         data.load_future(sampling_date=sampling_date, column="retadj")
         if sampling_date < LAST_SAMPLING_DATE
         else None
     )
-    var_data = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/var_data.pkl")
-    factor_data = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/factor_data.pkl")
-    var_cv = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/var_cv.pkl")
-    var = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/var.pkl")
-    cov_cv = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/cov_cv.pkl")
-    cov = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/cov.pkl")
-    fevd = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/fevd.pkl")
-    residuals = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/residuals.pkl")
+    vec_data = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/vec_data.pkl")
+    factor_data = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/vec_factor_data.pkl")
+    vec_cv = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/vec_cv.pkl")
+    vec = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/vec.pkl")
+    residuals = data.read(path=f"samples/{sampling_date:%Y-%m-%d}/vec_residuals.pkl")
     weights = data.load_asset_estimates(
         sampling_date=sampling_date, columns=["mean_mcap"]
     ).values.reshape(-1, 1)
     weights /= weights.mean()
 
-    # collect aggregate statistics
-    stats = describe_data(var_data)
+    # collect estimation statistics
+    stats = describe_data(vec_data)
     stats.update(
-        describe_var(var=var, var_cv=var_cv, var_data=var_data, factor_data=factor_data)
+        describe_vec(vec=vec, vec_cv=vec_cv, vec_data=vec_data, factor_data=factor_data)
     )
-    stats.update(describe_cov(cov=cov, cov_cv=cov_cv, data=residuals))
     stats.update(
-        describe_fevd(fevd=fevd, horizon=HORIZON, data=var_data, weights=weights)
+        describe_structure(vec=vec, weights=None)
     )
 
-    # collect asset-level estimates
+    # # collect estimates
     estimates = collect_data_estimates(
-        var_data, df_historic, df_future, df_rf, FORECAST_WINDOWS
+        vec_data, df_historic, df_future, df_rf, FORECAST_WINDOWS
     )
     estimates = estimates.join(
-        collect_var_estimates(var=var, var_data=var_data, factor_data=factor_data)
+        collect_vec_estimates(vec=vec, vec_data=vec_data, factor_data=factor_data)
     )
-    estimates = estimates.join(collect_cov_estimates(cov=cov, data=residuals))
     estimates = estimates.join(
-        collect_fevd_estimates(
-            fevd=fevd, horizon=HORIZON, data=var_data, weights=weights
-        )
+        collect_structural_estimates(vec=vec, data=vec_data, weights=None)
     )
 
     # store
-    data.dump(
+    data.store(
         data=pd.Series(
             stats, index=pd.Index(stats, name="statistic"), name=sampling_date
         ),

@@ -1,9 +1,28 @@
+# ---
+# jupyter:
+#   jupytext:
+#     cell_metadata_filter: -all
+#     custom_cell_magics: kql
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.11.2
+#   kernelspec:
+#     display_name: .venv
+#     language: python
+#     name: python3
+# ---
+
+# %% [markdown]
 # # Prepare analysis
 # ## Imports
 
+# %%
 # %load_ext autoreload
 # %autoreload 2
 
+# %%
 import numpy as np
 import pandas as pd
 import datetime as dt
@@ -17,6 +36,8 @@ from euraculus.settings import (
     OUTPUT_DIR,
     COLORS,
     TIME_STEP,
+    FIRST_ESTIMATION_DATE,
+    FIRST_ANALYSIS_DATE,
 )
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
@@ -28,10 +49,13 @@ from euraculus.utils.plot import save_ax_as_pdf
 from euraculus.analysis.index import construct_long_weights, construct_residual_weights, calculate_excess_returns, build_index_portfolio
 import pandas_datareader as web
 
+# %% [markdown]
 # ## Load & prepare data
 
-save_outputs = False
+# %%
+save_outputs = True
 
+# %%
 # %%time
 data = DataMap()
 df_rf = data.load_rf()
@@ -44,20 +68,20 @@ df_crsp_index = data.read("raw/crsp_index.pkl")
 df_crsp_index.index = pd.to_datetime(df_crsp_index.index)
 df_factors = data.load_famafrench_factors()
 
-# +
+# %%
 df_fred = pd.DataFrame()
 
-df_fred = df_fred.join(web.fred.FredReader("VIXCLS", start=SPLIT_DATE).read(), how="outer")
-df_fred = df_fred.join(web.fred.FredReader("DCOILWTICO", start=SPLIT_DATE).read(), how="outer") # Crude WTI
-df_fred = df_fred.join(web.fred.FredReader("TEDRATE", start=SPLIT_DATE).read(), how="outer")
+df_fred = df_fred.join(web.fred.FredReader("VIXCLS", start=FIRST_ANALYSIS_DATE).read(), how="outer")
+df_fred = df_fred.join(web.fred.FredReader("DCOILWTICO", start=FIRST_ANALYSIS_DATE).read(), how="outer") # Crude WTI
+df_fred = df_fred.join(web.fred.FredReader("TEDRATE", start=FIRST_ANALYSIS_DATE).read(), how="outer")
 
-df_fred = df_fred.join(web.fred.FredReader("DFF", start=SPLIT_DATE).read(), how="outer") # fed funds effective rate
-df_fred = df_fred.join(web.fred.FredReader("DGS3MO", start=SPLIT_DATE).read(), how="outer")
-df_fred = df_fred.join(web.fred.FredReader("DGS2", start=SPLIT_DATE).read(), how="outer")
-df_fred = df_fred.join(web.fred.FredReader("DGS10", start=SPLIT_DATE).read(), how="outer")
-df_fred = df_fred.join(web.fred.FredReader("DGS30", start=SPLIT_DATE).read(), how="outer")
+df_fred = df_fred.join(web.fred.FredReader("DFF", start=FIRST_ANALYSIS_DATE).read(), how="outer") # fed funds effective rate
+df_fred = df_fred.join(web.fred.FredReader("DGS3MO", start=FIRST_ANALYSIS_DATE).read(), how="outer")
+df_fred = df_fred.join(web.fred.FredReader("DGS2", start=FIRST_ANALYSIS_DATE).read(), how="outer")
+df_fred = df_fred.join(web.fred.FredReader("DGS10", start=FIRST_ANALYSIS_DATE).read(), how="outer")
+df_fred = df_fred.join(web.fred.FredReader("DGS30", start=FIRST_ANALYSIS_DATE).read(), how="outer")
 
-# +
+# %%
 df_fred["vix_ret"] = df_fred["VIXCLS"].pct_change()
 df_fred["oil_ret"] = df_fred["DCOILWTICO"].pct_change()
 df_fred["ted_ret"] = df_fred["TEDRATE"].pct_change()
@@ -73,10 +97,10 @@ df_fred["10y2y_diff"] = (df_fred["DGS10"]-df_fred["DGS2"]).diff()
 df_fred["30y10y_diff"] = (df_fred["DGS30"]-df_fred["DGS10"]).diff()
 
 
-# -
-
+# %% [markdown]
 # ## Granular Indices
 
+# %%
 def construct_granular_index(
     df_observations: pd.DataFrame,
     df_weighting: pd.DataFrame,
@@ -92,6 +116,7 @@ def construct_granular_index(
     return granular_index
 
 
+# %%
 def construct_granular_index_hedged(
     df_observations: pd.DataFrame,
     df_weighting: pd.DataFrame,
@@ -105,10 +130,10 @@ def construct_granular_index_hedged(
     """"""
     weights = construct_residual_weights(df_weighting, variable=weighting_column, benchmark_variable=benchmark, constant_leverage=constant_leverage)
     beta_contributions = weights * df_weighting[hedge_column]
-    print(beta_contributions[SPLIT_DATE:].sum(), beta_contributions[SPLIT_DATE:].sum()/df_estimates[SPLIT_DATE:].index.get_level_values("sampling_date").nunique())
+    print(beta_contributions[FIRST_ANALYSIS_DATE:].sum(), beta_contributions[FIRST_ANALYSIS_DATE:].sum()/df_estimates[FIRST_ANALYSIS_DATE:].index.get_level_values("sampling_date").nunique())
     
     # beta_factor = beta_contributions[weights>0].groupby("sampling_date").sum() / -beta_contributions[weights<0].groupby("sampling_date").sum()
-    beta_factor = beta_contributions[SPLIT_DATE:][weights>0].sum() / -beta_contributions[SPLIT_DATE:][weights<0].sum()
+    beta_factor = beta_contributions[FIRST_ANALYSIS_DATE:][weights>0].sum() / -beta_contributions[FIRST_ANALYSIS_DATE:][weights<0].sum()
     print(beta_factor)
     
     weights[weights>0] = weights[weights>0] / beta_factor
@@ -116,6 +141,7 @@ def construct_granular_index_hedged(
     return granular_index
 
 
+# %%
 def construct_shock_proxies(
     df_observations: pd.DataFrame,
     df_weighting: pd.DataFrame,
@@ -143,17 +169,24 @@ def construct_shock_proxies(
     return df_proxies
 
 
+# %%
 
-exposure = beta_contributions.groupby("sampling_date").sum()[SPLIT_DATE:]
+# %%
+exposure = beta_contributions.groupby("sampling_date").sum()[FIRST_ANALYSIS_DATE:]
 
+# %%
 exposure.mean()
 
+# %%
 exposure.std()
 
+# %%
 exposure.mean()/(exposure.std()/len(exposure)**0.5)
 
 
+# %%
 
+# %%
 def construct_granular_residual_index(
     df_observations: pd.DataFrame,
     df_weighting: pd.DataFrame,
@@ -170,6 +203,7 @@ def construct_granular_residual_index(
     return granular_index
 
 
+# %%
 def construct_residual_index(
     df_observations: pd.DataFrame,
     df_weighting: pd.DataFrame,
@@ -183,6 +217,25 @@ def construct_residual_index(
     return residual_index
 
 
+# %%
+doubledumm = df_future["anndummy"].unstack().replace(0, np.nan).ffill(limit=1).replace(np.nan, 0).stack()
+
+# %%
+annres = (df_future["capm_future_error"] * doubledumm).groupby("date").sum().rename("res")
+
+# %%
+annerr = (df_future["capm_future_alphaerror"] * doubledumm).groupby("date").sum().rename("err")
+
+# %%
+
+# %%
+df_future["annretadj"] = df_future["anndummy"] * df_future["retadj"]
+df_future["doubledummy"] = df_future["anndummy"].groupby("permno").transform(lambda x: x.replace(0, np.nan).ffill(limit=1).fillna(0))
+df_future["annretadjd"] = df_future["doubledummy"] * df_future["retadj"]
+# df_future["annresid"] = df_future["anndummy"] * df_future["ew_future_error"]
+# df_future["annerror"] = df_future["anndummy"] * df_future["ew_future_alphaerror"]
+
+# %%
 df_analysis = df_indices.copy()
 df_analysis["ret_vw"] = df_analysis["ret_vw"] -  df_analysis["rf"]
 df_analysis = df_analysis.join(construct_granular_index(df_observations=df_future,
@@ -221,16 +274,32 @@ df_analysis = df_analysis.join(construct_residual_index(df_observations=df_futur
                                                         df_weighting=df_estimates,
                                                         observation_column="capm_future_alphaerror",
                                                         weighting_column="wfevd_out_connectedness").rename("network_residual_index"))
+df_analysis = df_analysis.join(construct_granular_index(df_observations=df_future,
+                                                        df_weighting=df_estimates,
+                                                        observation_column="annretadjd",
+                                                        weighting_column="mean_mcap",
+                                                        benchmark="equal",
+                                                        constant_leverage=False,
+                                                        leg="both",).rename("granular_instrument"))
+df_analysis = df_analysis.join(construct_granular_index(df_observations=df_future,
+                                                        df_weighting=df_estimates,
+                                                        observation_column="annretadjd",
+                                                        weighting_column="wfevd_out_connectedness",
+                                                        benchmark="equal",
+                                                        constant_leverage=False,
+                                                        leg="both",).rename("network_instrument"))
 df_analysis = df_analysis.join(df_factors, rsuffix="_")
 
+# %%
 df_residuals = df_analysis[[
     "granular_residual", "network_residual",
     # "granular_residual_a", "network_residual_a",
     "granular_residual_index", "network_residual_index",
     # "granular_residual_beta", "network_residual_beta",
-]][SPLIT_DATE:].dropna()
+    "granular_instrument", "network_instrument",
+]][FIRST_ANALYSIS_DATE:].dropna()
 
-# +
+# %%
 fig, ax = plt.subplots(1, 1, figsize=(16, 4))
 # ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
 ax.set_ylim([-0.025, 0.025])
@@ -248,7 +317,7 @@ ax.legend()
 if save_outputs:
     save_ax_as_pdf(ax, save_path=OUTPUT_DIR / "analysis" / "granular_residual_return.pdf")
 
-# +
+# %%
 fig, ax = plt.subplots(1, 1, figsize=(16, 4))
 # ax.yaxis.set_major_formatter(FormatStrFormatter('%.3f'))
 ax.set_ylim([-0.025, 0.025])
@@ -265,20 +334,23 @@ ax.legend()
 
 if save_outputs:
     save_ax_as_pdf(ax, save_path=OUTPUT_DIR / "analysis" / "network_residual_return.pdf")
-# -
 
+# %%
 df_fin = kf.frame.FinancialDataFrame(df_residuals)
 df_fin.obstypes= ["return", "return"]
 df_fin.summarise_performance(annual_obs=252)
 
+# %%
 df_residuals.corr()
 
 
+# %% [markdown]
 # ## Granular OLS regressions
 
+# %%
 def run_granular_ols(endog: str, exog: list, controls: list = [], frequency: str = "d"):
     """"""
-    df_reg=df_analysis[SPLIT_DATE:][[endog]+exog+controls].dropna()
+    df_reg=df_analysis[SPLIT_DATE+dt.timedelta(days=366):][[endog]+exog+controls].dropna()
     if frequency == "m":
         df_reg = df_reg.groupby(pd.Grouper(freq="M")).apply(lambda x: (1+x).prod()-1)
         
@@ -292,6 +364,23 @@ def run_granular_ols(endog: str, exog: list, controls: list = [], frequency: str
     return reg
 
 
+# %%
+df_reg=df_analysis[SPLIT_DATE+dt.timedelta(days=366):][["ret_vw"]+["granular_residual", "network_residual"]].dropna()
+
+# %%
+reg = sm.regression.linear_model.OLS(
+        endog=df_reg["ret_vw"],
+        exog=sm.tools.tools.add_constant(df_reg[["granular_residual", "network_residual"]]).shift(0).fillna(0),
+    ).fit(
+        cov_type="HAC",
+        cov_kwds={'maxlags': round(len(df_reg)**(1/4))},
+    )
+
+# %%
+reg.summary()
+
+
+# %%
 def make_granular_ols_table(endog: str, exogs: list, controls: list = []):
 
     reg_table = kf.RegressionTable()
@@ -313,9 +402,8 @@ def make_granular_ols_table(endog: str, exogs: list, controls: list = []):
     return reg_table
 
 
+# %%
 reg_table = make_granular_ols_table(endog="ret_vw", exogs=["granular_residual", "network_residual"])
-reg_table
-
 reg_table = reg_table.change_row_labels(
     {
         "const": "intercept",
@@ -327,8 +415,8 @@ if save_outputs:
     reg_table.export_to_latex(str(OUTPUT_DIR / "analysis" / "granular_regressions_ols.tex"))
 reg_table
 
+# %%
 reg_table = make_granular_ols_table(endog="ret_vw", exogs=["granular_residual_index", "network_residual_index"])
-
 reg_table = reg_table.change_row_labels(
     {
         "const": "intercept",
@@ -340,6 +428,7 @@ if save_outputs:
     reg_table.export_to_latex(str(OUTPUT_DIR / "analysis" / "granular_index_regressions_ols.tex"))
 reg_table
 
+# %%
 df_analysis[[
     "granular_residual",
     "network_residual",
@@ -347,11 +436,16 @@ df_analysis[[
     "network_residual_index",
 ]].corr()
 
+# %% [markdown]
 # ## Granular regressions with controls
 
+# %%
 df_analysis = df_analysis.join(df_fred.iloc[:, 9:])
+
+# %%
 control_table = kf.RegressionTable()
 
+# %%
 reg_table = make_granular_ols_table(
     endog="ret_vw",
     exogs=["granular_residual", "network_residual"],
@@ -367,7 +461,9 @@ reg_table = make_granular_ols_table(
     }
 ).drop_second_index()
 control_table = control_table.append(reg_table)
+reg_table
 
+# %%
 reg_table = make_granular_ols_table(
     endog="ret_vw",
     exogs=["granular_residual", "network_residual"],
@@ -382,7 +478,9 @@ reg_table = make_granular_ols_table(
     }
 ).drop_second_index()
 control_table = control_table.append(reg_table)
+reg_table
 
+# %%
 reg_table = make_granular_ols_table(
     endog="ret_vw",
     exogs=["granular_residual", "network_residual"],
@@ -400,7 +498,9 @@ reg_table = make_granular_ols_table(
     }
 ).drop_second_index()
 control_table = control_table.append(reg_table)
+reg_table
 
+# %%
 reg_table = make_granular_ols_table(
     endog="ret_vw",
     exogs=["granular_residual", "network_residual"],
@@ -416,7 +516,9 @@ reg_table = make_granular_ols_table(
     }
 ).drop_second_index()
 control_table = control_table.append(reg_table)
+reg_table
 
+# %%
 reg_table = make_granular_ols_table(
     endog="ret_vw",
     exogs=["granular_residual", "network_residual"],
@@ -432,7 +534,9 @@ reg_table = make_granular_ols_table(
     }
 ).drop_second_index()
 control_table = control_table.append(reg_table)
+reg_table
 
+# %%
 reg_table = make_granular_ols_table(
     endog="ret_vw",
     exogs=["granular_residual", "network_residual"],
@@ -467,18 +571,23 @@ reg_table = make_granular_ols_table(
     }
 ).drop_second_index()
 control_table = control_table.append(reg_table)
+reg_table
 
+# %%
 if save_outputs:
     control_table.export_to_latex(str(OUTPUT_DIR / "analysis" / "granular_regressions_controls.tex"))
 control_table
 
+# %% [markdown]
 # ## Granular IV regressions
 
+# %%
 from euraculus.models.factor import CAPM
 from statsmodels.sandbox.regression.gmm import IV2SLS
 from tqdm import tqdm
 
 
+# %%
 class FullIV:
     
     def __init__(
@@ -647,6 +756,66 @@ class FullIV:
         return summary
 
 
+# %%
+
+# %%
+df_reg = df_analysis[["ret_vw", "network_instrument"]].dropna()
+reg = sm.regression.linear_model.OLS(
+        endog=df_reg["ret_vw"],
+        exog=sm.tools.add_constant(df_reg["network_instrument"]),
+    ).fit(
+        cov_type="HAC",
+        cov_kwds={'maxlags': round(len(df_reg)**(1/4))},
+    )
+reg.summary()
+
+
+# %%
+
+# %%
+def run_granular_iv_index(endog: str, exog: list, instrument: str = "capm_future_error", frequency: str = "d", estimator: str="2sls"):
+    """"""
+    df_reg=df_analysis[SPLIT_DATE:][[endog]+exog+instrument].dropna()
+    # df_iv = df_analysis["network_instrument"][df_reg.index]
+    # df_iv = sm.tools.add_constant(df_iv)
+    if frequency == "m":
+        df_reg = df_reg.groupby(pd.Grouper(freq="M")).apply(lambda x: (1+x).prod()-1)
+        # df_iv = df_iv.groupby(pd.Grouper(freq="M")).apply(lambda x: (1+x).prod()-1)
+        # df_reg = df_reg.groupby(pd.Grouper(freq="M")).apply(lambda x: np.log(1+x).sum())
+        # df_iv = df_iv.groupby(pd.Grouper(freq="M")).apply(lambda x: x.sum())
+    if estimator == "2sls":
+        reg = sm.sandbox.regression.gmm.IV2SLS(
+            endog=df_reg[endog],
+            exog=sm.tools.tools.add_constant(df_reg[exog]).shift(0).fillna(0),
+            instrument=sm.tools.tools.add_constant(df_reg[instrument]).shift(0).fillna(0),
+        ).fit()
+    elif estimator == "full":
+        reg = FullIV(
+            endog=df_reg[[endog]],
+            exog=sm.tools.tools.add_constant(df_reg[exog]).shift(0).fillna(0),
+            instruments=sm.tools.tools.add_constant(df_reg[instrument]).shift(0).fillna(0),
+        ).fit()
+    return reg
+
+
+# %%
+df_analysis[["ret_ew", 'granular_residual', 'granular_instrument']].corr()
+
+# %%
+df_analysis[["ret_ew", 'network_residual', 'network_instrument']].corr()
+
+# %%
+reg = run_granular_iv_index(endog="ret_vw", exog=["granular_residual", "network_residual"], instrument=["granular_instrument", "network_instrument"], frequency="d")
+reg.summary()
+
+# %%
+reg = run_granular_iv_index(endog="ret_vw", exog=["granular_residual", "network_residual"], instrument=["granular_instrument", "network_instrument"], frequency="d")
+reg.summary()
+
+
+# %%
+
+# %%
 def run_granular_iv(endog: str, exog: list, instrument: str = "capm_future_error", frequency: str = "d", estimator: str="2sls"):
     """"""
     df_reg=df_analysis[SPLIT_DATE:][[endog]+exog].dropna()
@@ -673,6 +842,7 @@ def run_granular_iv(endog: str, exog: list, instrument: str = "capm_future_error
     return reg
 
 
+# %%
 def make_granular_iv_table(endog: str, exogs: list, instrument: str = "capm_future_error", estimator: str="2sls", t_stats=True):
 
     if estimator=="2sls":
@@ -715,8 +885,10 @@ def make_granular_iv_table(endog: str, exogs: list, instrument: str = "capm_futu
     return reg_table.replace(np.nan, "")
 
 
+# %%
 estimator_table = kf.RegressionTable()
 
+# %%
 iv_table = make_granular_iv_table(endog="ret_vw", exogs=["granular_residual", "network_residual"], instrument="capm_future_error", estimator="2sls", t_stats=True)
 iv_table.change_row_labels(
     {
@@ -728,6 +900,7 @@ iv_table.change_row_labels(
 estimator_table = estimator_table.append(iv_table)
 iv_table
 
+# %%
 iv_table = make_granular_iv_table(endog="ret_vw", exogs=["granular_residual", "network_residual"], instrument="capm_future_error", estimator="full", t_stats=True)
 iv_table.change_row_labels(
     {
@@ -739,24 +912,29 @@ iv_table.change_row_labels(
 estimator_table = estimator_table.append(iv_table)
 iv_table
 
+# %%
 if save_outputs:
     estimator_table.export_to_latex(str(OUTPUT_DIR / "analysis" / "granular_regressions_iv.tex"))
 
+# %%
 
+# %%
 
-# +
+# %%
+
+# %%
 # first_stage = sm.regression.linear_model.OLS(endog=df_reg["network_residual"], exog=df_iv).fit()
 # first_stage.summary()
 
-# +
+# %%
 # zero_stage = sm.regression.linear_model.OLS(endog=df_reg["ret_vw"], exog=df_iv).fit()
 # zero_stage.summary()
-# -
+# %%
+
+# %%
 
 
-
-
-
+# %%
 def run_granular_iv(endog: str, exog: list, instrument: str = "capm_future_error", frequency: str = "d", estimator: str="2sls", num_proxies=100):
     """"""
     df_reg=df_analysis[SPLIT_DATE:][[endog]+exog].dropna()
@@ -792,12 +970,15 @@ def run_granular_iv(endog: str, exog: list, instrument: str = "capm_future_error
     return reg
 
 
+# %%
 make_granular_iv_table(endog="ret_vw", exogs=["granular_residual", "network_residual"], instrument="capm_future_error", estimator="2sls", t_stats=True)
 
 
+# %%
 
+# %%
 
-
+# %%
 def hful_iv(y, X, Z, C=1):
     
     N = len(y)
@@ -834,6 +1015,7 @@ def hful_iv(y, X, Z, C=1):
     return coef_, V_hat
 
 
+# %%
 y=df_reg[["ret_vw"]].values
 X=sm.tools.tools.add_constant(df_reg[[
     "granular_residual", 
@@ -842,6 +1024,7 @@ X=sm.tools.tools.add_constant(df_reg[[
 Z=df_iv.values
 C=1
 
+# %%
 coef_, coef_var_ = hful_iv(
     y=df_reg[["ret_vw"]].values, 
     X=sm.tools.tools.add_constant(df_reg[[
@@ -850,11 +1033,14 @@ coef_, coef_var_ = hful_iv(
     ]]).values, 
     Z=df_iv.values)
 
+# %%
 t_ratios_ = coef_.squeeze() / np.diag(coef_var_)**0.5
 coef_.squeeze(), t_ratios_
 
 
+# %%
 
+# %%
 def full_iv(y, X, Z, C=1):
     
     T = len(y)
@@ -897,6 +1083,7 @@ def full_iv(y, X, Z, C=1):
     return coef_, Lambda_hat
 
 
+# %%
 y=df_reg[["ret_vw"]].values
 X=sm.tools.tools.add_constant(df_reg[[
     "granular_residual", 
@@ -905,6 +1092,7 @@ X=sm.tools.tools.add_constant(df_reg[[
 Z=df_iv.values
 C=1
 
+# %%
 coef_, coef_var_ = full_iv(
     y=df_reg[["ret_vw"]].values, 
     X=sm.tools.tools.add_constant(df_reg[[
@@ -913,38 +1101,48 @@ coef_, coef_var_ = full_iv(
     ]]).values, 
     Z=df_iv.values)
 
+# %%
 se_ = np.diag(coef_var_)**0.5
 t_ratios_ = coef_.squeeze() / se_
 coef_.squeeze(), t_ratios_
 
+# %%
 
+# %%
 
-
-
+# %%
 from sklearn.decomposition import PCA, SparsePCA, FactorAnalysis
 from sklearn.cross_decomposition import PLSRegression
 
+# %%
 components = PCA(n_components=20).fit_transform(df_iv)
 
+# %%
 factors = FactorAnalysis(n_components=20).fit_transform(df_iv)
 
+# %%
 _ = PCA(n_components=50).fit(df_iv)
 
+# %%
 pd.Series(_.explained_variance_ratio_.cumsum()).plot()
 
+# %%
 _ = FactorAnalysis(n_components=25).fit(df_iv)
 
+# %%
 _.
 
+# %%
 partial = PLSRegression(n_components=10).fit_transform(df_iv, df_reg[[
         "granular_residual", 
         "network_residual",
     ]])[0]
 
+# %%
 
+# %%
 
-
-
+# %%
 df_iv = df_future["capm_future_error"][df_reg.index].unstack()
 # df_iv = df_iv.fillna(df_iv.mean())
 # df_iv = df_iv.fillna(df_iv.mean()).values
@@ -956,6 +1154,7 @@ df_iv = df_iv.fillna(0)
 #         "network_residual",
 #     ]])[0]
 
+# %%
 reg = IV2SLS(
     endog=df_reg[["ret_vw"]],
     exog=sm.tools.tools.add_constant(df_reg[[
@@ -966,6 +1165,7 @@ reg = IV2SLS(
 ).fit()#cov_type="HAC",cov_kwds={'maxlags': 5})
 reg.summary()
 
+# %%
 FullIV(
     endog=df_reg[["ret_vw"]],
     exog=sm.tools.tools.add_constant(df_reg[[
@@ -975,6 +1175,7 @@ FullIV(
     instruments=pd.DataFrame(sm.tools.add_constant(factors[:,:])),
 ).fit()._create_summary_column(add_outputs=["R-squared", "N"])
 
+# %%
 FullIV(
     endog=df_reg[["ret_vw"]],
     exog=sm.tools.tools.add_constant(df_reg[[
@@ -984,6 +1185,7 @@ FullIV(
     instruments=pd.DataFrame(sm.tools.add_constant(factors[:,:])),
 ).fit()._create_summary_column(add_outputs=["R-squared", "N"])
 
+# %%
 FullIV(
     endog=df_reg[["ret_vw"]],
     exog=sm.tools.tools.add_constant(df_reg[[
@@ -993,35 +1195,39 @@ FullIV(
     instruments=pd.DataFrame(sm.tools.add_constant(factors[:,:])),
 ).fit()._create_summary_column(add_outputs=["R-squared", "N"])
 
+# %%
 
+# %%
 
-
-
+# %%
 df_estimates.capm_mktrf.hist(bins=100)
 
+# %%
 df_estimates[["capm_mktrf"]].join(
     construct_residual_weights(df_estimates, variable="wfevd_out_connectedness", benchmark_variable="equal", constant_leverage=False).rename("equal")
 ).join(
     construct_residual_weights(df_estimates, variable="wfevd_out_connectedness", benchmark_variable="capm_mktrf", constant_leverage=False).rename("beta")
 ).corr()
 
+# %%
 df_estimates[["c4_mktrf", "c4_smb", "c4_hml", "c4_umd"]].join(
     construct_residual_weights(df_estimates, variable="mean_mcap", benchmark_variable="equal", constant_leverage=False).rename("granular")
 ).join(
     construct_residual_weights(df_estimates, variable="wfevd_out_connectedness", benchmark_variable="equal", constant_leverage=False).rename("network")
 ).corr()
 
+# %%
 
+# %%
 
-
-
-# +
+# %%
 # df_reg=df_analysis[SPLIT_DATE:][["ret_vw"]+["granular_residual", "network_residual"]].dropna()
 # df_iv = df_future["retadj"][df_reg.index].unstack().fillna(0)
-# -
 
+# %%
 reg_table = kf.RegressionTable()
 
+# %%
 endog = "ret_vw"
 exog = [
     "granular_residual",
@@ -1035,38 +1241,48 @@ reg = sm.sandbox.regression.gmm.IV2SLS(endog=df_reg[endog],
                                       ).fit()#cov_type="HAC",cov_kwds={'maxlags': 5})
 reg_table = reg_table.join_regression(reg, add_outputs=["R-squared", "N"])
 
+# %%
 reg_table
 
+# %%
 
+# %%
 
+# %%
 
+# %%
 
-
-
-
-
+# %%
 weights = construct_residual_weights(df_estimates, variable="mean_mcap", benchmark_variable="equal", constant_leverage=False)
 weights *= df_estimates["capm_mktrf"]
 index_beta = weights.groupby("sampling_date").sum()[SPLIT_DATE:]
 
+# %%
 index_beta.plot()
 
+# %%
 index_beta.mean()
 
+# %%
 weights = construct_residual_weights(df_estimates, variable="wfevd_out_connectedness", benchmark_variable="equal", constant_leverage=False)
 weights *= df_estimates["capm_mktrf"]
 index_beta = weights.groupby("sampling_date").sum()[SPLIT_DATE:]
 
+# %%
 index_beta.plot()
 
+# %%
 index_beta.mean()
 
+# %%
 weights = construct_residual_weights(df_estimates, variable="wfevd_out_connectedness", benchmark_variable="equal", constant_leverage=False)
 weights *= df_estimates["capm_mktrf_next1M"]
 index_beta = weights.groupby("sampling_date").sum()[SPLIT_DATE:]
 
+# %%
 index_beta.plot()
 
+# %%
 index_beta.mean()
 
-
+# %%

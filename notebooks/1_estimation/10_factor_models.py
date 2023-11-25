@@ -1,3 +1,19 @@
+# ---
+# jupyter:
+#   jupytext:
+#     cell_metadata_filter: -all
+#     custom_cell_magics: kql
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.11.2
+#   kernelspec:
+#     display_name: .venv
+#     language: python
+#     name: python3
+# ---
+
 # %% [markdown]
 # # Factor models estimation & residuals
 # This notebook contains:
@@ -37,10 +53,9 @@ from euraculus.settings import (
     LAST_SAMPLING_DATE,
     TIME_STEP,
     FORECAST_WINDOWS,
+    FIRST_ESTIMATION_DATE,
     SPLIT_DATE,
 )
-
-FIRST_SAMPLING_DATE = SPLIT_DATE
 
 # %% [markdown]
 # ## Set up
@@ -61,6 +76,7 @@ ret_models = {
     "c4": Carhart4FactorModel(data),
     "ff5": FamaFrench5FactorModel(data),
     "q5": Q5FactorModel(data),
+    "ew": FactorModel(data.read(DATA_DIR / "analysis/df_daily_indices.pkl")["ret_ew"])
 }
 
 # %%
@@ -76,7 +92,6 @@ var_models = {
 
 # %%
 # %%time
-FIRST_ESTIMATION_DATE = max(SPLIT_DATE, dt.datetime(year=1927, month=6, day=30))
 sampling_date = FIRST_ESTIMATION_DATE
 while sampling_date <= LAST_SAMPLING_DATE:
     # get excess return samples

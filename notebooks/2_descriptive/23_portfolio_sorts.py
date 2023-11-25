@@ -1,12 +1,31 @@
+# ---
+# jupyter:
+#   jupytext:
+#     cell_metadata_filter: -all
+#     custom_cell_magics: kql
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.11.2
+#   kernelspec:
+#     display_name: .venv
+#     language: python
+#     name: python3
+# ---
+
+# %% [markdown]
 # # Crossectional Portfolio Sorts
 
+# %% [markdown]
 # ## Imports
 
+# %%
 # %load_ext autoreload
 # %autoreload 2
 # # %matplotlib inline
 
-# +
+# %%
 import pandas as pd
 import numpy as np
 
@@ -23,17 +42,19 @@ import seaborn as sns
 from euraculus.data.map import DataMap
 import kungfu as kf
 
-from euraculus.settings import NASDAQ_INCLUSION_DATE, SPLIT_DATE, OUTPUT_DIR
+from euraculus.settings import NASDAQ_INCLUSION_DATE, SPLIT_DATE, OUTPUT_DIR, FIRST_ESTIMATION_DATE
 
-# -
 
+# %%
 data = DataMap()
 df_estimates = data.read("analysis/df_estimates.pkl")
 
 
+# %% [markdown]
 # ## Portfolio sorts
 
 
+# %%
 def sort_portfolios(
     df_estimates: pd.DataFrame, variable: "str", num_portfolios: int = 5
 ):
@@ -57,6 +78,7 @@ def sort_portfolios(
     return portfolios
 
 
+# %%
 def mean_estimates(df_estimates: pd.DataFrame, portfolios: pd.Series) -> pd.DataFrame:
     """"""
     return (
@@ -64,6 +86,7 @@ def mean_estimates(df_estimates: pd.DataFrame, portfolios: pd.Series) -> pd.Data
     )
 
 
+# %%
 def calculate_portolio_stats(portfolio_estimates, stat: str, transform=None):
     """"""
     # prepare monthly portfolio stats
@@ -83,6 +106,7 @@ def calculate_portolio_stats(portfolio_estimates, stat: str, transform=None):
     return portfolio_stats
 
 
+# %%
 def standard_errors(e: np.ndarray, X: np.ndarray) -> np.ndarray:
     """"""
     N = len(e)
@@ -93,6 +117,7 @@ def standard_errors(e: np.ndarray, X: np.ndarray) -> np.ndarray:
     return S0
 
 
+# %%
 def newey_west_standard_errors(
     e: np.ndarray, X: np.ndarray, lags: int = None
 ) -> np.ndarray:
@@ -115,6 +140,7 @@ def newey_west_standard_errors(
     return Q
 
 
+# %%
 def make_portfolio_sort_table(df: pd.DataFrame, variable: str, h=12, n_portfolios=5):
     """"""
     portfolios = sort_portfolios(df, variable, n_portfolios)
@@ -159,7 +185,7 @@ def make_portfolio_sort_table(df: pd.DataFrame, variable: str, h=12, n_portfolio
             portfolio_estimates, "var_intercept"
         ),
         "VARX factor loading": calculate_portolio_stats(
-            portfolio_estimates, "var_factor_loadings_crsp"
+            portfolio_estimates, "var_factor_loadings_logvola_ew_std" #"var_factor_loadings_crsp"
         ),
         "VARX average spillover loading": calculate_portolio_stats(
             portfolio_estimates, "var_mean_abs_in"
@@ -241,6 +267,7 @@ def make_portfolio_sort_table(df: pd.DataFrame, variable: str, h=12, n_portfolio
     return fevd_table
 
 
+# %%
 for variable in (
     "fevd_in_connectedness",
     "fevd_out_connectedness",
@@ -251,10 +278,10 @@ for variable in (
     "wfevd_full_out_connectedness",
 ):
     table = make_portfolio_sort_table(
-        df=df_estimates[SPLIT_DATE:], h=12, variable=variable, n_portfolios=5
+        df=df_estimates[FIRST_ESTIMATION_DATE:], h=12, variable=variable, n_portfolios=5
     )
     table.round(4).to_latex(
-        buf=OUTPUT_DIR / "temp" / f"{variable}_table.tex",
+        buf=OUTPUT_DIR / "analysis" / f"{variable}_table.tex",
         multirow=False,
         multicolumn_format="c",
         na_rep="",
@@ -262,9 +289,10 @@ for variable in (
     )
 
 
+# %% [markdown]
 # ### Plots
 
-# +
+# %%
 fig, axes = plt.subplots(9, 1, figsize=(16, 24))
 
 ax = axes[0]
@@ -590,7 +618,7 @@ ax.legend()
 
 plt.show()
 
-# +
+# %%
 fig, axes = plt.subplots(9, 1, figsize=(16, 24))
 
 ax = axes[0]
@@ -799,28 +827,32 @@ ax.set_title("Average 4-factor idiosyncratic volatility")
 ax.legend()
 
 plt.show()
-# -
 
+# %% [markdown]
 # ### Autorcorrelation
 
+# %%
 df_estimates["fevd_out_connectedness"].unstack().asfreq("a").apply(
     lambda x: x.autocorr(1)
 ).mean()
 
+# %%
 df_estimates["wfevd_out_connectedness"].unstack().asfreq("a").apply(
     lambda x: x.autocorr(1)
 ).mean()
 
+# %%
 df_estimates["wfevd_in_connectedness"].unstack().asfreq("a").apply(
     lambda x: x.autocorr(1)
 ).mean()
 
+# %%
 df_estimates["wfevd_net_connectedness"].unstack().asfreq("a").apply(
     lambda x: x.autocorr(1)
 ).mean()
 
 
-# +
+# %%
 outcomes = [
     "Total return (t)",
     "Total return (t+1)",

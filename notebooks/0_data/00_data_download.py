@@ -1,3 +1,19 @@
+# ---
+# jupyter:
+#   jupytext:
+#     cell_metadata_filter: -all
+#     custom_cell_magics: kql
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.11.2
+#   kernelspec:
+#     display_name: .venv
+#     language: python
+#     name: python3
+# ---
+
 # %% [markdown]
 # # Raw Data Download
 # ## Description
@@ -94,6 +110,19 @@ for year in range(first_year, last_year + 1):
 # %%time
 df_delist = db.download_delisting_returns()
 data.dump(df_delist, "raw/delisting.pkl")
+
+# %% [markdown]
+# ### Announcement dates
+
+# %%
+# %%time
+df_announce_comp = db.download_announcement_dates_compustat()
+data.dump(df_announce_comp, "raw/announce_comp.pkl")
+
+# %%
+# %%time
+df_announce_ibes = db.download_announcement_dates_ibes()
+data.dump(df_announce_ibes, "raw/announce_ibes.pkl")
 
 # %% [markdown]
 # ### Descriptive Data
