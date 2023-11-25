@@ -256,6 +256,23 @@ class LargeCapSampler:
             .rename("last_mcap_volatility")
         )
         return last_mcap_volatility
+    
+    @staticmethod
+    def _get_value_vola(df: pd.DataFrame) -> pd.Series:
+        """Get value times return volatility from dataset.
+
+        Return a series of daily volatilities times value for contained permnos.
+
+        Args:
+            df : CRSP data with column 'retadj' and 'mcap'.
+
+        Returns:
+            valvola: Permno, valvola pairs with average observed sizes.
+        """
+        val = df["mcap"].unstack().mean().squeeze()
+        vola = df["retadj"].unstack().std().squeeze()
+        valvola = (val * vola).rename("value_vola")
+        return valvola
 
     @staticmethod
     def _get_tickers(df: pd.DataFrame) -> pd.Series:
@@ -321,6 +338,7 @@ class LargeCapSampler:
             .join(self._get_mean_mcaps(df_back))
             .join(self._get_last_mcap_volatility(df_back))
             .join(self._get_mean_mcap_volatility(df_back))
+            .join(self._get_value_vola(df_back))
         )
 
         # set next obs to TRUE if there are no subsequent observations at all
@@ -348,6 +366,12 @@ class LargeCapSampler:
         )
         df_summary["mean_mcap_volatility_rank"] = (
             df_summary["mean_mcap_volatility"]
+            .where(df_summary["has_all_days"])
+            .where(df_summary["has_next_obs"])
+            .rank(ascending=False)
+        )
+        df_summary["mean_valvola_rank"] = (
+            df_summary["value_vola"]
             .where(df_summary["has_all_days"])
             .where(df_summary["has_next_obs"])
             .rank(ascending=False)

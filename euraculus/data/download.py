@@ -159,7 +159,7 @@ class WRDSDownloader:
             mn.naics AS crsp_naics,
             COALESCE(cn1.naics, cn2.naics) AS comp_naics,
             COALESCE(cn1.gsubind, cn2.gsubind) AS gic,
-            COALESCE(cn1.cusip, cn2.cusip) AS cusip,
+            CASE WHEN COALESCE(fq1.rdq, fq2.rdq, ibes.anndats) IS NULL THEN 0 ELSE 1 END AS anndummy,
             dsf.ret,
             del.dlret,
             dsf.shrout * dsf.prc AS mcap,
@@ -178,14 +178,26 @@ class WRDSDownloader:
             AND dsf.date=del.dlstdt
 
             LEFT JOIN comp.names AS cn1
-            ON mn.ncusip = substr(cn1.cusip, 1, 8)
-            and cn1.year1 <= extract(year from dsf.date)
-            and extract(year from dsf.date) <= cn1.year2
+            ON mn.ncusip = SUBSTR(cn1.cusip, 1, 8)
+            AND cn1.year1 <= EXTRACT(year from dsf.date)
+            AND EXTRACT(year from dsf.date) <= cn1.year2
 
             LEFT JOIN comp.names AS cn2
-            ON mn.cusip = substr(cn2.cusip, 1, 8)
-            and cn2.year1 <= extract(year from dsf.date)
-            and extract(year from dsf.date) <= cn2.year2
+            ON mn.cusip = SUBSTR(cn2.cusip, 1, 8)
+            AND cn2.year1 <= EXTRACT(year from dsf.date)
+            AND EXTRACT(year from dsf.date) <= cn2.year2
+
+            LEFT JOIN comp.fundq as fq1
+            ON mn.ncusip = SUBSTR(fq1.cusip, 1, 8)
+            AND dsf.date = fq1.rdq
+
+            LEFT JOIN comp.fundq as fq2
+            ON mn.cusip = SUBSTR(fq2.cusip, 1, 8)
+            AND dsf.date = fq2.rdq
+
+            LEFT JOIN ibes.act_epsus AS ibes
+            ON mn.ncusip = ibes.cusip
+            AND dsf.date=ibes.anndats
 
             WHERE dsf.date BETWEEN '01/01/{year}' AND '12/31/{year}'
             AND mn.exchcd BETWEEN 1 AND 3
@@ -219,7 +231,7 @@ class WRDSDownloader:
 
         # declare index & sort
         df.set_index(["date", "permno"], inplace=True)
-        df = df.sort_index()
+        df = df.sort_index().drop_duplicates()
 
         return df
 
@@ -239,6 +251,45 @@ class WRDSDownloader:
             FROM crsp.msedelist
             """
         df = self.query(query).set_index("permno")
+        return df
+    
+    def download_announcement_dates_ibes(self) -> pd.core.frame.DataFrame:
+        """Download IBES anouncement dates.
+
+        Returns:
+            df (pandas.DataFrame): The downloaded data in tabular form.
+
+        """
+        query = """
+            SELECT
+            ticker,
+            cname,
+            oftic,
+            cusip,
+            anndats,
+            pdicity
+            FROM ibes.act_epsus
+            """
+        df = self.query(query)
+        return df
+    
+    def download_announcement_dates_compustat(self) -> pd.core.frame.DataFrame:
+        """Download Compustat anouncement dates.
+
+        Returns:
+            df (pandas.DataFrame): The downloaded data in tabular form.
+
+        """
+        query = """
+            SELECT
+            datadate,
+            conm,
+            rdq,
+            tic,
+            cusip
+            FROM comp.fundq
+            """
+        df = self.query(query)
         return df
 
     def download_stocknames(self) -> pd.core.frame.DataFrame:
@@ -263,6 +314,8 @@ class WRDSDownloader:
             permno,
             comnam, 
             ticker,
+            cusip,
+            ncusip,
             namedt,
             nameendt,
             exchcd
@@ -307,10 +360,7 @@ class WRDSDownloader:
             df (pandas.DataFrame): The downloaded data in tabular form.
         """
         query = """
-            SELECT
-            date,
-            vwretd,
-            ewretd
+            SELECT *
             FROM crsp.dsi ;
             """
         df = self.query(query).set_index("date")

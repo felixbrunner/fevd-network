@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import scipy as sp
 from sklearn.decomposition import PCA
-from euraculus.settings import COLORS
+from euraculus.settings import COLORS, SECTOR_COLORS
 
 import kungfu as kf
 from kungfu.plotting import add_recession_bars
@@ -17,7 +17,8 @@ from kungfu.plotting import add_recession_bars
 
 # style
 plt.style.use("seaborn")
-plt.rcParams["figure.figsize"] = [17, 8]
+plt.style.use("seaborn-whitegrid")
+plt.rcParams["figure.figsize"] = [14,4]#[17, 8]
 
 # colors
 # DARK_BLUE = "#014c63"
@@ -307,9 +308,12 @@ def draw_network(
         "Other",
     ]
     ff_sector_codes = {tick: i for i, tick in enumerate(ff_sector_tickers)}
+    sector_colors = list(SECTOR_COLORS.values())
 
     # calculations to highlight nodes/edges
     connectedness = network.out_connectedness()
+    in_connectedness = network.in_connectedness()
+    net_connectedness = connectedness - in_connectedness
     include_edges = table > np.percentile(table, q=90, axis=None, keepdims=True)
 
     # plot
@@ -352,21 +356,23 @@ def draw_network(
         #     + 3
         #     * ((connectedness.squeeze().argsort().argsort() / (len(connectedness) - 1)))
         # ).tolist(),
-        "linewidths": (1 + 3 * connectedness.squeeze() / connectedness.max()).tolist(),
+        # "linewidths": (1 + 3 * connectedness.squeeze() / connectedness.max()).tolist(),
+        # "linewidths": (1 + 3 * (1-in_connectedness.squeeze() / in_connectedness.max())).tolist(),
+        "linewidths": (1 + 3 * (net_connectedness.squeeze().argsort().argsort() / (len(net_connectedness) - 1))).tolist(),
         "alpha": 0.9,
         # "edgecolors": [
-        #     "w"
-        #     if nc > np.percentile(net_connectedness, 80)
+        #     "k"
+        #     if nc > np.percentile(connectedness, 80)
         #     else "grey"
-        #     if nc < np.percentile(net_connectedness, 20)
-        #     else "r"
-        #     for nc in net_connectedness
+        #     if nc < np.percentile(connectedness, 20)
+        #     else "w"
+        #     for nc in connectedness
         # ],
         # "edgecolors": [
         #     plt.get_cmap("gray")(c[0] / connectedness.max()) for c in connectedness
         # ],
-        "edgecolors": plt.get_cmap("gray")(
-            connectedness.squeeze().argsort().argsort() / (len(connectedness) - 1)
+        "edgecolors": plt.get_cmap("gray_r")(
+            connectedness.squeeze().argsort().argsort() / (len(connectedness) - 1) / 1.25 + 0.2
         ),
         "node_shape": "o",
     }
@@ -416,7 +422,7 @@ def draw_network(
                 marker="o",
                 markerfacecolor="none",
                 markeredgewidth=2,
-                markeredgecolor="w",
+                markeredgecolor="k",
                 label="Key Assets",
                 markersize=10,
                 linewidth=0,
@@ -427,7 +433,7 @@ def draw_network(
                 marker="o",
                 markerfacecolor="none",
                 markeredgewidth=2,
-                markeredgecolor="grey",
+                markeredgecolor="lightgrey",
                 label="Satellite Assets",
                 markersize=10,
                 linewidth=0,

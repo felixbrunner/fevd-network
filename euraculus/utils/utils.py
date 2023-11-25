@@ -23,8 +23,7 @@ def matrix_asymmetry(M: np.ndarray, drop_diag: bool = False) -> float:
     """
     M_ = M.copy()
     if drop_diag:
-        M_diag = np.diag(np.diag(M))
-        M_ -= M_diag
+        M_ = remove_diagonal(M_)
     # M_s = (M_ + M_.T) / 2  # symmetric_part
     M_a = (M_ - M_.T) / 2  # asymmetric_part
     asymmetry = abs(M_a).sum() / abs(M_).sum()
@@ -184,3 +183,15 @@ def power_law_exponent(
     if alpha.size == 1:
         alpha = alpha.flat[0]
     return alpha
+
+def remove_diagonal(M: np.ndarray):
+    """Removes the diagonal values from a square matrix.
+    
+    Args:
+        M: A square matrix.
+        
+    Returns:
+        _M: The matrix without its diagonal values.
+    """
+    _M = M - np.diag(np.diag(M))
+    return _M
